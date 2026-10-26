@@ -15,21 +15,28 @@ private class TabBarViewController : View {
             needsLayout = true
         }
     }
+    private let tabShadowView = EdgeEffectView()
+    private var shadowColor = PresentationTheme.current.colors.listBackground
 
     
     required init(frame frameRect: NSRect) {
         tabView = TabBarView(frame: FloatingTabBarLayout.frame(in: frameRect.size))
         super.init(frame: frameRect)
+        tabShadowView.isEventLess = true
+        addSubview(tabShadowView)
         addSubview(tabView)
         accessory.isHidden = true
         accessory.scaleOnClick = true
         accessory.set(handler: { [weak self] _ in self?.presentation.accessoryAction?() }, for: .Click)
         addSubview(accessory)
+        updateShadow()
     }
     
     override func updateLocalizationAndTheme(theme: PresentationTheme) {
         super.updateLocalizationAndTheme(theme: theme)
         self.background = .clear
+        shadowColor = theme.colors.listBackground
+        updateShadow()
     }
     
     required public init?(coder: NSCoder) {
@@ -46,9 +53,22 @@ private class TabBarViewController : View {
         accessory.isHidden = presentation.accessoryAction == nil || tabView.isHidden
         transition.updateFrame(view: accessory, frame: NSMakeRect(tabFrame.maxX + 8, tabFrame.minY, presentation.height, presentation.height))
         accessory.layer?.cornerRadius = presentation.height / 2
-        for subview in subviews where subview !== tabView && subview !== accessory {
+        for subview in subviews where subview !== tabView && subview !== accessory && subview !== tabShadowView {
             transition.updateFrame(view: subview, frame: frame.size.bounds)
         }
+        updateShadow(transition: transition)
+    }
+
+    func addContentView(_ view: NSView) {
+        addSubview(view, positioned: .below, relativeTo: tabShadowView)
+    }
+
+    func updateShadow(transition: ContainedViewLayoutTransition = .immediate) {
+        let minY = max(0, tabView.frame.minY - 24)
+        let rect = NSRect(x: 0, y: minY, width: bounds.width, height: max(0, bounds.height - minY))
+        transition.updateFrame(view: tabShadowView, frame: rect)
+        tabShadowView.isHidden = tabView.isHidden || tabView.isEmpty
+        tabShadowView.update(color: shadowColor, alpha: 0.6, edge: .top, edgeSize: min(60, rect.height), rect: rect, transition: transition)
     }
 
     override func layout() {
@@ -132,7 +152,7 @@ public class TabBarController: ViewController, TabViewDelegate {
             item.controller.view.layer?.removeAnimation(forKey: "opacity")
             item.controller.updateContainerContentInsets(contentInsetsForTabs, transition: .immediate)
             item.controller.viewWillAppear(false)
-            view.addSubview(item.controller.view, positioned: .below, relativeTo: genericView.tabView)
+            genericView.addContentView(item.controller.view)
             if animated {
                 item.controller.view.layer?.animateAlpha(from: 0, to: 1, duration: 0.15)
             }
@@ -162,6 +182,7 @@ public class TabBarController: ViewController, TabViewDelegate {
     public func hideTabView(_ hide:Bool) {
         genericView.tabView.isHidden = hide
         genericView.needsLayout = true
+        genericView.updateShadow()
         current?.view.frame = bounds
         genericView.tabView.enumerateItems { item in
             item.controller.updateContainerContentInsets(self.contentInsetsForTabs, transition: .immediate)
@@ -206,6 +227,7 @@ public class TabBarController: ViewController, TabViewDelegate {
     
     public func add(tab:TabItem) -> Void {
         genericView.tabView.addTab(tab)
+        genericView.updateShadow()
         tab.controller.updateContainerContentInsets(contentInsetsForTabs, transition: .immediate)
     }
     public func tab(at index:Int) -> TabItem {
@@ -219,10 +241,12 @@ public class TabBarController: ViewController, TabViewDelegate {
     }
     public func insert(tab: TabItem, at index: Int) -> Void {
         genericView.tabView.insertTab(tab, at: index)
+        genericView.updateShadow()
         tab.controller.updateContainerContentInsets(contentInsetsForTabs, transition: .immediate)
     }
     public func remove(at index: Int) -> Void {
         genericView.tabView.removeTab(at: index)
+        genericView.updateShadow()
     }
     public var isEmpty:Bool {
         return genericView.tabView.isEmpty
