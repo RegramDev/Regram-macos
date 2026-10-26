@@ -31,7 +31,7 @@ Regram 是基于 [Telegram for macOS](https://github.com/TelegramMessenger/teleg
 
 此版本使用 Apple/Mac Development 开发证书签名，尚未经 Apple 公证。打开下载的 DMG，将 Regram 拖到 Applications（应用程序）文件夹，再从该文件夹启动。
 
-首次打开若被 Gatekeeper 阻止，请先确认下载来自本仓库的 GitHub Releases 且来源可信，再进入“系统设置 → 隐私与安全性 → 仍要打开”，按提示确认打开。详见 [Apple 官方说明](https://support.apple.com/zh-cn/102445)。
+首次打开若被 Gatekeeper 阻止，请先确认下载来自本仓库的 GitHub Releases 且来源可信，再按系统版本操作：macOS 13 或更高版本进入“系统设置 → 隐私与安全性 → 仍要打开”；macOS 12 进入“系统偏好设置 → 安全性与隐私 → 通用 → 仍要打开”，按提示确认打开。详见 [Apple 官方说明](https://support.apple.com/zh-cn/102445)及 [macOS Monterey 官方指南](https://support.apple.com/en-gb/guide/mac-help/mh40616/12.0/mac/12.0)。
 
 Regram 使用独立的应用标识和本地数据目录，可以与 Telegram 同时安装。更新需要手动下载并替换应用；正常更新保留现有账号与本地数据。
 

@@ -13,7 +13,7 @@ Download the [Regram 13.1.0 (283368) Universal DMG](https://github.com/RegramDev
 
 This release is signed with an Apple/Mac Development certificate and has not been notarized by Apple. Open the downloaded DMG, drag Regram to Applications, and launch it from that folder.
 
-If Gatekeeper blocks the first launch, first confirm that the download came from this repository's GitHub Releases and that you trust its source. Then use System Settings → Privacy & Security → Open Anyway and confirm opening the app. See [Apple's official instructions](https://support.apple.com/en-us/102445).
+If Gatekeeper blocks the first launch, first confirm that the download came from this repository's GitHub Releases and that you trust its source. On macOS 13 or later, use System Settings → Privacy & Security → Open Anyway. On macOS 12, use System Preferences → Security & Privacy → General → Open Anyway. Confirm opening the app when prompted. See [Apple's official instructions](https://support.apple.com/en-us/102445) and the [macOS Monterey guide](https://support.apple.com/en-gb/guide/mac-help/mh40616/12.0/mac/12.0).
 
 ## Requirements
 
