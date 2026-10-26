@@ -1,4 +1,6 @@
-# Building Telegram for macOS
+# Building Regram for macOS
+
+**English** · [简体中文](INSTALL.zh-CN.md) · [Project overview](README.en.md)
 
 The app is an Xcode workspace (`Telegram-Mac.xcworkspace`) that links a set of native
 libraries built once from `core-xprojects/` and a collection of local Swift packages
@@ -9,8 +11,8 @@ package dependencies, so once the submodules are checked out the build is offlin
 
 - macOS on Apple Silicon or Intel. On Apple Silicon, Rosetta 2 is needed: the `tde2e`
   build compiles an x86_64 code-generation tool and runs it.
-- Full Xcode 16 or newer (Command Line Tools alone are not enough). Xcode 26 is what the
-  team builds with. Xcode 27 supports macOS 12.0 and newer only, so it needs the local
+- Full Xcode 16 or newer (Command Line Tools alone are not enough).
+  Xcode 27 supports macOS 12.0 and newer only, so it needs the local
   changes in [XCODE27.md](XCODE27.md) before anything builds. Make it the active
   developer directory:
   ```
@@ -38,8 +40,8 @@ package dependencies, so once the submodules are checked out the build is offlin
 ## 1. Clone with submodules
 
 ```
-git clone --recurse-submodules https://github.com/macosswift/telegram.git
-cd TelegramSwift
+git clone --recurse-submodules https://github.com/RegramDev/Regram-macos.git
+cd Regram-macos
 ```
 
 For an existing checkout:
@@ -51,6 +53,30 @@ git submodule update --init --recursive
 `--recursive` matters: `submodules/telegram-ios` has nested submodules that the native
 libraries are built from (`third-party/td`, `third-party/dav1d`, `third-party/libvpx`,
 `third-party/webrtc`, `third-party/wallet-engine`, and others).
+
+For this Regram checkout, initialize the app dependencies explicitly if the optional
+`third-party/twidget` or `third-party/widget-sandbox` repositories are unavailable:
+
+```
+git submodule update --init --recursive -- submodules/libtgvoip submodules/Sparkle submodules/telegram-ios submodules/rlottie submodules/tgcalls submodules/tg_owt submodules/libprisma submodules/regex submodules/tlottie
+bash scripts/prepare-regram-core.sh
+```
+
+The two widget repositories are not dependencies of the native app. Apply the
+[tracked core patch](patches/README.md) before opening the workspace; native-library
+preparation also applies it. Regram uses its own bundle identifiers and data paths.
+Automatic updating is disabled; install future builds manually.
+
+Configure the Telegram API credentials before building Regram:
+
+```
+cp Telegram-Mac/ApiCredentials.example.xcconfig Telegram-Mac/ApiCredentials.local.xcconfig
+```
+
+Set `REGRAM_API_ID` and `REGRAM_API_HASH` in the local file. It is ignored by Git and
+included by both Debug and Release configurations. The application and share extension
+read the processed values from their own Info.plist. There is no official-client API
+credential fallback.
 
 ## 2. Prepare the machine
 
@@ -128,14 +154,15 @@ Schemes:
 
 | Scheme | Use |
 |---|---|
-| `Telegram` | Day-to-day development, Debug configuration (`Telegram-Mac/Debug.xcconfig`) |
+| `Telegram` | Development tools, Debug configuration (`Telegram-Mac/Debug.xcconfig`) |
 | `TelegramShare` | The share extension on its own |
-| `Release` | Release archives (`Telegram-Mac/Release.xcconfig`) |
+| `Release` | Regram testing and distribution (`Telegram-Mac/Release.xcconfig`) |
 
 From the command line:
 
 ```
-xcodebuild -workspace Telegram-Mac.xcworkspace -scheme Telegram -configuration Debug build
+xcodebuild -workspace Telegram-Mac.xcworkspace -scheme Release -configuration Release \
+  'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) STABLE' build
 ```
 
 The main app targets macOS 11.0 and the share extension macOS 10.13. Swift packages are
@@ -180,16 +207,52 @@ The Xcode test builds a temporary command-line app against a clean copy of Teleg
 then checks incremental generation, schema changes, and failed-generator handling.
 It prints the temporary directory containing its build logs.
 
+### Local Regram testing and updates
+
+Use the Release configuration for local Regram testing. Install and launch the fixed
+`/Applications/Regram.app` path. The installer builds for the current Mac, passes
+`STABLE` to Swift packages, checks that debug features are excluded, and signs with a
+fixed certificate. It verifies the replacement before removing the old app and the
+temporary build app bundles. Compilation caches and application data are retained.
+
+Configure the signing certificate once using its SHA-1 fingerprint from
+`security find-identity -v -p codesigning`:
+
+```
+python3 scripts/install-regram-release.py --identity YOUR_CERTIFICATE_SHA1
+```
+
+The fingerprint is saved in ignored `Telegram-Mac/Signing.local.json`. Subsequent
+updates use the same command without `--identity`. Ad-hoc signing is not accepted.
+Keeping the signing requirement stable allows Keychain to recognize updated builds;
+see Apple's [code signing requirements](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements).
+Regram uses a separate passcode and wallet keychain scope for each channel and does
+not import Telegram's credentials. Existing Regram logins and local data are preserved
+when updating the application.
+
+The installer keeps the previous app available for rollback until verification
+succeeds. Launch the installed app after installation. Run the installer checks with:
+
+```
+python3 -m unittest discover -s tools/tests/regram-release-install -p 'test_*.py' -v
+```
+
 ### Signing
 
-The project is set up for the Telegram team (`6N38VWS5BX`) with bundle identifier
-`ru.keepcoder.Telegram`, an app group `6N38VWS5BX.ru.keepcoder.Telegram` shared with the
-extensions, and iCloud/keychain entitlements tied to that identifier. Building for your
-own team means changing the identifier and team everywhere (see "Forking" below) or
-switching the targets to a personal team with automatic signing and removing the
-entitlements you cannot request.
+The app uses `app.regram.macos` and the share extension uses
+`app.regram.macos.share`. The development team is left empty in the source project.
+For your own distribution, configure a team and signing entitlements appropriate to
+your certificate. The local installer signs updates with the same saved identity;
+do not reuse Telegram's bundle identifiers or credentials.
 
-## Build configurations and release channels
+## Upstream build configurations and CI reference
+
+This section describes the inherited Telegram channel and CI scripts. Some scripts
+still expect `Telegram.app` and Telegram's release-runner configuration. For local
+Regram Release builds and updates, use the [local installer](#local-regram-testing-and-updates).
+Regram installation packages are distributed through this repository's
+[GitHub Releases](https://github.com/RegramDev/Regram-macos/releases); automatic
+updating remains disabled.
 
 `Telegram-Mac/common.xcconfig` holds the shared settings. The channel is selected by an
 xcconfig that defines `TYPE` (a Swift compiler flag) plus the Sparkle feed URL:
@@ -329,17 +392,18 @@ cd packages/TGUIKit && swift build
 ## If you want to develop a fork
 
 1. Build the app first, as above.
-2. Obtain your own [API ID](https://core.telegram.org/api/obtaining_api_id). The built-in
-   `apiId` is rate-limited and must not be used for anything but verifying binaries.
-3. Put your `apiId`, `apiHash`, `bundleId` and `teamId` into
-   `packages/ApiCredentials/Sources/ApiCredentials/Config.swift`.
-4. Search the project for `ru.keepcoder.Telegram` and `6N38VWS5BX` and replace them with
-   your bundle identifier and team (project settings, entitlements, app group).
+2. Obtain your own [API ID](https://core.telegram.org/api/obtaining_api_id).
+3. Set `REGRAM_API_ID` and `REGRAM_API_HASH` in
+   `Telegram-Mac/ApiCredentials.local.xcconfig`. Configure the bundle identifier and
+   development team in the Xcode target settings and Regram Info.plist keys.
+4. Configure your bundle identifier and team consistently in project settings,
+   entitlements, app groups and the `Regram*` Info.plist keys. Regram's current app
+   identifier is `app.regram.macos`.
 5. Replace or remove `SFEED_URL`, `DSA_PEM_FILE` and `APPCENTER_SECRET` in the xcconfig
    files. They point at Telegram's Sparkle update feeds and AppCenter crash collection.
-6. Follow the rules in the README's "Forking" section: do not call the fork Telegram and
-   do not reuse the logo.
-7. Questions: open an issue at https://github.com/macosswift/telegram/issues/new.
+6. Follow the attribution and license requirements in [README.md](README.md): use
+   your own branding and preserve the source and resource licenses.
+7. Questions: open an issue at https://github.com/RegramDev/Regram-macos/issues/new.
 
 ## Performance labs and CI releases
 

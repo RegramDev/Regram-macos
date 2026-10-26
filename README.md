@@ -1,83 +1,60 @@
 <div align="center">
-  <img src="Telegram-Mac/Assets.xcassets/AppIcon.appiconset/Logo_1024.png"
-      width="125" 
-      height="125">
-  
-  <h2 align="center">Telegram for macOS</h2>
+  <p><strong>简体中文</strong> · <a href="README.en.md">English</a></p>
+  <img src="Telegram-Mac/Regram.icon/Assets/Regram.png" alt="Regram" width="120" height="120">
+  <h1>Regram for macOS</h1>
+  <p>基于 Telegram 原生 macOS 客户端，提供更灵活的消息、翻译与外观设置。</p>
+  <p>
+    <a href="https://github.com/RegramDev/Regram-macos/releases">下载</a> ·
+    <a href="CHANGELOG.md">更新日志</a> ·
+    <a href="INSTALL.zh-CN.md">构建说明</a> ·
+    <a href="https://github.com/RegramDev/Regram-macos/issues">问题反馈</a>
+  </p>
 </div>
 
-![Telegram macOS screenshot](images/tg.png)
+Regram 是基于 [Telegram for macOS](https://github.com/TelegramMessenger/telegram-macos) 的非官方客户端，沿用 Swift 与 AppKit 原生界面，由 Regram 独立维护。
 
-[**Telegram**](https://telegram.org) is a messaging app with a focus on speed and security. It’s superfast, simple, and free! This repo contains the official source code for [Telegram for macOS](https://macos.telegram.org/).
+## 功能
 
-## Get it
+- **消息与记录**：消息菜单自定义、无引用复读与转发、书签、标签、群备注，以及按作者或共同群组查找消息。
+- **翻译与总结**：选择翻译引擎，提供单条、整聊、发送前及网页翻译；支持自定义 LLM 翻译与总结、语音转写。
+- **隐私与过滤**：关键词和正则表达式过滤、隐藏用户、过滤规则导入、本地撤回与编辑记录。
+- **图片与媒体**：原图复制、高画质图片粘贴、媒体信息查看及链接预览设置。
+- **外观与导航**：自定义字体、九款 Regram 图标、紧凑聊天列表，以及底栏项目与宽度调整。
+- **设置与网络**：设置搜索、分类备份与恢复、DNS 和代理策略、连接诊断。
+- **显摆一下**：本地会员外观、手机号、评级、Stars、TON 和礼物展示。
 
-[![Download on the Mac App Store](images/mas_badge.png)](https://itunes.apple.com/us/app/telegram/id747648890?mt=12)
+“显摆一下”只影响本机展示与本地模拟记录，不改变 Telegram 服务端会员权益、真实余额或礼物所有权。外部翻译、LLM 和语音服务按所选提供方配置使用。
 
-### Using `mas-cli`
+## 下载与更新
 
+安装包通过本仓库的 [GitHub Releases](https://github.com/RegramDev/Regram-macos/releases) 发布。首个公开版本尚未发布，当前新增和修复内容见[更新日志](CHANGELOG.md)。
+
+Regram 使用独立的应用标识和本地数据目录，可以与 Telegram 同时安装。更新需要手动下载并替换应用；正常更新保留现有账号与本地数据。
+
+## 从源码构建
+
+完整的工具链、子模块和原生依赖准备步骤见[中文构建指南](INSTALL.zh-CN.md)或 [English build guide](INSTALL.md)。
+
+```sh
+git clone https://github.com/RegramDev/Regram-macos.git
+cd Regram-macos
+cp Telegram-Mac/ApiCredentials.example.xcconfig Telegram-Mac/ApiCredentials.local.xcconfig
 ```
-mas install 747648890
+
+在本地配置文件中填写自己的 `REGRAM_API_ID` 和 `REGRAM_API_HASH`，完成依赖准备后，使用固定的代码签名证书构建并安装 Release 版本：
+
+```sh
+python3 scripts/install-regram-release.py --identity YOUR_CERTIFICATE_SHA1
 ```
 
-### Manual download
+安装脚本会向 Swift 包传入 `STABLE`，校验并安装到 `/Applications/Regram.app`。后续更新省略 `--identity`，继续使用同一证书。API 凭据和本地签名配置由 Git 忽略。
 
-If you would like, you can [download the non-MAS version](https://telegram.org/dl/macos).
+## 问题反馈
 
-You can also [download the beta version](https://telegram.org/dl/macos/beta) if you want to try the latest features and you are prepared for bugs and crashes. If you are running the beta, join the [beta testing chat on Telegram](https://t.me/macswift) to report bugs.
+请通过本仓库的 [Issues](https://github.com/RegramDev/Regram-macos/issues) 反馈问题，并提供 Regram 版本、macOS 版本和复现步骤。
 
-## Contributors
+## 来源与许可
 
-### Contributors on GitHub
-See [this repository’s contributors graph](https://github.com/macosswift/telegram/graphs/contributors).
+感谢 [Telegram for macOS](https://github.com/TelegramMessenger/telegram-macos) 及 Regram iOS 的贡献者。Regram 相关代码与资源的来源说明见 [Core](packages/RegramCore/ATTRIBUTION.md)、[Services](packages/RegramServices/ATTRIBUTION.md) 和 [UI](packages/RegramUI/ATTRIBUTION.md)。
 
-### Bugs and Suggestions
-You can report bug or suggestions feature for Telegram for macOS on [Telegram’s Bugs & Suggestions platform](https://bugs.telegram.org). Read [the platform tip](https://bugs.telegram.org/c/746) before creating first card.
-
-### Translations
-You can help translate Telegram for macOS on [Telegram’s translations platform](https://translations.telegram.org). Pick your language, then look for the macOS translation set.
-
-<!--### Third-party libraries-->
-<!--See [LIBRARIES](LIBRARIES.md).-->
-
-## Permissions
-Telegram strives to protect your privacy.  This app asks for as few permissions as possible:
-
-* **Microphone**: You can send voice messages and make audio calls with Telegram.
-* **Camera**: You can set your profile picture using your Mac’s iSight camera.
-* **Location**: You can send your location to friends.
-* **Outgoing network connections**: Telegram needs to connect to the internet to send your messages to your friends.
-* **Incoming network connections**: Telegram needs to accept incoming connections for peer-to-peer voice calls.
-* **User-selected files**: You can save files or images to your Mac.
-* **Downloads folder**: Telegram can automatically download files or images you receive.
-
-## Shortcuts
-With [Shortcuts](https://github.com/macosswift/telegram/wiki) you can learn how easy is navigate using your devices.
-
-## License
-Telegram for macOS is licensed under the GNU Public License, version 2.0. See [LICENSE](LICENSE) for more information.
-
-## Forking
-You can fork this application and make something awesome! Make sure that your fork follows these five requirements:
-
-1. **Do** [get your own API ID](https://core.telegram.org/api/obtaining_api_id).
-2. **Don’t** call your fork **Telegram** — or at least make sure your users understand that yours is unofficial.
-3. **Don’t** use our standard logo (white paper plane in a blue circle) for your fork.
-3. **Do** read and follow our [security guidelines](https://core.telegram.org/mtproto/security_guidelines) to make sure you take good care of your users’ data and protect their privacy.
-4. **Do** publish your code. The [GPL license](LICENSE) requires it!
-
-## How to Build
-
-Quick start (full details, requirements and troubleshooting are in [INSTALL.md](INSTALL.md)):
-
-1. Install Xcode 16 or newer, Homebrew and a Rust toolchain (rustup). On Xcode 27, apply the local changes in
-   [XCODE27.md](XCODE27.md) first: it supports macOS 12.0 and newer only, and the project targets 10.13.
-2. Clone with submodules:
-   ```
-   git clone --recurse-submodules https://github.com/macosswift/telegram.git
-   ```
-3. Prepare the machine and build the native libraries once:
-   ```
-   sh scripts/setup_build_env.sh --build
-   ```
-4. Open `Telegram-Mac.xcworkspace` in Xcode and build the `Telegram` scheme.
+本项目沿用 [GNU GPL v2](LICENSE) 许可。派生版本应使用自己的 API 凭据、应用名称、图标与签名配置，并保留原作者及第三方资源的署名和许可。
