@@ -129,6 +129,36 @@ final class TabBarViewTreeTests: XCTestCase {
         XCTAssertNotNil(bar.nativeLens)
     }
 
+    func testRegramLabelsAndExternalSlotSurviveNativeLensAndFallback() throws {
+        defer { System.liquidGlass = false }
+        let bar = makeBar()
+        for index in 0..<bar.count { bar.tab(at: index).accessibilityTitle = "Tab \(index)" }
+        bar.showsLabels = true
+        bar.externalTabIndex = 3
+        bar.setFrameSize(NSSize(width: 333, height: 64))
+        try enableNativeLens(bar)
+        bar.beginSelection(at: center(bar, 0))
+        bar.updateSelection(at: center(bar, 3))
+        bar.setFrameSize(NSSize(width: 300, height: 64))
+        XCTAssertFalse(bar.isTrackingSelection)
+        XCTAssertEqual(bar.selectedIndex, 0)
+        XCTAssertLessThan(bar.control(for: 2).frame.maxX, bar.control(for: 3).frame.minX)
+        for index in 0..<bar.count {
+            let label = try XCTUnwrap(bar.control(for: index).subviews.compactMap { $0 as? NSTextField }.first)
+            XCTAssertEqual(label.stringValue, "Tab \(index)")
+            XCTAssertFalse(label.isHidden)
+            XCTAssertTrue(bar.control(for: index).bounds.contains(label.frame))
+        }
+        bar.beginSelection(at: center(bar, 3))
+        bar.endSelection(at: center(bar, 3))
+        XCTAssertEqual(bar.selectedIndex, 3)
+        bar.reduceTransparency = { true }
+        bar.updateLocalizationAndTheme(theme: presentation)
+        XCTAssertNil(bar.nativeLens)
+        XCTAssertEqual(bar.selectedIndex, 3)
+        XCTAssertEqual(bar.control(for: 3).subviews.compactMap { $0 as? NSTextField }.first?.stringValue, "Tab 3")
+    }
+
     func testDisabledGlassKeepsTheExistingInteractionWithoutConstructingALens() {
         let bar = makeBar()
         var attempts = 0

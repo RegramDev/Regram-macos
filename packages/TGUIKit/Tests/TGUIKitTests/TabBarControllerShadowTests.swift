@@ -32,6 +32,28 @@ final class TabBarControllerShadowTests: XCTestCase {
         return try XCTUnwrap(controller.view.subviews.compactMap { $0 as? TabBarView }.first)
     }
 
+    func testRegramCompactLabelsAndAccessoryKeepShadowAndContentInsets() throws {
+        let controller = makeController()
+        controller.add(tab: makeTab())
+        controller.add(tab: makeTab())
+        let custom = TabBarPresentation(showsLabels: true, width: .fraction(0.5), accessoryTitle: "Search", accessoryAction: {})
+        controller.updatePresentation(custom)
+        let bar = try bar(in: controller)
+        let shadow = try shadow(in: controller)
+        let accessory = try XCTUnwrap(controller.view.subviews.compactMap { $0 as? ImageButton }.first)
+        XCTAssertEqual(bar.frame, custom.frame(in: controller.bounds.size, count: 2))
+        XCTAssertEqual(controller.contentBottomInset, 80)
+        XCTAssertFalse(accessory.isHidden)
+        XCTAssertGreaterThan(accessory.frame.minX, bar.frame.maxX)
+        XCTAssertLessThanOrEqual(accessory.frame.maxX, controller.bounds.width)
+        XCTAssertEqual(shadow.frame.maxY, controller.bounds.height)
+        controller.hideTabView(true)
+        controller.view.layoutSubtreeIfNeeded()
+        XCTAssertTrue(shadow.isHidden)
+        XCTAssertTrue(accessory.isHidden)
+        XCTAssertEqual(controller.contentBottomInset, 0)
+    }
+
     func testShadowStaysAboveOpaqueContentWhenSwitchingTabs() throws {
         let controller = makeController()
         let first = ViewController()
