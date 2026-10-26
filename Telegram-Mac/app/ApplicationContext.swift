@@ -436,6 +436,7 @@ final class AuthorizedApplicationContext: NSObject, SplitViewDelegate {
                 
         
         super.init()
+        someActionsDisposable.add(bindRegramFonts(accountId: context.peerId.toInt64(), window: window))
         
 
                 

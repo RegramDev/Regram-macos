@@ -1,3 +1,4 @@
+import RegramCore
 import Cocoa
 import Foundation
 import TGUIKit
@@ -277,7 +278,7 @@ public final class ChatRecordingVideoState : ChatRecordingState {
     public init(context: (any AccountContextProtocol), liveUpload:Bool, autohold: Bool) {
         let id:Int64 = arc4random64()
         let path = temporaryMediaPath("video_message", "mp4")
-        self.pipeline = VideoRecorderPipeline(path: path, config: VideoMessageConfig.with(appConfiguration: context.appConfiguration), liveUploading: liveUpload ? PreUploadManager(path, engine: context.engine, id: id) : nil)
+        self.pipeline = VideoRecorderPipeline(path: path, config: VideoMessageConfig.with(appConfiguration: context.appConfiguration), liveUploading: liveUpload ? PreUploadManager(path, engine: context.engine, id: id) : nil, forceBuiltInMic: RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["forceBuiltInMic"].bool)
         super.init(autohold: autohold)
     }
     
@@ -425,7 +426,7 @@ public final class ChatRecordingAudioState : ChatRecordingState {
         self.path = path
         let uploadManager:PreUploadManager? = liveUpload ? PreUploadManager(path, engine: context.engine, id: id) : nil
         let dataItem = DataItem(path: path)
-        recorder = ManagedAudioRecorder(liveUploading: uploadManager, dataItem: dataItem)
+        recorder = ManagedAudioRecorder(liveUploading: uploadManager, dataItem: dataItem, forceBuiltInMic: RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["forceBuiltInMic"].bool)
         super.init(autohold: autohold)
     }
     

@@ -395,9 +395,12 @@ final class ManagedAudioRecorderContext : RecoderContextRenderer {
     private var recordingStateUpdateTimestamp: Double?
     
     
-    init(queue: Queue, micLevel: ValuePromise<Float>, recordingState: ValuePromise<AudioRecordingState>, liveUploading: PreUploadManager?, dataItem: DataItem) {
+    private let forceBuiltInMic: Bool
+
+    init(queue: Queue, micLevel: ValuePromise<Float>, recordingState: ValuePromise<AudioRecordingState>, liveUploading: PreUploadManager?, dataItem: DataItem, forceBuiltInMic: Bool = false) {
         assert(queue.isCurrent())
         self.liveUploading = liveUploading
+        self.forceBuiltInMic = forceBuiltInMic
         self.id = getNextRecorderContextId()
         self.micLevel = micLevel
         self.recordingState = recordingState
@@ -462,6 +465,8 @@ final class ManagedAudioRecorderContext : RecoderContextRenderer {
             AudioComponentInstanceDispose(audioUnit)
             return
         }
+
+        if forceBuiltInMic, let builtIn = regramBuiltInAudioInputDevice() { deviceId = builtIn }
 
         guard AudioUnitSetProperty(audioUnit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, kOutputBus, &deviceId, UInt32(MemoryLayout<AudioDeviceID>.size)) == noErr else {
             return
@@ -943,10 +948,10 @@ public final class ManagedAudioRecorder {
         return self.recordingStateValue.get()
     }
     
-    public init(liveUploading: PreUploadManager?, dataItem: DataItem) {
+    public init(liveUploading: PreUploadManager?, dataItem: DataItem, forceBuiltInMic: Bool = false) {
         
         self.queue.async {
-            let context = ManagedAudioRecorderContext(queue: self.queue, micLevel: self.micLevelValue, recordingState: self.recordingStateValue, liveUploading: liveUploading, dataItem: dataItem)
+            let context = ManagedAudioRecorderContext(queue: self.queue, micLevel: self.micLevelValue, recordingState: self.recordingStateValue, liveUploading: liveUploading, dataItem: dataItem, forceBuiltInMic: forceBuiltInMic)
             self.contextRef = Unmanaged.passRetained(context)
         }
     }

@@ -1,3 +1,4 @@
+import RegramCore
 import Cocoa
 import TGUIKit
 import SwiftSignalKit
@@ -1453,7 +1454,7 @@ public class ChatListRowView: TableRowView, RevealTableView {
              let suppressForHighlight = item.isHighlighted
              let suppressForResort = self.isResorting
              let suppressForDrag = containerView.activeDragging
-             if !suppressForSelection, !suppressForHighlight, !suppressForResort, !suppressForDrag, !item.isAutohidden, !nextSelected, !nextHighlighted, !nextResorting, !nextDragging {
+             if !item.regramHideSeparator, !suppressForSelection, !suppressForHighlight, !suppressForResort, !suppressForDrag, !item.isAutohidden, !nextSelected, !nextHighlighted, !nextResorting, !nextDragging {
 
                 ctx.setFillColor(theme.colors.border.cgColor)
                 ctx.fill(NSMakeRect(item.isLastPinned ? 0 : item.leftInset, contentView.bounds.height - .borderSize, item.isLastPinned ? contentView.frame.width : contentView.bounds.width - item.leftInset, .borderSize))
@@ -1562,10 +1563,10 @@ public class ChatListRowView: TableRowView, RevealTableView {
         
         photo.set(handler: { [weak self] _ in
             if let item = self?.item as? ChatListRowItem {
-                if item.showsCommunityDropdown {
-                    item.openCommunityPreview()
-                } else {
+                if item.avatarStoryIndicator != nil {
                     item.openPeerStory()
+                } else if item.showsCommunityDropdown, RegramPreferences.shared.settings(accountId: item.context.peerId.toInt64())["features.communityAvatarTapAction"].string == "community" {
+                    item.openCommunityPreview()
                 }
             }
         }, for: .Click)
@@ -2331,7 +2332,7 @@ public class ChatListRowView: TableRowView, RevealTableView {
                  self.starBadgeView = nil
              }
 
-             if item.showsCommunityDropdown, item.context.layout != .minimisize {
+             if item.showsCommunityDropdown, item.context.layout != .minimisize, RegramPreferences.shared.settings(accountId: item.context.peerId.toInt64())["features.communityAvatarTapAction"].string != "chat" {
                  var animate: Bool = false
                  let current: ImageButton
                  if let view = self.communityDropdown {
@@ -2656,6 +2657,8 @@ public class ChatListRowView: TableRowView, RevealTableView {
         revealLeftView.removeAllSubviews()
         revealRightView.removeAllSubviews()
         
+        let regramSettings = RegramPreferences.shared.settings(accountId: item.context.peerId.toInt64())
+        guard RegramChatListPolicy.swipeAction(settings: regramSettings).allowsQuickActions else { return }
         revealLeftView.backgroundColor = backdorColor
         revealRightView.backgroundColor = backdorColor
         
@@ -2723,7 +2726,7 @@ public class ChatListRowView: TableRowView, RevealTableView {
                 revealRightView.addSubview(pin)
             }
 
-            if (item.isTopic && item.canDeleteTopic) || !item.isTopic {
+            if !regramSettings["disableDeleteChatSwipeOption"].bool, (item.isTopic && item.canDeleteTopic) || !item.isTopic {
                 revealRightView.addSubview(delete)
             }
             
@@ -3285,12 +3288,15 @@ public class ChatListRowView: TableRowView, RevealTableView {
        
         guard let item = item as? ChatListRowItem else { return }
                 
-        photo.userInteractionEnabled = (item.avatarStoryIndicator != nil || item.showsCommunityDropdown) && item.context.layout != .minimisize && item.selectedForum == nil
+        photo.userInteractionEnabled = (item.avatarStoryIndicator != nil || item.showsCommunityDropdown && RegramPreferences.shared.settings(accountId: item.context.peerId.toInt64())["features.communityAvatarTapAction"].string == "community") && item.context.layout != .minimisize && item.selectedForum == nil
 
         if item.context.layout == .minimisize {
+            photo.setFrameSize(NSMakeSize(50, 50))
             photo.setFrameOrigin(NSMakePoint(floorToScreenPixels(backingScaleFactor, (containerView.frame.width - photo.frame.width) / 2), 10))
         } else {
-            photo.setFrameOrigin(NSMakePoint(10, 10))
+            let avatarSize = item.regramCompact ? CGFloat(item.regramLayoutPreferences.avatarSize) : 50
+            photo.setFrameSize(NSMakeSize(avatarSize, avatarSize))
+            photo.setFrameOrigin(NSMakePoint(10, item.regramCompact ? floor((item.height - avatarSize) / 2) : 10))
         }
 
         if let animatedView {
@@ -3419,7 +3425,6 @@ public class ChatListRowView: TableRowView, RevealTableView {
             var addition:CGFloat = 0
             
             if let statusControl = leftStatusControl {
-                statusControl.setFrameOrigin(NSMakePoint(item.leftInset, displayNameView.frame.height - 8))
                 addition += statusControl.frame.width + 2
             }
             
@@ -3430,6 +3435,19 @@ public class ChatListRowView: TableRowView, RevealTableView {
                // addition += 20
             }
             displayNameView.position = NSMakePoint(item.leftInset + addition, item.margin - 1)
+
+            func statusFrame(_ control: PremiumStatusControl, x: CGFloat) -> CGRect {
+                guard item.regramCompact, let line = item.ctxDisplayLayout?.lines.first else {
+                    return CGRect(origin: CGPoint(x: x, y: displayNameView.frame.height - 8), size: control.frame.size)
+                }
+                var ascent: CGFloat = 0
+                var descent: CGFloat = 0
+                CTLineGetTypographicBounds(line.line, &ascent, &descent, nil)
+                return RegramChatListBadgeGeometry.frame(x: x, titleFrame: displayNameView.frame, baseline: line.frame.minY, ascent: ascent, descent: descent, badgeSize: control.frame.size, rowHeight: item.height)
+            }
+            if let control = leftStatusControl {
+                control.frame = statusFrame(control, x: item.leftInset)
+            }
             
             var offset: CGFloat = 0
             if let chatName = item.ctxChatNameLayout {
@@ -3437,16 +3455,7 @@ public class ChatListRowView: TableRowView, RevealTableView {
             }
             
             if let statusControl = statusControl {
-                var addition:CGFloat = 0
-                if item.isSecret {
-                    addition += theme.icons.secretImage.backingSize.height
-                }
-                if let statusControl = leftStatusControl {
-                    addition += statusControl.frame.width + 2
-                }
-                statusControl.setFrameOrigin(NSMakePoint(addition + item.leftInset + displayNameView.frame.width + 2, displayNameView.frame.height - 8))
-                
-                addition += statusControl.frame.width + 4
+                statusControl.frame = statusFrame(statusControl, x: displayNameView.frame.maxX + 2)
             }
             
             if let monoforumMessagesView {

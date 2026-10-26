@@ -227,7 +227,7 @@
 		275DDC3A267B8702009CF884 /* bot_menu_close.tgs in Resources */ = {isa = PBXBuildFile; fileRef = 275DDC38267B8701009CF884 /* bot_menu_close.tgs */; };
 		275DDC3B267B8702009CF884 /* bot_close_menu.tgs in Resources */ = {isa = PBXBuildFile; fileRef = 275DDC39267B8702009CF884 /* bot_close_menu.tgs */; };
 		275E4B402EEC24C400BC1A68 /* Sparkle.framework in Copy Files */ = {isa = PBXBuildFile; fileRef = 9F0BCD9E2087BABC001D8D8A /* Sparkle.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		275E4B432EEC31DF00BC1A68 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 275E4B422EEC31DF00BC1A68 /* AppIcon.icon */; };
+		275E4B432EEC31DF00BC1A68 /* Regram.icon in Resources */ = {isa = PBXBuildFile; fileRef = 275E4B422EEC31DF00BC1A68 /* Regram.icon */; };
 		275E4B492EF0287E00BC1A68 /* dice_roll.tgs in Resources */ = {isa = PBXBuildFile; fileRef = 275E4B482EF0287E00BC1A68 /* dice_roll.tgs */; };
 		275E4B4B2EFA778C00BC1A68 /* menu_cocoon.tgs in Resources */ = {isa = PBXBuildFile; fileRef = 275E4B4A2EFA778C00BC1A68 /* menu_cocoon.tgs */; };
 		275E851C2B20C4EC007A72CA /* ShelfPack in Frameworks */ = {isa = PBXBuildFile; productRef = 275E851B2B20C4EC007A72CA /* ShelfPack */; };
@@ -984,6 +984,10 @@
 		9AB6DAD8DF0C1248CC621AFB /* PasscodeCore in Frameworks */ = {isa = PBXBuildFile; productRef = 8108E8A15C9EE293636E539F /* PasscodeCore */; };
 		4B9679F90FE2EF0F0FD21C7A /* PasscodeUIHooksInstall.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47318F78978A06BD3FA4B985 /* PasscodeUIHooksInstall.swift */; };
 		BE3536CA4246405D5520629A /* WalletUIHooksInstall.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83A5FA781BD7994857138FCB /* WalletUIHooksInstall.swift */; };
+		8906078AAACC5A8C9B73E62E /* RegramCore in Frameworks */ = {isa = PBXBuildFile; productRef = 8BE0F3050B8B5791956B3FE4 /* RegramCore */; };
+		E83AD432732D5B3FA3BA9F2D /* RegramUI in Frameworks */ = {isa = PBXBuildFile; productRef = 84A1701E123256D7A0BC172E /* RegramUI */; };
+		803CFDF764EE45BD8E2BF38A /* RegramAppearanceIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7C88C7600AA4E26AFE2B15B /* RegramAppearanceIntegration.swift */; };
+		1BCDBD573C254AA69AF06F28 /* RegramDataReset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F8C66E561C84F2EAD6433CB /* RegramDataReset.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1243,7 +1247,7 @@
 		275C14122A61780F000DDACF /* expired_story.tgs */ = {isa = PBXFileReference; lastKnownFileType = file; path = expired_story.tgs; sourceTree = "<group>"; };
 		275DDC38267B8701009CF884 /* bot_menu_close.tgs */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = bot_menu_close.tgs; sourceTree = "<group>"; };
 		275DDC39267B8702009CF884 /* bot_close_menu.tgs */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = bot_close_menu.tgs; sourceTree = "<group>"; };
-		275E4B422EEC31DF00BC1A68 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
+		275E4B422EEC31DF00BC1A68 /* Regram.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = Regram.icon; sourceTree = "<group>"; };
 		275E4B482EF0287E00BC1A68 /* dice_roll.tgs */ = {isa = PBXFileReference; lastKnownFileType = file; path = dice_roll.tgs; sourceTree = "<group>"; };
 		275E4B4A2EFA778C00BC1A68 /* menu_cocoon.tgs */ = {isa = PBXFileReference; lastKnownFileType = file; path = menu_cocoon.tgs; sourceTree = "<group>"; };
 		275E851A2B20C452007A72CA /* ShelfPack */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = ShelfPack; path = "submodules/telegram-ios/submodules/Utils/ShelfPack"; sourceTree = "<group>"; };
@@ -2001,6 +2005,11 @@
 		345CA31BC0A2A11FA5B91D15 /* SelectColorUI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = SelectColorUI; path = packages/SelectColorUI; sourceTree = "<group>"; };
 		DC03D85B85DFD13971D4E5B3 /* GiftCraftingUI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = GiftCraftingUI; path = packages/GiftCraftingUI; sourceTree = "<group>"; };
 		7EFAFFDDB86A365C817F7F0A /* PasscodeCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PasscodeCore; path = "submodules/telegram-ios/submodules/PasscodeCore"; sourceTree = "<group>"; };
+		07E4B76459635253B4E87382 /* RegramCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = RegramCore; path = packages/RegramCore; sourceTree = "<group>"; };
+		2BCDD1CA2BB95F89B64252CE /* RegramUI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = RegramUI; path = packages/RegramUI; sourceTree = "<group>"; };
+		259F0794284456B8AD3BCBF5 /* RegramServices */ = {isa = PBXFileReference; lastKnownFileType = folder; name = RegramServices; path = packages/RegramServices; sourceTree = "<group>"; };
+		E7C88C7600AA4E26AFE2B15B /* RegramAppearanceIntegration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RegramAppearanceIntegration.swift; sourceTree = "<group>"; };
+		7F8C66E561C84F2EAD6433CB /* RegramDataReset.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RegramDataReset.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -2081,6 +2090,8 @@
 				8E38A44712FA4542A5CF8D80 /* VerifyAgeUI in Frameworks */,
 				07EDD2B662264351B2D102DE /* EditTagLabelUI in Frameworks */,
 				7BE4259A2C3D4D73BBBC2302 /* SelectCountryUI in Frameworks */,
+				8906078AAACC5A8C9B73E62E /* RegramCore in Frameworks */,
+				E83AD432732D5B3FA3BA9F2D /* RegramUI in Frameworks */,
 				53C2655B791449A18A453BBD /* GroupsInCommonUI in Frameworks */,
 				5105D43394A54BCB8773E53C /* QrStudioUI in Frameworks */,
 				B2011E3EB7D84C48A0B9509D /* CrashRecoveryUI in Frameworks */,
@@ -2758,6 +2769,9 @@
 				CBE224712F9F44AAA680D412 /* VerifyAgeUI */,
 				F70986F290D0462F9CEF770F /* EditTagLabelUI */,
 				447E693028674930A9722A3F /* SelectCountryUI */,
+				07E4B76459635253B4E87382 /* RegramCore */,
+				2BCDD1CA2BB95F89B64252CE /* RegramUI */,
+				259F0794284456B8AD3BCBF5 /* RegramServices */,
 				2382F66FCB03472CB031B1D7 /* GroupsInCommonUI */,
 				3735CDD1DC42418CBDF358F5 /* QrStudioUI */,
 				7110771E0000000000000001 /* TLottie */,
@@ -3377,6 +3391,7 @@
 			isa = PBXGroup;
 			children = (
 				5D1C475964FAD1AA5BF7E679 /* main.swift */,
+				7F8C66E561C84F2EAD6433CB /* RegramDataReset.swift */,
 				D098C7181D7E175A007784E4 /* AppDelegate.swift */,
 				C24949131E5B763F00D7ED5D /* ApplicationContext.swift */,
 				C2303E891D9A76D800098E12 /* MainViewController.swift */,
@@ -3397,6 +3412,7 @@
 				047835680ACB43C8BAE552A3 /* FolderSharingUIIntegration.swift */,
 				C0C3576FEC2B401CA8A25439 /* WalletUIIntegration.swift */,
 				8DE33C58072B4802BE646848 /* SidebarUIIntegration.swift */,
+				E7C88C7600AA4E26AFE2B15B /* RegramAppearanceIntegration.swift */,
 			);
 			path = bridges;
 			sourceTree = "<group>";
@@ -3500,7 +3516,7 @@
 				D098C71C1D7E175A007784E4 /* MainMenu.xib */,
 				C253A9721D92F9F100CDC850 /* Localizable.strings */,
 				D098C71A1D7E175A007784E4 /* Assets.xcassets */,
-				275E4B422EEC31DF00BC1A68 /* AppIcon.icon */,
+				275E4B422EEC31DF00BC1A68 /* Regram.icon */,
 			);
 			name = "supporting-files";
 			sourceTree = "<group>";
@@ -3707,6 +3723,8 @@
 				63263708E31A48DE80557F02 /* VerifyAgeUI */,
 				7C9B791DE6E3430FADA989DF /* EditTagLabelUI */,
 				857E4375FE0F41E9A737B925 /* SelectCountryUI */,
+				8BE0F3050B8B5791956B3FE4 /* RegramCore */,
+				84A1701E123256D7A0BC172E /* RegramUI */,
 				8C849FFE3CF443CEAAFD9A65 /* GroupsInCommonUI */,
 				019B2BAFB79C48F1A4A5666E /* QrStudioUI */,
 				7110771E0000000000000002 /* TLottie */,
@@ -3942,6 +3960,9 @@
 			);
 			mainGroup = D098C70C1D7E175A007784E4;
 			packageReferences = (
+				B7B0E9A52B99523BAB1DFD86 /* XCLocalSwiftPackageReference "packages/RegramServices" */,
+				E6847C64125E57E996743CCA /* XCLocalSwiftPackageReference "packages/RegramUI" */,
+				96295964D06C55868CFC39B7 /* XCLocalSwiftPackageReference "packages/RegramCore" */,
 				8412CCD8FD1ED53B957DC5A9 /* XCLocalSwiftPackageReference "packages/AvatarUI" */,
 				F0255D56305311A9001994C2 /* XCLocalSwiftPackageReference "packages/TelegramUtils" */,
 			);
@@ -4385,7 +4406,7 @@
 				27D8B5DC2E0DC4F50033136D /* left.png in Resources */,
 				27CCE8332B839B7100F7C687 /* coin_anim.png in Resources */,
 				2729341C2779A35C00F10D3C /* menu_select_multiple.tgs in Resources */,
-				275E4B432EEC31DF00BC1A68 /* AppIcon.icon in Resources */,
+				275E4B432EEC31DF00BC1A68 /* Regram.icon in Resources */,
 				2773A56825FA4E4B00AB45E9 /* voice_chat_raise_hand_7.tgs in Resources */,
 				270FD5942C500B8A000070E6 /* duck_webapp_error.tgs in Resources */,
 				D07450F32340E89100769D7F /* sad_man.tgs in Resources */,
@@ -4705,12 +4726,14 @@
 				4518F8F646BFF69AD02BEACD /* ChatListFilterPredicate.swift in Sources */,
 				532033F7F48F391836787019 /* AccountContextConformance.swift in Sources */,
 				05976A10C30DCDC2DE7A700B /* main.swift in Sources */,
+				1BCDBD573C254AA69AF06F28 /* RegramDataReset.swift in Sources */,
 				44CA2DA9CAA980BF3DCC85DC /* TelegramThemeHooksInstall.swift in Sources */,
 				27A1B2C3D4E5F60718293A4B /* GeneralRowsHooksInstall.swift in Sources */,
 				12D364FFF19D45B18AA545D6 /* InputDataUIHooksInstall.swift in Sources */,
 				CD43762E46BA48F697A64271 /* FolderSharingUIIntegration.swift in Sources */,
 				9C3D251712014DBDB798F464 /* WalletUIIntegration.swift in Sources */,
 				AD3BD9CEA2704F31B1959842 /* SidebarUIIntegration.swift in Sources */,
+				803CFDF764EE45BD8E2BF38A /* RegramAppearanceIntegration.swift in Sources */,
 				F6679659E4D9A18FC9DBFF58 /* Exports.swift in Sources */,
 				AAFDB93441D554F4DDDD2A3C /* MMMenuItem.swift in Sources */,
 				9F0F8E82226DCD1C00A97F6A /* OpmizeDatabaseView.swift in Sources */,
@@ -4846,7 +4869,7 @@
 			baseConfigurationReference = 278926CF2755222700923087 /* Release.xcconfig */;
 			buildSettings = {
 				ARCHS = "$(ARCHS_STANDARD)";
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = Regram;
 				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_USE_OPTIMIZATION_PROFILE = NO;
@@ -4860,7 +4883,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 278481;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = 6N38VWS5BX;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_BITCODE = NO;
 				ENABLE_DEBUG_DYLIB = YES;
 				ENABLE_HARDENED_RUNTIME = NO;
@@ -4903,8 +4926,8 @@
 				OTHER_CODE_SIGN_FLAGS = "";
 				OTHER_LDFLAGS = "-ObjC";
 				OTHER_SWIFT_FLAGS = "$(inherited)";
-				PRODUCT_BUNDLE_IDENTIFIER = ru.keepcoder.Telegram;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = app.regram.macos;
+				PRODUCT_NAME = Regram;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = PRODUCTION;
 				SWIFT_COMPILATION_MODE = wholemodule;
@@ -4927,7 +4950,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 278481;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = 6N38VWS5BX;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_DEBUG_DYLIB = YES;
 				ENABLE_HARDENED_RUNTIME = NO;
 				FRAMEWORK_SEARCH_PATHS = "";
@@ -4956,7 +4979,7 @@
 				OTHER_CODE_SIGN_FLAGS = "";
 				OTHER_LDFLAGS = "";
 				OTHER_SWIFT_FLAGS = "$(inherited)";
-				PRODUCT_BUNDLE_IDENTIFIER = ru.keepcoder.Telegram.TelegramShare;
+				PRODUCT_BUNDLE_IDENTIFIER = app.regram.macos.share;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SKIP_INSTALL = NO;
@@ -4979,7 +5002,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 278481;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = 6N38VWS5BX;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_DEBUG_DYLIB = YES;
 				ENABLE_HARDENED_RUNTIME = NO;
 				FRAMEWORK_SEARCH_PATHS = "";
@@ -5009,7 +5032,7 @@
 				OTHER_LDFLAGS = "";
 				OTHER_SWIFT_FLAGS = "$(inherited)";
 				"OTHER_SWIFT_FLAGS[arch=*]" = "";
-				PRODUCT_BUNDLE_IDENTIFIER = ru.keepcoder.Telegram.TelegramShare;
+				PRODUCT_BUNDLE_IDENTIFIER = app.regram.macos.share;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SKIP_INSTALL = NO;
@@ -5071,7 +5094,7 @@
 			baseConfigurationReference = 278926CE27551B5600923087 /* Debug.xcconfig */;
 			buildSettings = {
 				ARCHS = "$(ARCHS_STANDARD)";
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = Regram;
 				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_WARN_CONSTANT_CONVERSION = YES;
@@ -5086,7 +5109,7 @@
 				CURRENT_PROJECT_VERSION = 278481;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = 6N38VWS5BX;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_BITCODE = NO;
 				ENABLE_DEBUG_DYLIB = YES;
 				ENABLE_HARDENED_RUNTIME = NO;
@@ -5129,8 +5152,8 @@
 				OTHER_CODE_SIGN_FLAGS = "";
 				OTHER_LDFLAGS = "-ObjC";
 				OTHER_SWIFT_FLAGS = "$(inherited)";
-				PRODUCT_BUNDLE_IDENTIFIER = ru.keepcoder.Telegram;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = app.regram.macos;
+				PRODUCT_NAME = Regram;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_COMPILATION_MODE = singlefile;
@@ -5183,6 +5206,9 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = packages/TelegramUtils;
 		};
+		96295964D06C55868CFC39B7 /* XCLocalSwiftPackageReference "packages/RegramCore" */ = {isa = XCLocalSwiftPackageReference; relativePath = packages/RegramCore; };
+		E6847C64125E57E996743CCA /* XCLocalSwiftPackageReference "packages/RegramUI" */ = {isa = XCLocalSwiftPackageReference; relativePath = packages/RegramUI; };
+		B7B0E9A52B99523BAB1DFD86 /* XCLocalSwiftPackageReference "packages/RegramServices" */ = {isa = XCLocalSwiftPackageReference; relativePath = packages/RegramServices; };
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -6064,6 +6090,8 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = PasscodeCore;
 		};
+		8BE0F3050B8B5791956B3FE4 /* RegramCore */ = {isa = XCSwiftPackageProductDependency; package = 96295964D06C55868CFC39B7; productName = RegramCore; };
+		84A1701E123256D7A0BC172E /* RegramUI */ = {isa = XCSwiftPackageProductDependency; package = E6847C64125E57E996743CCA; productName = RegramUI; };
 /* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = D098C70D1D7E175A007784E4 /* Project object */;

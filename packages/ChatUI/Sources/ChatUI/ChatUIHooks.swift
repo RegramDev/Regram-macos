@@ -55,6 +55,7 @@ public struct ChatUIHooks {
     public let showMessageEffectsWindow: (any AccountContextProtocol, PeerId, [ChatUIEmojiSelectedItem], @escaping (StickerPackItem, NSRect?) -> Void, NSView & StickerFramesCollector) -> Void
     public let makeForwardMessagesShareModal: (any AccountContextProtocol, [Message], @escaping ([MessageId], Bool) -> Signal<[Message], NoError>) -> ModalViewController
     public var makeForwardMessagesShareModalWithContext: ((any AccountContextProtocol, [Message], @escaping ([MessageId], Bool) -> Signal<[Message], NoError>) -> ModalViewController)?
+    public var makeForwardMessagesWithoutQuoteShareModal: ((any AccountContextProtocol, [Message], @escaping ([MessageId], Bool) -> Signal<[Message], NoError>) -> ModalViewController)?
     public func makeForwardMessagesShareModalObserved(_ context: any AccountContextProtocol, _ messages: [Message], _ getMessages: @escaping ([MessageId], Bool) -> Signal<[Message], NoError>) -> ModalViewController {
         return makeForwardMessagesShareModal(context, messages, getMessages)
     }

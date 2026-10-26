@@ -11,7 +11,7 @@ public extension Message {
         if self.isCopyProtected() {
             return true
         }
-        if let _ = self.peers[self.id.peerId] as? TelegramUser, let cachedData = cachedData as? CachedUserData {
+        if let cachedData = cachedData as? CachedUserData {
             return cachedData.flags.contains(.copyProtectionEnabled) || cachedData.flags.contains(.myCopyProtectionEnabled)
         }
         return false

@@ -1,4 +1,6 @@
 import Cocoa
+import RegramCore
+import RegramServices
 import ImageIO
 import TGUIKit
 import TelegramCore
@@ -1451,7 +1453,16 @@ public class PreviewSenderController: ModalViewController, Notifable {
     
     public override func returnKeyAction() -> KeyHandlerResult {
         if let currentEvent = NSApp.currentEvent {
-            if FastSettings.checkSendingAbility(for: currentEvent), didSetReady {
+            let input = genericView.textView.inputView
+            if currentEvent.modifierFlags.contains(.command), let input = input as? NSView, input.window?.firstResponder === input {
+                if let client = input as? NSTextInputClient, client.hasMarkedText() {
+                    input.keyDown(with: currentEvent)
+                } else {
+                    input.insertNewline(nil)
+                }
+                return .invoked
+            }
+            if !input.hasMarkedText(), currentEvent.modifierFlags.intersection([.command, .shift, .control, .option]).isEmpty, FastSettings.checkSendingAbility(for: currentEvent), didSetReady {
                 send(false)
                 return .invoked
             }
@@ -1492,13 +1503,16 @@ public class PreviewSenderController: ModalViewController, Notifable {
             self.genericView.sendButton.shake(beep: false)
             return
         }
+        let visibleState = self.genericView.textView.interactions.presentation
+        var captionInput = visibleState.textInputState().subInputState(from: NSMakeRange(0, visibleState.inputText.length))
+        if captionInput.attributes.isEmpty { captionInput = ChatTextInputState(inputText: captionInput.inputText.trimmed) }
         pendingActions.invalidate()
         if self.getMedias().contains(where: isPreviewPlaceholder) {
             self.genericView.sendButton.shake(beep: false)
             return
         }
         
-        let text = self.genericView.textView.string().trimmed
+        let text = regramOutgoingInput(captionInput, context: context, peerId: chatInteraction.peerId).inputText.trimmed
         let context = self.context
         if context.isPremium {
             if text.length > context.premiumLimits.caption_length_limit_premium {
@@ -2924,7 +2938,7 @@ public class PreviewSenderController: ModalViewController, Notifable {
 
     
     func processEnter(_ event: NSEvent) -> Bool {
-        if FastSettings.checkSendingAbility(for: event) {
+        if !genericView.textView.inputView.hasMarkedText(), event.modifierFlags.intersection([.command, .shift, .control, .option]).isEmpty, FastSettings.checkSendingAbility(for: event) {
             return true
         }
         return false
@@ -3072,6 +3086,17 @@ public class PreviewSenderController: ModalViewController, Notifable {
     func processPaste(_ pasteboard: NSPasteboard) -> Bool {
         guard !pendingActions.isClosed, !sent else { return false }
         
+        if RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["clipboardOriginalImages"].bool, let original = RegramClipboardImages.snapshot(from: pasteboard), original.containsImage {
+            guard original.urls.allSatisfy({ fileSize($0.path).map { FeatureNavigationHooks.shared.fileSizeLimitExceed(context, $0) } ?? false }) else { FeatureNavigationHooks.shared.showFileLimit(context, nil); return true }
+            if let peer = contextChatInteraction.presentation.peer, let text = permissionText(from: peer, for: .banSendMedia) { alert(for: context.window, info: text); return true }
+            guard let photos = try? RegramClipboardImages.preparingPhotos(original) else { alert(for: context.window, info: strings().unknownError); return true }
+            self.receivePasteURLs(.single(photos.urls), completion: { [weak self] urls in
+                guard let self, !urls.isEmpty else { return }
+                self.genericView.state = self.genericView.state.withUpdatedState(.media)
+                self.insertAdditionUrls?(urls)
+            })
+            return true
+        }
         let result = InputPasteboardParser.canProccessPasteboard(pasteboard, context: context)
         
     

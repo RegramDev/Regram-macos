@@ -19,6 +19,7 @@ import DiceCache
 import EmojiReplacements
 import TelegramMediaUtils
 import InputView
+import RegramCore
 
 
 
@@ -370,7 +371,8 @@ public class Sender: NSObject {
                     media = TelegramMediaFile(fileId: MediaId(namespace: Namespaces.Media.LocalFile, id: randomId), partialReference: nil, resource: resource, previewRepresentations: previewForFile(path, isSecretRelated: isSecretRelated, account: account), videoThumbnails: [], immediateThumbnailData: nil, mimeType: mimeType, size: nil, attributes: fileAttributes(for: mimeType, path: path, isMedia: true), alternativeRepresentations: [])
                 } else if mimeType.hasPrefix("image/") && !mimeType.hasSuffix("gif"), let imageData = try? Data(contentsOf: URL(fileURLWithPath: path)) {
                     
-                    let dimension: CGFloat = FastSettings.photoDimension
+                    let settings = RegramPreferences.shared.settings(accountId: account.peerId.toInt64())
+                    let dimension = CGFloat(RGMediaPolicy.photoMaximumDimension(native: Double(FastSettings.photoDimension), settings: settings, pasted: RGMediaPolicy.isPastedPhoto(path: container.path)))
                    
                     let options = NSMutableDictionary()
                     options.setValue(true as NSNumber, forKey: kCGImageSourceCreateThumbnailWithTransform as String)
@@ -389,7 +391,7 @@ public class Sender: NSObject {
                             if size.width / 10 > size.height || size.height < 40 {
                                 makeFileMedia(true)
                             } else {
-                                let data = compressImageToJPEG(image, quality: 0.75)
+                                let data = compressImageToJPEG(image, quality: Float(RGMediaPolicy.photoQuality(settings: settings, pasted: RGMediaPolicy.isPastedPhoto(path: container.path))))
                                 let path = NSTemporaryDirectory() + "tg_image_\(arc4random()).jpeg"
                                 FileManager.default.createFile(atPath: path, contents: data)
 

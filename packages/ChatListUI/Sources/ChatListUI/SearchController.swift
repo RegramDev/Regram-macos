@@ -18,6 +18,8 @@ import StoriesUI
 import ChatHistoryModel
 import ChatUI
 import ChatModeTypes
+import RegramCore
+import RegramSignals
 
 extension SearchMessagesLocation {
     public func withUpdatedSouce(_ source: SearchController.MessaagesSourceValue) -> SearchMessagesLocation {
@@ -443,9 +445,9 @@ private func peerContextMenuItems(peer: Peer, pinnedItems:[PinnedItemId], argume
 }
 
 
-fileprivate func prepareEntries(from:[AppearanceWrapperEntry<ChatListSearchEntry>]?, to:[AppearanceWrapperEntry<ChatListSearchEntry>], arguments:SearchControllerArguments, pinnedItems:[PinnedItemId], initialSize:NSSize, animated: Bool, target: SearchController.Target) -> TableEntriesTransition<[AppearanceWrapperEntry<ChatListSearchEntry>]> {
+fileprivate func prepareEntries(from:[AppearanceWrapperEntry<ChatListSearchEntry>]?, to:[AppearanceWrapperEntry<ChatListSearchEntry>], arguments:SearchControllerArguments, pinnedItems:[PinnedItemId], initialSize:NSSize, animated: Bool, target: SearchController.Target, forceUpdate: Bool = false) -> TableEntriesTransition<[AppearanceWrapperEntry<ChatListSearchEntry>]> {
     
-    let (deleted, inserted, updated) = proccessEntriesWithoutReverse(from, right: to, { entry -> TableRowItem in
+    let makeItem: (AppearanceWrapperEntry<ChatListSearchEntry>) -> TableRowItem = { entry in
         switch entry.entry {
         case let .message(message, query, combinedState, threadInfo, _):
             var peer = RenderedPeer(message: message)
@@ -636,9 +638,11 @@ fileprivate func prepareEntries(from:[AppearanceWrapperEntry<ChatListSearchEntry
                 }
             }), alignment: .center, centerViewAlignment: true)
         }
-    })
-    
-    return TableEntriesTransition(deleted: deleted, inserted: inserted, updated:updated, entries: to, animated: animated, state: .none(nil))
+    }
+    let (deleted, inserted, updated) = proccessEntriesWithoutReverse(from, right: to, makeItem)
+    let insertedIndices = Set(inserted.map { $0.0 })
+    let effectiveUpdated = forceUpdate ? to.enumerated().filter { !insertedIndices.contains($0.offset) }.map { ($0.offset, makeItem($0.element)) } : updated
+    return TableEntriesTransition(deleted: deleted, inserted: inserted, updated: effectiveUpdated, entries: to, animated: animated, state: .none(nil))
 
 }
 
@@ -955,6 +959,18 @@ public class SearchController<Context: AccountContextProtocol>: GenericViewContr
                 var all = query.transformKeyboard
                 all.insert(query.lowercased(), at: 0)
                 all = all.uniqueElements
+                let remarkPeers = regramRemarkChanges(accountId: context.peerId.toInt64()) |> mapToSignal { _ in
+                    context.account.postbox.transaction { transaction -> [RenderedPeer] in
+                        let ids = Set(all.flatMap { RGGroupRemarks.shared.matchingPeerIds(accountId: context.peerId.toInt64(), query: $0) })
+                        return ids.sorted().compactMap { id in
+                            let peerId = PeerId(id)
+                            guard let peer = transaction.getPeer(peerId), transaction.getPeerChatListIndex(peerId) != nil else { return nil }
+                            if let group = peer as? TelegramGroup, group.migrationReference == nil { return RenderedPeer(peer: group) }
+                            if let channel = peer as? TelegramChannel, case .group = channel.info { return RenderedPeer(peer: channel) }
+                            return nil
+                        }
+                    }
+                }
                 let localPeers:Signal<([RenderedPeer], [PeerId: UnreadSearchBadge], EngineDataMap<TelegramEngine.EngineData.Item.Peer.StoryStats>.Result), NoError> = combineLatest(all.map {
                     return context.account.postbox.searchPeers(query: $0) |> map {
                         $0.filter { peer in
@@ -972,9 +988,18 @@ public class SearchController<Context: AccountContextProtocol>: GenericViewContr
                             }
                         }
                     }
-                }) |> map { result in
+                } + [remarkPeers]) |> map { result in
                     var seen = Set<PeerId>()
-                    return Array(result.joined()).filter { seen.insert($0.peerId).inserted }
+                    return Array(result.joined()).filter { peer in
+                        guard seen.insert(peer.peerId).inserted else { return false }
+                        if let listType = globalTags.listType {
+                            switch listType {
+                            case .channels, .globalPosts: return peer.peer?.isChannel == true
+                            case .bots: return peer.peer?.botInfo?.flags.contains(.hasWebApp) == true
+                            }
+                        }
+                        return true
+                    }
                 } |> mapToSignal { peers in
                     return combineLatest(peers.map { context.account.postbox.peerView(id: $0.peerId) |> take(1) }) |> map { ($0, peers) }
                 } |> mapToSignal { peerViews, peers in
@@ -1016,6 +1041,7 @@ public class SearchController<Context: AccountContextProtocol>: GenericViewContr
                 case let .common(groupId):
                     foundLocalPeers = query.hasPrefix("#") || query.hasPrefix("$") || !options.contains(.chats) || !globalTags.isEmpty ? .single([]) : combineLatest(localPeers, context.account.postbox.loadedPeerWithId(context.peerId), foundQueryPeers.get())
                         |> map { peers, accountPeer, inLinkPeer -> [ChatListSearchEntry] in
+                            var ids: [PeerId: PeerId] = [:]
                             var entries: [ChatListSearchEntry] = []
                             
                             
@@ -1075,6 +1101,7 @@ public class SearchController<Context: AccountContextProtocol>: GenericViewContr
                             foundRemotePeers = query.hasPrefix("#") || query.hasPrefix("$") || !options.contains(.chats) || !globalTags.isEmpty || globalTags.listType == .bots ? .single(([], [], false)) : .single(([], [], true)) |> then(combineLatest(context.engine.contacts.searchRemotePeers(query: query, scope: globalTags.scope(.allChats)), adPeers)
                                 |> delay(0.2, queue: prepareQueue)
                                 |> map { (founds, adPeers) -> ([FoundPeer], [FoundPeer], [AdPeer]) in
+                                    var ids: [PeerId: PeerId] = [:]
                                     return (founds.0.filter { found -> Bool in
                                         let first = ids[found.peer.id] == nil
                                         ids[found.peer.id] = found.peer.id
@@ -1828,11 +1855,39 @@ public class SearchController<Context: AccountContextProtocol>: GenericViewContr
         }
         
         
-        let transition = combineLatest(queue: prepareQueue, searchItems, appearanceSignal, context.globalPeerHandler.get() |> distinctUntilChanged, pinnedPromise.get()) |> map { value, appearance, location, pinnedItems in
-            return (value.0.map {AppearanceWrapperEntry(entry: $0, appearance: appearance)}, value.1, value.2 ? nil : location, value.2, pinnedItems, value.3, value.4)
+        let refreshRevision = Atomic<Int64>(value: Int64.min)
+        let appearanceAndRegram = combineLatest(appearanceSignal, regramPreferenceChanges(accountId: context.peerId.toInt64()), regramRemarkChanges(accountId: context.peerId.toInt64())) |> map { appearance, _, _ in appearance }
+        let transition = combineLatest(queue: prepareQueue, searchItems, appearanceAndRegram, context.globalPeerHandler.get() |> distinctUntilChanged, pinnedPromise.get()) |> map { value, appearance, location, pinnedItems in
+            var seenPeers = Set<PeerId>()
+            var visible = value.0.filter { entry in
+                switch entry {
+                case let .localPeer(peer, _, _, _, _, _, _):
+                    guard seenPeers.insert(peer.peerId).inserted else { return false }
+                case let .globalPeer(peer, _, _, _):
+                    guard seenPeers.insert(peer.peer.id).inserted else { return false }
+                case let .savedMessages(peer):
+                    guard seenPeers.insert(peer.id).inserted else { return false }
+                default:
+                    break
+                }
+                if case let .message(message, _, _, _, _) = entry { return !regramShouldHideMessage(message, accountId: context.peerId.toInt64()) }
+                return true
+            }
+            visible = visible.enumerated().filter { index, entry in
+                guard case .separator = entry else { return true }
+                for next in visible.dropFirst(index + 1) {
+                    if case .separator = next { return false }
+                    return true
+                }
+                return false
+            }.map { $0.element }
+            if visible.isEmpty, !value.1 { visible = [.emptySearch] }
+            let revision = RegramPreferences.shared.revision(accountId: context.peerId.toInt64()) &+ RGGroupRemarks.shared.revision(accountId: context.peerId.toInt64())
+            let forceUpdate = refreshRevision.swap(revision) != revision
+            return (visible.map {AppearanceWrapperEntry(entry: $0, appearance: appearance)}, value.1, value.2 ? nil : location, value.2, pinnedItems, value.3, value.4, forceUpdate)
         }
-        |> map { entries, loading, location, animated, pinnedItems, searchMessagesState, searchMessagesResult -> (TableUpdateTransition, Bool, ChatLocation?, SearchMessagesState?, SearchMessagesResult?) in
-            let transition = prepareEntries(from: previousSearchItems.swap(entries) , to: entries, arguments: arguments, pinnedItems: pinnedItems, initialSize: atomicSize.modify { $0 }, animated: animated, target: target)
+        |> map { entries, loading, location, animated, pinnedItems, searchMessagesState, searchMessagesResult, forceUpdate -> (TableUpdateTransition, Bool, ChatLocation?, SearchMessagesState?, SearchMessagesResult?) in
+            let transition = prepareEntries(from: previousSearchItems.swap(entries) , to: entries, arguments: arguments, pinnedItems: pinnedItems, initialSize: atomicSize.modify { $0 }, animated: animated, target: target, forceUpdate: forceUpdate)
             return (transition, loading, location, searchMessagesState, searchMessagesResult)
         } |> deliverOnMainQueue
         
@@ -1869,7 +1924,7 @@ public class SearchController<Context: AccountContextProtocol>: GenericViewContr
                 self.currentMessagesSearchState = nil
             }
             
-            self._messagesValue.set(.single((ExternalSearchMessages(messages: searchMessagesResult?.messages ?? [], count: searchMessagesResult?.totalCount ?? 0), searchMessagesResult != nil)))
+            self._messagesValue.set(.single((ExternalSearchMessages(messages: regramVisibleMessages(searchMessagesResult?.messages ?? [], accountId: context.peerId.toInt64()), count: searchMessagesResult?.totalCount ?? 0), searchMessagesResult != nil)))
             
             if let location = location {
                 if !(self.genericView.selectedItem() is ChatListMessageRowItem) {

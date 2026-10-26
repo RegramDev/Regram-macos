@@ -15,6 +15,7 @@ import EntertainmentUI
 import GalleryUI
 import GeneralRows
 import InAppSettings
+import InputDataUI
 import LocalAnimations
 import Localization
 import PremiumStatusUI
@@ -24,6 +25,8 @@ import TelegramContext
 import TelegramTheme
 import TelegramUtils
 import InlineStickerLayer
+import ChatHistoryModel
+import RegramCore
 
 private func profileButtonColor(over background: NSColor, isDark: Bool) -> NSColor {
     let base = background.usingColorSpace(.sRGB) ?? background
@@ -393,12 +396,25 @@ private func actionItems<Context: AccountContextProtocol>(item: PeerInfoHeadItem
         }
     }
     
-    if items.count > rowItemsCount {
+    let commonGroupMessagesAction: SubActionItem?
+    if let peer = item.peer as? TelegramUser, peer.id.namespace == Namespaces.Peer.CloudUser, peer.id != item.context.peerId, !peer.isDeleted {
+        let destination = "commonGroupMessages/\(peer.id.toInt64())"
+        commonGroupMessagesAction = SubActionItem(text: regramLocalizedString("CommonGroups.Action", languageCode: appCurrentLanguage.primaryLanguage.languageCode), animation: .menu_search, action: { [weak item] in
+            guard let item, let controller = FeatureNavigationHooks.shared.makeRegramController(item.context, destination) else { return }
+            item.context.bindings.rootNavigation().push(controller)
+        })
+    } else {
+        commonGroupMessagesAction = nil
+    }
+    if items.count > rowItemsCount || commonGroupMessagesAction != nil {
         var subItems:[SubActionItem] = []
         while items.count > rowItemsCount - 1 {
             let item = items.removeLast()
             let action = item.action
             subItems.insert(SubActionItem(text: item.text, animation: item.animation, destruct: item.destruct, action: action), at: 0)
+        }
+        if let commonGroupMessagesAction {
+            subItems.insert(commonGroupMessagesAction, at: 0)
         }
         if !subItems.isEmpty {
             items.append(ActionItem(text: strings().peerInfoActionMore, color: item.accentColor, image: theme.icons.profile_more, animation: .menu_plus, action: { }, subItems: subItems))
@@ -640,6 +656,7 @@ class PeerInfoHeadItem<Context: AccountContextProtocol>: GeneralRowItem {
     
     let musicFile: TelegramMediaFile?
     let walletBalance: Int64?
+    let profileCachedData: CachedUserData?
 
     var hasProfileStrip: Bool {
         return !editing && musicFile != nil
@@ -691,8 +708,12 @@ class PeerInfoHeadItem<Context: AccountContextProtocol>: GeneralRowItem {
     
     var photos: [TelegramPeerPhoto] = []
     init(_ initialSize:NSSize, stableId:AnyHashable, context: Context, arguments: PeerInfoArguments<Context>, peerView:PeerView, threadData: MessageHistoryThreadData?, threadId: Int64?, stories: PeerExpiringStoryListContext.State? = nil, viewType: GeneralViewType, editing: Bool, updatingPhotoState:PeerInfoUpdatingPhotoState? = nil, updatePhoto:@escaping(NSImage?, Control?)->Void = { _, _ in }, giftsContext: ProfileGiftsContext? = nil, threadPeer: EnginePeer? = nil, savedMusic: ProfileSavedMusicContext.State? = nil, profileSavedMusic: ProfileSavedMusicContext? = nil) {
-        let peer = peerViewMainPeer(peerView)
+        let localProfile = RGLocalGiftsStore.shared.state(account: regramLocalGiftsAccount(context: context))
+        let rawPeer = peerViewMainPeer(peerView)
+        let peer = rawPeer.flatMap(EnginePeer.init).map { regramLocalAppearancePeer(context: context, peer: $0, localState: localProfile)._asPeer() } ?? rawPeer
+        let profileCachedData = regramLocalProfileCachedData(context: context, peerId: peerView.peerId, cachedData: peerView.cachedData, localState: localProfile) as? CachedUserData
         self.peer = peer
+        self.profileCachedData = profileCachedData
         self.threadPeer = threadPeer
         self.threadData = threadData
         self.peerView = peerView
@@ -719,14 +740,15 @@ class PeerInfoHeadItem<Context: AccountContextProtocol>: GeneralRowItem {
         }
 
         if #available(macOS 10.15, *), !editing, threadId == nil, let user = peer as? TelegramUser, peerView.peerId.namespace == Namespaces.Peer.CloudUser,
-           user.id != context.peerId, let walletHooks = PeerInfoUIHooks.shared.wallet as? PeerInfoWalletHooks, walletHooks.hasWallet(context),
-           let walletCard = (peerView.cachedData as? CachedUserData)?.walletCard, walletCard.balance >= 100_000_000 {
+           let walletCard = profileCachedData?.walletCard,
+           (user.id == context.peerId && localProfile.enabled && localProfile.walletCardEnabled) ||
+           (user.id != context.peerId && (PeerInfoUIHooks.shared.wallet as? PeerInfoWalletHooks)?.hasWallet(context) == true && walletCard.balance >= 100_000_000) {
             self.walletBalance = walletCard.balance
         } else {
             self.walletBalance = nil
         }
         
-        self.rating = (peerView.cachedData as? CachedUserData)?.starRating
+        self.rating = profileCachedData?.starRating
         
         if let storyState = stories, !storyState.items.isEmpty {
             
@@ -858,7 +880,7 @@ class PeerInfoHeadItem<Context: AccountContextProtocol>: GeneralRowItem {
     
     func previewRatig() {
         if let rating, let peer {
-            showModal(with: PeerRatingModalController(context: context, peer: peer, rating: rating, pendingRating: (peerView.cachedData as? CachedUserData)?.pendingStarRating), for: context.window)
+            showModal(with: PeerRatingModalController(context: context, peer: peer, rating: rating, pendingRating: profileCachedData?.pendingStarRating), for: context.window)
         }
     }
     
@@ -962,7 +984,8 @@ class PeerInfoHeadItem<Context: AccountContextProtocol>: GeneralRowItem {
         if let peer = peer, let controlSize = PremiumStatusControl.controlSize(peer, true, left: true) {
             textWidth -= (controlSize.width + 5)
         }
-        nameLayout.measure(width: textWidth)
+        if let size = developerBadgeSize { textWidth -= size.width + developerBadgeInset }
+        nameLayout.measure(width: max(1, textWidth))
         statusLayout.measure(width: textWidth)
         
         if let _ = threadData {
@@ -995,6 +1018,22 @@ class PeerInfoHeadItem<Context: AccountContextProtocol>: GeneralRowItem {
     
 
     
+    fileprivate var developerBadgeTitle: String? {
+        guard threadData == nil, let user = peer as? TelegramUser, RegramProfileBadge.badge(userId: user.id.id._internalGetInt64Value()) == .developer else { return nil }
+        return regramLocalizedString("ProfileBadge.developer", languageCode: appCurrentLanguage.primaryLanguage.languageCode)
+    }
+
+    fileprivate var developerBadgeSize: NSSize? {
+        guard let title = developerBadgeTitle else { return nil }
+        let width = ceil((title as NSString).size(withAttributes: [.font: NSFont.medium(11)]).width) + 12
+        return NSMakeSize(width, 18)
+    }
+
+    private var developerBadgeInset: CGFloat {
+        guard let peer else { return 5 }
+        return PremiumStatusControl.controlSize(peer, true, left: false) == nil ? 5 : 8
+    }
+
     fileprivate var nameSize: NSSize {
         var stateHeight: CGFloat = 0
         if let peer = peer, let size = PremiumStatusControl.controlSize(peer, true, left: false) {
@@ -1009,6 +1048,10 @@ class PeerInfoHeadItem<Context: AccountContextProtocol>: GeneralRowItem {
         if let peer = peer, let size = PremiumStatusControl.controlSize(peer, true, left: true)  {
             width += size.width + 5
         }
+        if let size = developerBadgeSize {
+            width += size.width + developerBadgeInset
+            stateHeight = max(stateHeight, size.height)
+        }
         return NSMakeSize(width, stateHeight)
     }
     
@@ -1022,6 +1065,7 @@ private final class NameContainer : View {
     let nameView = TextView()
     var statusControl: PremiumStatusControl?
     var leftStatusControl: PremiumStatusControl?
+    private var developerBadge: TextButton?
     required init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         addSubview(nameView)
@@ -1070,8 +1114,17 @@ private final class NameContainer : View {
             control.set(handler: { control in
                 if let emojiStatus = item.peer?.emojiStatus {
                     switch emojiStatus.content {
-                    case let .starGift(_, _, _, slug, _, _, _, _, _):
-                        PeerInfoUIHooks.shared.executeNftLink(item.context.meUrlDisplayPrefix + "nft/\(slug)", slug, item.context)
+                    case let .starGift(id, _, _, slug, _, _, _, _, _):
+                        if id < 0 {
+                            guard let peer = item.peer.flatMap(EnginePeer.init), peer.id == item.context.peerId,
+                                  let gift = regramLocalUniqueGifts(context: item.context).first(where: { $0.id == id }) else {
+                                showModalText(for: item.context.window, text: regramLocalizedString("LocalGifts.Notice", languageCode: appCurrentLanguage.primaryLanguage.languageCode))
+                                return
+                            }
+                            showModal(with: StarGift_Nft_Controller(context: item.context, gift: .unique(gift), source: .quickLook(peer, gift), giftsContext: item.giftsContext), for: item.context.window)
+                        } else {
+                            PeerInfoUIHooks.shared.executeNftLink(item.context.meUrlDisplayPrefix + "nft/\(slug)", slug, item.context)
+                        }
                     default:
                         prem(with: PremiumBoardingController(context: context, source: .profile(peerId)), for: context.window)
                     }
@@ -1096,6 +1149,32 @@ private final class NameContainer : View {
             statusControl?.userInteractionEnabled = false
         }
              
+        if let title = item.developerBadgeTitle, let size = item.developerBadgeSize {
+            let badge = self.developerBadge ?? TextButton()
+            badge.autoSizeToFit = false
+            badge.set(font: .medium(11), for: .Normal)
+            badge.set(text: title, for: .Normal)
+            badge.set(color: .white, for: .Normal)
+            badge.set(background: theme.colors.accent, for: .Normal)
+            badge.set(background: theme.colors.accent.withAlphaComponent(0.55), for: .Highlight)
+            badge.change(size: size, animated: animated)
+            badge.layer?.cornerRadius = size.height / 2
+            badge.scaleOnClick = true
+            badge.setAccessibilityRole(.button)
+            badge.setAccessibilityLabel(title)
+            badge.setAccessibilityHelp(regramLocalizedString("ProfileBadge.developer.Info", languageCode: appCurrentLanguage.primaryLanguage.languageCode))
+            badge.removeAllHandlers()
+            badge.set(handler: { control in
+                let text = NSMutableAttributedString()
+                text.append(.initialize(string: title + "\n", color: .white, font: .bold(.text)))
+                text.append(.initialize(string: regramLocalizedString("ProfileBadge.developer.Info", languageCode: appCurrentLanguage.primaryLanguage.languageCode), color: .white, font: .normal(.text)))
+                tooltip(for: control, text: "", attributedText: text, maxWidth: 260, timeout: 4.0, alignment: .left)
+            }, for: .Click)
+            if self.developerBadge == nil { addSubview(badge); self.developerBadge = badge }
+        } else if let badge = developerBadge {
+            performSubviewRemoval(badge, animated: animated)
+            developerBadge = nil
+        }
         needsLayout = true
     }
     
@@ -1112,6 +1191,7 @@ private final class NameContainer : View {
             control.centerY(x: inset, addition: -1)
             inset = control.frame.maxX + 8
         }
+        developerBadge?.centerY(x: inset, addition: -1)
     }
     
     required init?(coder: NSCoder) {
@@ -1451,9 +1531,10 @@ private final class SpawnGiftsView: View {
         if self.giftsDisposable == nil {
             self.giftsDisposable = combineLatest(
                 queue: Queue.mainQueue(),
-                giftsContext.state,
-                context.engine.data.subscribe(TelegramEngine.EngineData.Item.Peer.Peer(id: peerId))
-                |> map { peer -> Int64? in
+                regramLocalGiftProfileState(context: context, peerId: peerId, profileGifts: giftsContext, canSelect: false),
+                combineLatest(context.engine.data.subscribe(TelegramEngine.EngineData.Item.Peer.Peer(id: peerId)), regramLocalAppearanceState(context: context))
+                |> map { peer, state -> Int64? in
+                    let peer = peer.map { regramLocalAppearancePeer(context: context, peer: $0, localState: state) }
                     if case let .user(user) = peer, case let .starGift(id, _, _, _, _, _, _, _, _) = user.emojiStatus?.content {
                         return id
                     }
@@ -1486,7 +1567,7 @@ private final class SpawnGiftsView: View {
             }
             let id: AnyHashable
             if case let .unique(uniqueGift) = gift.gift {
-                id = uniqueGift.slug
+                id = uniqueGift.id < 0 ? AnyHashable(uniqueGift.id) : AnyHashable(uniqueGift.slug)
             } else {
                 id = index
             }
@@ -2245,7 +2326,7 @@ private final class PeerInfoHeadView<Context: AccountContextProtocol> : GeneralC
         }
 
         if let walletBalance = item.walletBalance, !item.editing {
-            if #available(macOS 10.15, *), let card = (item.peerView.cachedData as? CachedUserData)?.walletCard, card != self.preloadedWalletCard {
+            if #available(macOS 10.15, *), let card = item.profileCachedData?.walletCard, card != self.preloadedWalletCard {
                 self.preloadedWalletCard = card
                 PeerInfoUIHooks.shared.walletHooks.preloadPeerCard(item.context, card)
             }

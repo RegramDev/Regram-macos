@@ -15,35 +15,6 @@ var walletPasscodeCredentialManagedKey: String {
     return unscopedWalletPasscodeCredentialManagedKey
 }
 
-#if !SHARE
-@available(macOS 10.15, *)
-private func migrateWalletKeychainScopeIfNeeded(basePath: String, isFreshInstallation: Bool) {
-    guard PasscodeEnvironment.shared.keychainScope != nil else {
-        return
-    }
-    let marker = ((basePath as NSString).deletingLastPathComponent as NSString).appendingPathComponent("keychain-scope-v1")
-    if FileManager.default.fileExists(atPath: marker) {
-        return
-    }
-    if !isFreshInstallation {
-        let migration = migrateWalletKeychainScope()
-        Logger.shared.log("KeychainScope", "migration: \(migration)")
-        switch migration {
-        case .keychainLocked, .failed:
-            PasscodeCredentialStore.shared.requireExistingCredential()
-            return
-        case .migrated:
-            if UserDefaults.standard.bool(forKey: unscopedWalletPasscodeCredentialManagedKey) {
-                UserDefaults.standard.set(true, forKey: walletPasscodeCredentialManagedKey)
-            }
-        case .nothingToMigrate:
-            break
-        }
-    }
-    FileManager.default.createFile(atPath: marker, contents: Data())
-}
-#endif
-
 func makeAccountManagerAccessChallenge(basePath: String, isTemporary: Bool, isReadOnly: Bool) -> AccountManagerAccessChallenge {
     let isMainProcess = PasscodeEnvironment.shared.isMainApp
     return AccountManagerAccessChallenge(prepare: { isFreshInstallation in
@@ -53,9 +24,6 @@ func makeAccountManagerAccessChallenge(basePath: String, isTemporary: Bool, isRe
         _ = try PasscodeEnvironment.shared.sharedAccessGroup()
         PasscodeCredentialStore.shared.configureLock(directory: basePath)
         #if !SHARE
-        if isMainProcess && !isTemporary && !isReadOnly {
-            migrateWalletKeychainScopeIfNeeded(basePath: basePath, isFreshInstallation: isFreshInstallation)
-        }
         if isMainProcess && !isTemporary && !isReadOnly && isFreshInstallation {
             try resetWalletLocalSecrets()
         }

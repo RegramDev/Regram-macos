@@ -622,6 +622,7 @@ func crashRecoveryUpdater() -> CrashRecoveryUpdater {
 }
 
 func updateAppIfNeeded() {
+    guard Bundle.main.object(forInfoDictionaryKey: "RegramUpdatesDisabled") as? Bool != true else { return }
     let state = stateValue.with {$0.loadingState}
     
     switch state {
@@ -732,6 +733,7 @@ private func cancelStagedUpdate() {
 }
 
 private func resetUpdater() {
+    guard Bundle.main.object(forInfoDictionaryKey: "RegramUpdatesDisabled") as? Bool != true else { return }
     
     #if !GITHUB
         let update:()->Void = {
@@ -763,6 +765,7 @@ private func resetUpdater() {
 private var updaterSource: UpdaterSource? = nil
 
 func updater_resetWithUpdaterSource(_ source: UpdaterSource, force: Bool = true) {
+    guard Bundle.main.object(forInfoDictionaryKey: "RegramUpdatesDisabled") as? Bool != true else { return }
     let state = stateValue.with { $0 }
     switch state.loadingState {
     case .readyToInstall:

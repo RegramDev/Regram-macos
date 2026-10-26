@@ -1,3 +1,6 @@
+import RegramCore
+import RegramServices
+import ChatHistoryModel
 import Cocoa
 import TGUIKit
 import SwiftSignalKit
@@ -972,18 +975,51 @@ private func entries(_ state: State, arguments: Arguments) -> [InputDataEntry] {
 
 
 
-func translateBlocks(context: any AccountContextProtocol, from: String?, to: String, blocks: [(String, [MessageTextEntity])], configState: AppConfigTranslateState, tone: TranslationTone = .neutral) -> Signal<(detect: String?, result: String, entities: [MessageTextEntity]), Translate.Error> {
+func translateBlocks(context: any AccountContextProtocol, from: String?, to: String, blocks: [(String, [MessageTextEntity])], configState: AppConfigTranslateState, tone: TranslationTone = .neutral, permitsExternal: Bool = true, llmContext: [String] = [], settings: RegramAccountSettings? = nil) -> Signal<(detect: String?, result: String, entities: [MessageTextEntity]), Translate.Error> {
+    guard !blocks.isEmpty else { return .single((detect: nil, result: "", entities: [])) }
+    let regramSettings = settings ?? RegramPreferences.shared.settings(accountId: context.peerId.toInt64())
+    if permitsExternal, regramSettings["translationBackend"].string != "default" {
+        let translated = blocks.map { block -> Signal<(String, [MessageTextEntity]), Translate.Error> in
+            let ranges = block.1.enumerated().map { RGTranslationLinkPlan.ProtectedRange(range: NSRange(location: $0.element.range.lowerBound, length: $0.element.range.count), id: $0.offset) }
+            let protected = Set(block.1.enumerated().compactMap { index, entity -> Int? in
+                switch entity.type {
+                case .Code, .Pre, .TextUrl, .TextMention, .Mention, .CustomEmoji: return index
+                default: return nil
+                }
+            })
+            return regramProtectedTranslation(text: block.0, to: to, accountId: context.peerId.toInt64(), settings: regramSettings, ranges: ranges, protectedIds: protected, context: llmContext)
+            |> mapError { _ in Translate.Error.generic }
+            |> map { value in
+                let entities = value.ranges.compactMap { range -> MessageTextEntity? in
+                    guard range.id >= 0, range.id < block.1.count else { return nil }
+                    return MessageTextEntity(range: range.range.location..<(range.range.location + range.range.length), type: block.1[range.id].type)
+                }
+                return (value.text, entities)
+            }
+        }
+        return combineLatest(translated) |> map { values in
+            var text = ""
+            var entities: [MessageTextEntity] = []
+            for value in values {
+                let offset = text.utf16.count
+                entities += value.1.map { MessageTextEntity(range: ($0.range.lowerBound + offset)..<($0.range.upperBound + offset), type: $0.type) }
+                text += value.0
+            }
+            return (detect: nil, result: text, entities: entities)
+        }
+    }
     var signals:[Signal<(detect: String?, result: String, entities: [MessageTextEntity]), Translate.Error>] = []
     for block in blocks {
-        switch configState {
+        switch permitsExternal ? configState : .enabled {
         case .enabled:
             signals.append(context.engine.messages.translate(text: block.0, toLang: to, entities: block.1, tone: tone) |> `catch` { error in
                 switch error {
                 case .tryAlternative:
+                    guard permitsExternal else { return .fail(.generic) }
                     return .single(nil)
                 default:
                     #if DEBUG
-                    return .single(nil)
+                    return permitsExternal ? .single(nil) : .fail(.generic)
                     #endif
                     return .fail(.generic)
                 }
@@ -1001,7 +1037,7 @@ func translateBlocks(context: any AccountContextProtocol, from: String?, to: Str
                 (detect: $0.detect, result: $0.result, entities: [])
             })
         case .disabled, .system:
-            continue
+            signals.append(.fail(.generic))
         }
         
     }
@@ -1023,7 +1059,7 @@ func translateBlocks(context: any AccountContextProtocol, from: String?, to: Str
     
     return signal
 }
-public func TranslateModalController(context: any AccountContextProtocol, from: String?, toLang: String, text: String, entities: [MessageTextEntity] = [], canBreak: Bool = true, configState: AppConfigTranslateState = .enabled, messageId: MessageId? = nil, isRichMessage: Bool = false, richMessagePage: InstantPage? = nil, onUse: ((NSAttributedString)->Void)? = nil, onSend: ((NSAttributedString)->Void)? = nil, richBlocks: [Block]? = nil, onUseRich: (([Block])->Void)? = nil, dismissOnly: Bool = false, onToneChanged: ((TranslationTone)->Void)? = nil, translateEntireChat: (()->Void)? = nil) -> InputDataModalController {
+public func TranslateModalController(context: any AccountContextProtocol, from: String?, toLang: String, text: String, entities: [MessageTextEntity] = [], canBreak: Bool = true, configState: AppConfigTranslateState = .enabled, messageId: MessageId? = nil, isRichMessage: Bool = false, richMessagePage: InstantPage? = nil, onUse: ((NSAttributedString)->Void)? = nil, onSend: ((NSAttributedString)->Void)? = nil, richBlocks: [Block]? = nil, onUseRich: (([Block])->Void)? = nil, dismissOnly: Bool = false, onToneChanged: ((TranslationTone)->Void)? = nil, translateEntireChat: (()->Void)? = nil, source: ChatHistoryTranslationSource? = nil) -> InputDataModalController {
 
     let actionsDisposable = DisposableSet()
     let disposable = MetaDisposable()
@@ -1037,6 +1073,13 @@ public func TranslateModalController(context: any AccountContextProtocol, from: 
     let richPage: InstantPage? = richMessagePage ?? richBlocks.flatMap { richTextInstantPage(from: outgoingBlocks(fromSelection: $0), media: [:]) }
 
     let isInputMode = onUse != nil || onUseRich != nil
+    let isSourceBacked: Bool
+    switch source {
+    case .some(.message), .some(.transcription), .some(.poll), .some(.richMessage): isSourceBacked = true
+    default: isSourceBacked = messageId != nil || isRichMessage
+    }
+    let accountId = context.peerId.toInt64()
+    var configurationIdentity = RegramPreferences.shared.settings(accountId: accountId).translationIdentity
 
     let configTones = translationStyles(from: context)
     let defaultToneId = configTones.first?.id ?? "neutral"
@@ -1118,6 +1161,11 @@ public func TranslateModalController(context: any AccountContextProtocol, from: 
 
 
     let request:()->Void = {
+        let currentIdentity = RegramPreferences.shared.settings(accountId: accountId).translationIdentity
+        if currentIdentity != configurationIdentity {
+            configurationIdentity = currentIdentity
+            updateState { current in var current = current; current.cache = [:]; current.richCache = [:]; return current }
+        }
         let state = stateValue.with { $0 }
 
         if state.limitExceeded {
@@ -1138,7 +1186,7 @@ public func TranslateModalController(context: any AccountContextProtocol, from: 
         }
 
         let key = state.cacheKey
-        if let cached = state.cache[key] {
+        if !isSourceBacked, let cached = state.cache[key] {
             updateState { current in
                 var current = current
                 current.translated = cached.text
@@ -1274,20 +1322,53 @@ public func TranslateModalController(context: any AccountContextProtocol, from: 
             |> map { result -> (detect: String?, result: String, entities: [MessageTextEntity]) in
                 return (detect: nil, result: result.0, entities: result.1)
             }
-        } else if let messageId = messageId {
-            signal = context.engine.messages.translate(text: text, toLang: stateValue.with { $0.to }, tone: stateValue.with { $0.tone }, messageId: messageId)
-            |> mapError { _ -> Translate.Error in
-                return .generic
-            }
-            |> map { result -> (detect: String?, result: String, entities: [MessageTextEntity]) in
-                if let result = result {
-                    return (detect: nil, result: result.0, entities: result.1)
-                } else {
-                    return (detect: nil, result: "", entities: [])
-                }
-            }
         } else {
-            signal = translateBlocks(context: context, from: stateValue.with { $0.from }, to: stateValue.with { $0.to }, blocks: blocks, configState: configState, tone: stateValue.with { $0.tone })
+            let settings = RegramPreferences.shared.settings(accountId: accountId)
+            let sourcePolicy: Signal<(Message?, Bool, [String]), Translate.Error>
+            if let messageId {
+                sourcePolicy = context.account.postbox.transaction { transaction -> (Message?, Bool, [String]) in
+                    guard let original = transaction.getMessage(messageId) else { return (nil, false, []) }
+                    let cached = transaction.getPeerCachedData(peerId: messageId.peerId) as? CachedUserData
+                    let privateProtected = cached.map { $0.flags.contains(.copyProtectionEnabled) || $0.flags.contains(.myCopyProtectionEnabled) } ?? false
+                    var external = original.id.namespace == Namespaces.Message.Cloud && original.id.peerId.namespace != Namespaces.Peer.SecretChat && !original.containsSecretMedia && !original.isCopyProtected() && !privateProtected && !original.media.contains { $0 is TelegramMediaPaidContent || $0 is TelegramMediaPoll } && !isRichMessage
+                    switch source {
+                    case .some(.transcription):
+                        guard original.attributes.compactMap({ $0 as? AudioTranscriptionMessageAttribute }).first?.text == text else { return (nil, false, []) }
+                    case .some(.poll), .some(.richMessage): external = false
+                    default:
+                        if external, original.text != text { return (nil, false, []) }
+                    }
+                    return (original, external, external ? regramLLMTranslationContext(transaction: transaction, message: original, settings: settings) : [])
+                } |> castError(Translate.Error.self)
+            } else {
+                sourcePolicy = .single((nil, !isSourceBacked, []))
+            }
+            signal = sourcePolicy |> mapToSignal { original, permitsExternal, history -> Signal<(detect: String?, result: String, entities: [MessageTextEntity]), Translate.Error> in
+                guard messageId == nil || original != nil, RegramPreferences.shared.settings(accountId: accountId).translationIdentity == settings.translationIdentity else { return .fail(.generic) }
+                if permitsExternal, settings["translationBackend"].string == "system", !isInputMode, !isRichMessage, #available(macOS 15.0, *) {
+                    DispatchQueue.main.async {
+                        close?()
+                        regramPresentSystemTranslation(text: text, window: context.window)
+                    }
+                    return .complete()
+                }
+                let useExternal = permitsExternal && settings["translationBackend"].string != "default"
+                if useExternal || messageId == nil {
+                    let translated = translateBlocks(context: context, from: state.from, to: state.to, blocks: blocks, configState: configState, tone: state.tone, permitsExternal: permitsExternal, llmContext: history, settings: settings)
+                    return translated |> mapToSignal { result in
+                        context.account.postbox.transaction { transaction -> Bool in
+                            guard RegramPreferences.shared.settings(accountId: accountId).translationIdentity == settings.translationIdentity else { return false }
+                            guard let original else { return !isSourceBacked }
+                            guard let current = transaction.getMessage(original.id), current.stableVersion == original.stableVersion, !current.containsSecretMedia, !current.isCopyProtected() else { return false }
+                            if let cached = transaction.getPeerCachedData(peerId: current.id.peerId) as? CachedUserData, cached.flags.contains(.copyProtectionEnabled) || cached.flags.contains(.myCopyProtectionEnabled) { return false }
+                            return true
+                        } |> castError(Translate.Error.self) |> mapToSignal { valid in valid ? .single(result) : .fail(.generic) }
+                    }
+                }
+                return context.engine.messages.translate(text: text, toLang: state.to, tone: state.tone, messageId: messageId)
+                |> mapError { _ -> Translate.Error in .generic }
+                |> map { result in (detect: nil, result: result?.0 ?? "", entities: result?.1 ?? []) }
+            }
         }
         disposable.set((signal).start(next: { result in
             updateState { current in

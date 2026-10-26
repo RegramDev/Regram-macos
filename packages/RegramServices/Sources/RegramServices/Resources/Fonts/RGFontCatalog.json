@@ -1,0 +1,623 @@
+{
+  "files": [
+    {
+      "file": "JetBrainsMono-Regular.ttf",
+      "source": "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9/fonts/ttf/JetBrainsMono-Regular.ttf",
+      "sha256": "a0bf60ef0f83c5ed4d7a75d45838548b1f6873372dfac88f71804491898d138f",
+      "bytes": 273900
+    },
+    {
+      "file": "JetBrainsMono-Medium.ttf",
+      "source": "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9/fonts/ttf/JetBrainsMono-Medium.ttf",
+      "sha256": "31c92d01a8a08528b718a43addf0ad3df0af2ca4b7b3290a452f70f358e14d3d",
+      "bytes": 273860
+    },
+    {
+      "file": "JetBrainsMono-SemiBold.ttf",
+      "source": "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9/fonts/ttf/JetBrainsMono-SemiBold.ttf",
+      "sha256": "1b3bfa1ed5665a4ce3f9feb68d2d4e40e70bf8b4b7d9a3edd418f321b4e166a0",
+      "bytes": 277092
+    },
+    {
+      "file": "JetBrainsMono-Bold.ttf",
+      "source": "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9/fonts/ttf/JetBrainsMono-Bold.ttf",
+      "sha256": "5590990c82e097397517f275f430af4546e1c45cff408bde4255dad142479dcb",
+      "bytes": 277828
+    },
+    {
+      "file": "JetBrainsMono-Italic.ttf",
+      "source": "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9/fonts/ttf/JetBrainsMono-Italic.ttf",
+      "sha256": "9d0a1f7a708e6af183f1193b7e81d40da294f5c67682c085d8401c60aac8ded4",
+      "bytes": 276840
+    },
+    {
+      "file": "JetBrainsMono-BoldItalic.ttf",
+      "source": "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9/fonts/ttf/JetBrainsMono-BoldItalic.ttf",
+      "sha256": "4039d5ce0ed225bf9c8b2c8c6436290ae2f356b7e90d70fa666227238324aa3b",
+      "bytes": 279832
+    },
+    {
+      "file": "JetBrainsMonoNL-Regular.ttf",
+      "source": "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9/fonts/ttf/JetBrainsMonoNL-Regular.ttf",
+      "sha256": "fb3b2575d7b0657359707993288f12a7360344d39387bb26050e276d61f6bd2a",
+      "bytes": 208576
+    },
+    {
+      "file": "JetBrainsMonoNL-Medium.ttf",
+      "source": "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9/fonts/ttf/JetBrainsMonoNL-Medium.ttf",
+      "sha256": "44099e1efefba55637e0abbbf8dd3f526e59523345888a257bb01d39df4af74c",
+      "bytes": 208276
+    },
+    {
+      "file": "JetBrainsMonoNL-SemiBold.ttf",
+      "source": "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9/fonts/ttf/JetBrainsMonoNL-SemiBold.ttf",
+      "sha256": "2c5dc6725fdbb0dccf65adceb38fdcd95e5fc8a5b74d5c150e38a5faa02a8945",
+      "bytes": 209864
+    },
+    {
+      "file": "JetBrainsMonoNL-Bold.ttf",
+      "source": "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9/fonts/ttf/JetBrainsMonoNL-Bold.ttf",
+      "sha256": "0198e841824025f8876e5c297f0b9b497ee8d6eb9969710a3328e1303f996ec3",
+      "bytes": 210988
+    },
+    {
+      "file": "JetBrainsMonoNL-Italic.ttf",
+      "source": "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9/fonts/ttf/JetBrainsMonoNL-Italic.ttf",
+      "sha256": "c7392a134293e1af1d36fbf04940dd844f632afbf97f8325d1591d3af5096cb8",
+      "bytes": 211624
+    },
+    {
+      "file": "JetBrainsMonoNL-BoldItalic.ttf",
+      "source": "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9/fonts/ttf/JetBrainsMonoNL-BoldItalic.ttf",
+      "sha256": "6c2716f2e85101f4109a8c16916061eb38176b3b10342834858d6221ec2fda1b",
+      "bytes": 214132
+    },
+    {
+      "file": "Inter-Bold.ttf",
+      "source": "https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip",
+      "archive_member": "extras/ttf/Inter-Bold.ttf",
+      "sha256": "288316099b1e0a47a4716d159098005eef7c0066921f34e3200393dbdb01947f",
+      "bytes": 420428,
+      "archive_sha256": "9883fdd4a49d4fb66bd8177ba6625ef9a64aa45899767dde3d36aa425756b11e"
+    },
+    {
+      "file": "Inter-BoldItalic.ttf",
+      "source": "https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip",
+      "archive_member": "extras/ttf/Inter-BoldItalic.ttf",
+      "sha256": "948405a16cdc62701da5f4005ed068ca5f4d27061d98f7974ccfc37831d9581d",
+      "bytes": 425296,
+      "archive_sha256": "9883fdd4a49d4fb66bd8177ba6625ef9a64aa45899767dde3d36aa425756b11e"
+    },
+    {
+      "file": "Inter-Italic.ttf",
+      "source": "https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip",
+      "archive_member": "extras/ttf/Inter-Italic.ttf",
+      "sha256": "bbc051dd204b5019a1aa0bc0ae2aa8a05ab13e7a3f979fa357631dc7feb6833a",
+      "bytes": 417388,
+      "archive_sha256": "9883fdd4a49d4fb66bd8177ba6625ef9a64aa45899767dde3d36aa425756b11e"
+    },
+    {
+      "file": "Inter-Medium.ttf",
+      "source": "https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip",
+      "archive_member": "extras/ttf/Inter-Medium.ttf",
+      "sha256": "97ad806f526e41546d46365bb3a393145f75b7b1568913db74549ad8b8dba872",
+      "bytes": 417300,
+      "archive_sha256": "9883fdd4a49d4fb66bd8177ba6625ef9a64aa45899767dde3d36aa425756b11e"
+    },
+    {
+      "file": "Inter-Regular.ttf",
+      "source": "https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip",
+      "archive_member": "extras/ttf/Inter-Regular.ttf",
+      "sha256": "40d692fce188e4471e2b3cba937be967878f631ad3ebbbdcd587687c7ebe0c82",
+      "bytes": 411640,
+      "archive_sha256": "9883fdd4a49d4fb66bd8177ba6625ef9a64aa45899767dde3d36aa425756b11e"
+    },
+    {
+      "file": "Inter-SemiBold.ttf",
+      "source": "https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip",
+      "archive_member": "extras/ttf/Inter-SemiBold.ttf",
+      "sha256": "78a843fade9d4612a5567302fb595b56976eb5fcebf4fea5a5912d638bafcde3",
+      "bytes": 419744,
+      "archive_sha256": "9883fdd4a49d4fb66bd8177ba6625ef9a64aa45899767dde3d36aa425756b11e"
+    },
+    {
+      "file": "Inter-MediumItalic.ttf",
+      "source": "https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip",
+      "archive_member": "extras/ttf/Inter-MediumItalic.ttf",
+      "sha256": "51c2c8d7c36f7c26e6e2678b5c3069b329bde9a081154553b0f5bc2d4fc14075",
+      "bytes": 423452,
+      "archive_sha256": "9883fdd4a49d4fb66bd8177ba6625ef9a64aa45899767dde3d36aa425756b11e"
+    },
+    {
+      "file": "Inter-SemiBoldItalic.ttf",
+      "source": "https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip",
+      "archive_member": "extras/ttf/Inter-SemiBoldItalic.ttf",
+      "sha256": "eff2930c3d3b35d3fcf5f76252b6baef4c3e907d9d2fde1d16cf5d417f8deef4",
+      "bytes": 423976,
+      "archive_sha256": "9883fdd4a49d4fb66bd8177ba6625ef9a64aa45899767dde3d36aa425756b11e"
+    },
+    {
+      "file": "Poppins-Regular.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/2eb0b48d5f760f62e286216f0859a8c540dbc1bd/ofl/poppins/Poppins-Regular.ttf",
+      "sha256": "7e65201e9b79159e2300267cc885e16c8dcef2424cdfa09a29bfb0980a94a7ba",
+      "bytes": 160316
+    },
+    {
+      "file": "Poppins-Medium.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/2eb0b48d5f760f62e286216f0859a8c540dbc1bd/ofl/poppins/Poppins-Medium.ttf",
+      "sha256": "90373e7d838d32468438fc3e152dca0bdb12edcab99ea639f158790b1ba1fd05",
+      "bytes": 158576
+    },
+    {
+      "file": "Poppins-SemiBold.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/2eb0b48d5f760f62e286216f0859a8c540dbc1bd/ofl/poppins/Poppins-SemiBold.ttf",
+      "sha256": "d3bf1bdaf0550e83da9ac0b1d1d9fe6db086835a83aa28578e609a394b9a0286",
+      "bytes": 157312
+    },
+    {
+      "file": "Poppins-Bold.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/2eb0b48d5f760f62e286216f0859a8c540dbc1bd/ofl/poppins/Poppins-Bold.ttf",
+      "sha256": "983676516167748b74de6f4771fb384c664fd913acb8b471122ecacf5da5ea6c",
+      "bytes": 155996
+    },
+    {
+      "file": "Poppins-Italic.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/2eb0b48d5f760f62e286216f0859a8c540dbc1bd/ofl/poppins/Poppins-Italic.ttf",
+      "sha256": "4fa76ae75b40f926420514044722cb97f32186cafd3b38263cc34dad7174d46d",
+      "bytes": 184544
+    },
+    {
+      "file": "Poppins-MediumItalic.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/2eb0b48d5f760f62e286216f0859a8c540dbc1bd/ofl/poppins/Poppins-MediumItalic.ttf",
+      "sha256": "765addf6c7c11ec3c54325cacd68cabd05df8e4b6455302d812a9b9bafd1c614",
+      "bytes": 183012
+    },
+    {
+      "file": "Poppins-SemiBoldItalic.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/2eb0b48d5f760f62e286216f0859a8c540dbc1bd/ofl/poppins/Poppins-SemiBoldItalic.ttf",
+      "sha256": "16bb118aa232c9a13fa238027d24d7854dd1a1d9cbaf99b17fec4388d56b432c",
+      "bytes": 181108
+    },
+    {
+      "file": "Poppins-BoldItalic.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/2eb0b48d5f760f62e286216f0859a8c540dbc1bd/ofl/poppins/Poppins-BoldItalic.ttf",
+      "sha256": "3572ac8116a0ac7317d342262b29937bcbaf94d8f03f90df6fe666fa7e2fb43a",
+      "bytes": 179108
+    },
+    {
+      "file": "Lora-Regular.ttf",
+      "source": "https://raw.githubusercontent.com/cyrealtype/Lora-Cyrillic/2d53b449b60e185b39f671b44fded83e0910ad30/fonts/ttf/Lora-Regular.ttf",
+      "sha256": "c72a925082ba55885e7b4ead25d34a3c91fa44edda72a16a3a2983fc7fa7cef3",
+      "bytes": 198380
+    },
+    {
+      "file": "Lora-Medium.ttf",
+      "source": "https://raw.githubusercontent.com/cyrealtype/Lora-Cyrillic/2d53b449b60e185b39f671b44fded83e0910ad30/fonts/ttf/Lora-Medium.ttf",
+      "sha256": "0342ce54e8f3ce352e01cc056e0c355ec6190b6da2eaad815400211eebba1f9a",
+      "bytes": 224604
+    },
+    {
+      "file": "Lora-SemiBold.ttf",
+      "source": "https://raw.githubusercontent.com/cyrealtype/Lora-Cyrillic/2d53b449b60e185b39f671b44fded83e0910ad30/fonts/ttf/Lora-SemiBold.ttf",
+      "sha256": "a9f5bbcebb6b53d53b6d7d571b2076f3db4931026693397200f69801b6701a81",
+      "bytes": 218792
+    },
+    {
+      "file": "Lora-Bold.ttf",
+      "source": "https://raw.githubusercontent.com/cyrealtype/Lora-Cyrillic/2d53b449b60e185b39f671b44fded83e0910ad30/fonts/ttf/Lora-Bold.ttf",
+      "sha256": "32baf740eac1bf3f257904a6cf89e4e067ca1566b375bf22f743a26fc88b3791",
+      "bytes": 218640
+    },
+    {
+      "file": "Lora-Italic.ttf",
+      "source": "https://raw.githubusercontent.com/cyrealtype/Lora-Cyrillic/2d53b449b60e185b39f671b44fded83e0910ad30/fonts/ttf/Lora-Italic.ttf",
+      "sha256": "1985f2fa49d675c3d88ca6a0b9161be38f955bec7efb025d2a5b68bc03e471fe",
+      "bytes": 206912
+    },
+    {
+      "file": "Lora-MediumItalic.ttf",
+      "source": "https://raw.githubusercontent.com/cyrealtype/Lora-Cyrillic/2d53b449b60e185b39f671b44fded83e0910ad30/fonts/ttf/Lora-MediumItalic.ttf",
+      "sha256": "67aca838282f89a4a63b3e0ccc9e15a6b74d68e170f4713865e203c4d1bbc935",
+      "bytes": 215848
+    },
+    {
+      "file": "Lora-SemiBoldItalic.ttf",
+      "source": "https://raw.githubusercontent.com/cyrealtype/Lora-Cyrillic/2d53b449b60e185b39f671b44fded83e0910ad30/fonts/ttf/Lora-SemiBoldItalic.ttf",
+      "sha256": "c6fa1c0f00230cd7e1543a4f9695de93f54a8c3ecb4c07d2d6bea504f9e101e0",
+      "bytes": 217352
+    },
+    {
+      "file": "Lora-BoldItalic.ttf",
+      "source": "https://raw.githubusercontent.com/cyrealtype/Lora-Cyrillic/2d53b449b60e185b39f671b44fded83e0910ad30/fonts/ttf/Lora-BoldItalic.ttf",
+      "sha256": "f448e41ab0bf529ec7bd4f8aef843eb4d33b5608c7ed0a53128ead588e6ea9e5",
+      "bytes": 213560
+    },
+    {
+      "file": "IBMPlexSans-Regular.ttf",
+      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-Regular.ttf",
+      "sha256": "975dcda37d80f038dcd143c22e33ca2d97a0cc5a929aace1c749153b0fe1afa5",
+      "bytes": 200500
+    },
+    {
+      "file": "IBMPlexSans-Medium.ttf",
+      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-Medium.ttf",
+      "sha256": "331c8639d7598b2cde62a911a71db195e30cb655cd6bdf2e324a7e984955f907",
+      "bytes": 202460
+    },
+    {
+      "file": "IBMPlexSans-SemiBold.ttf",
+      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-SemiBold.ttf",
+      "sha256": "a20caf8286023a6a7a85e40b1d2a4ae9fc3e3b1f9eda8f4c542dd4986af67bb1",
+      "bytes": 202632
+    },
+    {
+      "file": "IBMPlexSans-Bold.ttf",
+      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-Bold.ttf",
+      "sha256": "9e6c74a889a700d707613d24548fe4ffa6bc59559a0689d2cf9e133bdcdafb2f",
+      "bytes": 200872
+    },
+    {
+      "file": "IBMPlexSans-Italic.ttf",
+      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-Italic.ttf",
+      "sha256": "a9c6ef9942c49e49d11e11a6dacc0b3a087978757e9b22a06b8ac22a6400fb15",
+      "bytes": 207920
+    },
+    {
+      "file": "IBMPlexSans-MediumItalic.ttf",
+      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-MediumItalic.ttf",
+      "sha256": "9928852bf60d82fdbbfe30eac86bcecd611e4188f0fa4d98938560659fa99c64",
+      "bytes": 210220
+    },
+    {
+      "file": "IBMPlexSans-SemiBoldItalic.ttf",
+      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-SemiBoldItalic.ttf",
+      "sha256": "147106b619423a82b40f6d64bace074ad5b786e59f48023bda69d63b1755fb82",
+      "bytes": 211072
+    },
+    {
+      "file": "IBMPlexSans-BoldItalic.ttf",
+      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-BoldItalic.ttf",
+      "sha256": "0e3142ba2ef31fe5c02f0c6c36424f251609cd6b73880076e21c2e81931ba2b9",
+      "bytes": 208588
+    },
+    {
+      "file": "IBMPlexMono-Regular.ttf",
+      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-mono/fonts/complete/ttf/IBMPlexMono-Regular.ttf",
+      "sha256": "7c6fbddca4b700be918f5f6183d9bd4464fa427fe435f0b480d77fe2bb8c5a43",
+      "bytes": 173052
+    },
+    {
+      "file": "IBMPlexMono-Medium.ttf",
+      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-mono/fonts/complete/ttf/IBMPlexMono-Medium.ttf",
+      "sha256": "98fbd727aae340b236955879dabed4d991aac9e8e90b3b2a67ce4a59221cc97c",
+      "bytes": 174008
+    },
+    {
+      "file": "IBMPlexMono-SemiBold.ttf",
+      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-mono/fonts/complete/ttf/IBMPlexMono-SemiBold.ttf",
+      "sha256": "f04d7c488ddf7d1fa99f2574efc3406ea4cbe17bb1af3a1ab960f84d0c96a172",
+      "bytes": 174608
+    },
+    {
+      "file": "IBMPlexMono-Bold.ttf",
+      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-mono/fonts/complete/ttf/IBMPlexMono-Bold.ttf",
+      "sha256": "74e5eedcfa4596497d34e19023cabdabd3a8c852b903007a5654a59591a72ffb",
+      "bytes": 175096
+    },
+    {
+      "file": "IBMPlexMono-Italic.ttf",
+      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-mono/fonts/complete/ttf/IBMPlexMono-Italic.ttf",
+      "sha256": "a55368deb953f594ac18336a1029009ed820e2d9abbb57ad601f61e22bec072b",
+      "bytes": 179756
+    },
+    {
+      "file": "IBMPlexMono-MediumItalic.ttf",
+      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-mono/fonts/complete/ttf/IBMPlexMono-MediumItalic.ttf",
+      "sha256": "100852349a441076bb03aca3a3c7786eaf5d59a91dca3e4677ee8337805817fb",
+      "bytes": 179624
+    },
+    {
+      "file": "IBMPlexMono-SemiBoldItalic.ttf",
+      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-mono/fonts/complete/ttf/IBMPlexMono-SemiBoldItalic.ttf",
+      "sha256": "d2039ddfa9236d642fafae5aa46446c54eb7961b3771a1ca3e9bba960172b9bb",
+      "bytes": 179992
+    },
+    {
+      "file": "IBMPlexMono-BoldItalic.ttf",
+      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-mono/fonts/complete/ttf/IBMPlexMono-BoldItalic.ttf",
+      "sha256": "c8b00068fd2fd69bbcf62059148623f09d19e9ada8bf9e8caf1aedd01347046a",
+      "bytes": 180256
+    },
+    {
+      "file": "IBMPlexSerif-Regular.ttf",
+      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-serif/fonts/complete/ttf/IBMPlexSerif-Regular.ttf",
+      "sha256": "6c490ccd38e856c674e0d163f3f40742a75058b7b935998dbfbc1745ba54e474",
+      "bytes": 217332
+    },
+    {
+      "file": "IBMPlexSerif-Medium.ttf",
+      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-serif/fonts/complete/ttf/IBMPlexSerif-Medium.ttf",
+      "sha256": "bab252b4f84ca9e409fc39410099fb481635b25628b5687524d657853ab07ed7",
+      "bytes": 222320
+    },
+    {
+      "file": "IBMPlexSerif-SemiBold.ttf",
+      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-serif/fonts/complete/ttf/IBMPlexSerif-SemiBold.ttf",
+      "sha256": "857edeaaff0f3913f4dfaf6bc0e9c89ef73e475429cf63d6a3cb5d1022a213d5",
+      "bytes": 222876
+    },
+    {
+      "file": "IBMPlexSerif-Bold.ttf",
+      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-serif/fonts/complete/ttf/IBMPlexSerif-Bold.ttf",
+      "sha256": "5fa66833dc80adb6252c793adb555716ec10833d2b1e5b0235b68c72cd69adf0",
+      "bytes": 220924
+    },
+    {
+      "file": "IBMPlexSerif-Italic.ttf",
+      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-serif/fonts/complete/ttf/IBMPlexSerif-Italic.ttf",
+      "sha256": "d28aa63cf618439712d6b459c5649af1d6d789cb911994f2357f1ce44128f163",
+      "bytes": 227404
+    },
+    {
+      "file": "IBMPlexSerif-MediumItalic.ttf",
+      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-serif/fonts/complete/ttf/IBMPlexSerif-MediumItalic.ttf",
+      "sha256": "5188f7b2bd1907a748075be31404870b6d29c956a190974ff290cb91eb74d664",
+      "bytes": 231940
+    },
+    {
+      "file": "IBMPlexSerif-SemiBoldItalic.ttf",
+      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-serif/fonts/complete/ttf/IBMPlexSerif-SemiBoldItalic.ttf",
+      "sha256": "c1bf6e7e5d3fd740916184e171703db25729fefd4d2423ae1b79a6afcf1a34ef",
+      "bytes": 232112
+    },
+    {
+      "file": "IBMPlexSerif-BoldItalic.ttf",
+      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-serif/fonts/complete/ttf/IBMPlexSerif-BoldItalic.ttf",
+      "sha256": "e33c9d0a692bb26c9c1ece4a35fd2a351317f5a60009d0e9945ae30d0297bf42",
+      "bytes": 229664
+    },
+    {
+      "file": "IBMPlexSansSC-Regular.ttf",
+      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-sans-sc/fonts/complete/ttf/hinted/IBMPlexSansSC-Regular.ttf",
+      "sha256": "012e587c5a78d25f456057614b880fc7450b748c352573d8052245df2a71158a",
+      "bytes": 8455892
+    },
+    {
+      "file": "IBMPlexSansSC-Medium.ttf",
+      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-sans-sc/fonts/complete/ttf/hinted/IBMPlexSansSC-Medium.ttf",
+      "sha256": "6e6a084fd3f43c2c6f6d662cbc4c7b09987bafd928c43e91c8e8f68c6ae01e31",
+      "bytes": 8425496
+    },
+    {
+      "file": "IBMPlexSansSC-SemiBold.ttf",
+      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-sans-sc/fonts/complete/ttf/hinted/IBMPlexSansSC-SemiBold.ttf",
+      "sha256": "76706e94340ac068ec2d398dc2f387946c815a3610f35c41cc93a8f8097d6c6b",
+      "bytes": 8422796
+    },
+    {
+      "file": "IBMPlexSansSC-Bold.ttf",
+      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-sans-sc/fonts/complete/ttf/hinted/IBMPlexSansSC-Bold.ttf",
+      "sha256": "3e94ef1df394eae336cc1bc98f2160b58e2cab186f47d820e4c808aef1f4e28f",
+      "bytes": 8426792
+    },
+    {
+      "file": "SourceSerif4-Regular.ttf",
+      "source": "https://raw.githubusercontent.com/adobe-fonts/source-serif/80d3f8894c09c937bebfa9011247d2e1c79fd6f4/TTF/SourceSerif4-Regular.ttf",
+      "sha256": "e5a4ee6a3d87bb9024796be390c6771e2a0eb1883dae25effaf57ca01668e24b",
+      "bytes": 261868
+    },
+    {
+      "file": "SourceSerif4-Semibold.ttf",
+      "source": "https://raw.githubusercontent.com/adobe-fonts/source-serif/80d3f8894c09c937bebfa9011247d2e1c79fd6f4/TTF/SourceSerif4-Semibold.ttf",
+      "sha256": "36db62940cb5728b12b1802476dc7fcf4c6c519a7bdd476ba23a4e555fc4655f",
+      "bytes": 272088
+    },
+    {
+      "file": "SourceSerif4-Bold.ttf",
+      "source": "https://raw.githubusercontent.com/adobe-fonts/source-serif/80d3f8894c09c937bebfa9011247d2e1c79fd6f4/TTF/SourceSerif4-Bold.ttf",
+      "sha256": "7cf4f4e1ad74f45058d5bc61716b82560442fbdcd9d3654d2dea96bf6c683d86",
+      "bytes": 271568
+    },
+    {
+      "file": "SourceSerif4-It.ttf",
+      "source": "https://raw.githubusercontent.com/adobe-fonts/source-serif/80d3f8894c09c937bebfa9011247d2e1c79fd6f4/TTF/SourceSerif4-It.ttf",
+      "sha256": "9d2950a8f1da66e21502c35d646a1d2148e79f9ea43fd2158cf02f5232e7f430",
+      "bytes": 187808
+    },
+    {
+      "file": "SourceSerif4-SemiboldIt.ttf",
+      "source": "https://raw.githubusercontent.com/adobe-fonts/source-serif/80d3f8894c09c937bebfa9011247d2e1c79fd6f4/TTF/SourceSerif4-SemiboldIt.ttf",
+      "sha256": "d6a0a4317102a255a55850640332ba3acc7c872606a555516b4ecdb66f3c9899",
+      "bytes": 192392
+    },
+    {
+      "file": "SourceSerif4-BoldIt.ttf",
+      "source": "https://raw.githubusercontent.com/adobe-fonts/source-serif/80d3f8894c09c937bebfa9011247d2e1c79fd6f4/TTF/SourceSerif4-BoldIt.ttf",
+      "sha256": "7b215b37f8873f5579f3f8d2ded3ca7c588e2f435cd996605ebfc5befe2cd5eb",
+      "bytes": 191832
+    },
+    {
+      "file": "SourceSans3-Regular.ttf",
+      "source": "https://raw.githubusercontent.com/adobe-fonts/source-sans/87b37a2daaed80fcb8e8ccb0085c4d72ddade12e/TTF/SourceSans3-Regular.ttf",
+      "sha256": "4644c81b86ec9caaa76b634889968ed3c4f4f52f054855933acc7c2b21e53b0f",
+      "bytes": 431196
+    },
+    {
+      "file": "SourceSans3-Medium.ttf",
+      "source": "https://raw.githubusercontent.com/adobe-fonts/source-sans/87b37a2daaed80fcb8e8ccb0085c4d72ddade12e/TTF/SourceSans3-Medium.ttf",
+      "sha256": "a7af35c1cab5dd0b29d742f86f2edfdf83fa7ec213643e765c5c51a2dc24edbc",
+      "bytes": 424748
+    },
+    {
+      "file": "SourceSans3-Semibold.ttf",
+      "source": "https://raw.githubusercontent.com/adobe-fonts/source-sans/87b37a2daaed80fcb8e8ccb0085c4d72ddade12e/TTF/SourceSans3-Semibold.ttf",
+      "sha256": "a3f4f8dcf343a8f24dc61951de93f3ba1558b15cd250ba24af8a40e957081b7d",
+      "bytes": 425904
+    },
+    {
+      "file": "SourceSans3-Bold.ttf",
+      "source": "https://raw.githubusercontent.com/adobe-fonts/source-sans/87b37a2daaed80fcb8e8ccb0085c4d72ddade12e/TTF/SourceSans3-Bold.ttf",
+      "sha256": "9214b9d95e4231c609802815c2646c98174e2102d0d37f88978a7f8e71006e6a",
+      "bytes": 428176
+    },
+    {
+      "file": "SourceSans3-It.ttf",
+      "source": "https://raw.githubusercontent.com/adobe-fonts/source-sans/87b37a2daaed80fcb8e8ccb0085c4d72ddade12e/TTF/SourceSans3-It.ttf",
+      "sha256": "192afd78f0f54a3c69eaf02d43f4d9a821e9d6110e41d3d25d61a7385cd580e4",
+      "bytes": 315812
+    },
+    {
+      "file": "SourceSans3-MediumIt.ttf",
+      "source": "https://raw.githubusercontent.com/adobe-fonts/source-sans/87b37a2daaed80fcb8e8ccb0085c4d72ddade12e/TTF/SourceSans3-MediumIt.ttf",
+      "sha256": "abb47f35400c01bc23406bea4ba3319f4aafc02c19703efe98efedb799719753",
+      "bytes": 318204
+    },
+    {
+      "file": "SourceSans3-SemiboldIt.ttf",
+      "source": "https://raw.githubusercontent.com/adobe-fonts/source-sans/87b37a2daaed80fcb8e8ccb0085c4d72ddade12e/TTF/SourceSans3-SemiboldIt.ttf",
+      "sha256": "8221d5e4bd3cf249e8023a5f8fad024d37c2def0f3d3aa7fd1f5830afda51f34",
+      "bytes": 319172
+    },
+    {
+      "file": "SourceSans3-BoldIt.ttf",
+      "source": "https://raw.githubusercontent.com/adobe-fonts/source-sans/87b37a2daaed80fcb8e8ccb0085c4d72ddade12e/TTF/SourceSans3-BoldIt.ttf",
+      "sha256": "7978291fc1bf314db887e0366853b33c5cf2e964c7b95cfb9ce403a6ec46a842",
+      "bytes": 318700
+    },
+    {
+      "file": "JetBrainsMono-MediumItalic.ttf",
+      "source": "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9/fonts/ttf/JetBrainsMono-MediumItalic.ttf",
+      "sha256": "4477fda6bd472ef96b11bc1083370f7fc3ff427bdc807e682ced5819e3dee9df",
+      "bytes": 276804
+    },
+    {
+      "file": "JetBrainsMono-SemiBoldItalic.ttf",
+      "source": "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9/fonts/ttf/JetBrainsMono-SemiBoldItalic.ttf",
+      "sha256": "3b3000507a7285872395ddbb4e53a28f07910dbf494fb0d5e1421dd60b5d8436",
+      "bytes": 279828
+    },
+    {
+      "file": "JetBrainsMonoNL-MediumItalic.ttf",
+      "source": "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9/fonts/ttf/JetBrainsMonoNL-MediumItalic.ttf",
+      "sha256": "2a5c56075d7bec1d54fa9761d5eeef7d4267e134d86962011425503b27e61ddd",
+      "bytes": 211604
+    },
+    {
+      "file": "JetBrainsMonoNL-SemiBoldItalic.ttf",
+      "source": "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/cd5227bd1f61dff3bbd6c814ceaf7ffd95e947d9/fonts/ttf/JetBrainsMonoNL-SemiBoldItalic.ttf",
+      "sha256": "f813544badbdab235b1f2f9933bb978be0a87cbde0133aaa05b80a84a7d94c22",
+      "bytes": 214032
+    },
+    {
+      "file": "NotoSerifSC-Variable.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/2eb0b48d5f760f62e286216f0859a8c540dbc1bd/ofl/notoserifsc/NotoSerifSC%5Bwght%5D.ttf",
+      "sha256": "050080d9255a86808f2945bffac582b31ef32bc36411ce29563b4961670c66f9",
+      "bytes": 25125512
+    },
+    {
+      "file": "AnthropicSans-Variable.woff2",
+      "source": "https://cdn.prod.website-files.com/67ce28cfec624e2b733f8a52/69971a00a3295036497e1a28_AnthropicSans-Roman-Web.woff2",
+      "sha256": "1b75c8ee81a05fa77331366e9602b82072bb5223593c928a6488dfe6fd023f1b",
+      "bytes": 118340
+    },
+    {
+      "file": "AnthropicSans-VariableItalic.woff2",
+      "source": "https://cdn.prod.website-files.com/67ce28cfec624e2b733f8a52/69971a016067bf14b9b8f48d_AnthropicSans-Italic-Web.woff2",
+      "sha256": "ffcf21c4e9a729cbf4710401760434bb1d10bc7db244540e4af796d182c6817d",
+      "bytes": 129868
+    },
+    {
+      "file": "AnthropicSerif-Variable.woff2",
+      "source": "https://cdn.prod.website-files.com/67ce28cfec624e2b733f8a52/69971a1551eb6cda0d656e8a_AnthropicSerif-Roman-Web.woff2",
+      "sha256": "e96fe97bb7ba2190a9a227d27380e0c79894408bfc6acea5a511774d93a16f69",
+      "bytes": 175356
+    },
+    {
+      "file": "AnthropicSerif-VariableItalic.woff2",
+      "source": "https://cdn.prod.website-files.com/67ce28cfec624e2b733f8a52/69971a15a9fb8c1107a3570e_AnthropicSerif-Italic-Web.woff2",
+      "sha256": "7f61e32b5941ad6e5699aeb3e03390a43e5f04f3bff6a5853bed08c802596f83",
+      "bytes": 166724
+    },
+    {
+      "file": "GoogleSans-Variable.ttf",
+      "source": "https://github.com/googlefonts/googlesans/releases/download/v14.000/GoogleSans-v14.000.zip",
+      "sha256": "d0a87d835a944b8b40d0e82a5651bb59ab97b936a2aeed5946eb57e7b2a3a90a",
+      "bytes": 4974940,
+      "archive_member": "build/GoogleSans/variable/GoogleSans[GRAD,opsz,wght].ttf",
+      "archive_sha256": "d338f0e74f5eabead86a85b87edf4cc50cd6561196dbe173d1db4139e95b3ca7"
+    },
+    {
+      "file": "GoogleSans-VariableItalic.ttf",
+      "source": "https://github.com/googlefonts/googlesans/releases/download/v14.000/GoogleSans-v14.000.zip",
+      "sha256": "b6662abd2131cad1b248750149a7f2b644f871ebcc9af7fe4cd1135cd290b6d1",
+      "bytes": 5079424,
+      "archive_member": "build/GoogleSans/variable/GoogleSans-Italic[GRAD,opsz,wght].ttf",
+      "archive_sha256": "d338f0e74f5eabead86a85b87edf4cc50cd6561196dbe173d1db4139e95b3ca7"
+    },
+    {
+      "file": "GoogleSansFlex-Variable.ttf",
+      "source": "https://github.com/googlefonts/googlesans-flex/releases/download/v4.007/GoogleSansFlex-v4.007.zip",
+      "sha256": "7551c307350329c6cf05de9cda1add37277b31e130d46c3532fd4914955df3bf",
+      "bytes": 4179956,
+      "archive_member": "GoogleSansFlex[GRAD,ROND,opsz,slnt,wdth,wght].ttf",
+      "archive_sha256": "b7375131bffc5eaaebeb65c69529ba10e7f7a9962b913488f6ef35c432ce19c9"
+    },
+    {
+      "file": "GoogleSansCode-Variable.ttf",
+      "source": "https://github.com/googlefonts/googlesans-code/releases/download/v7.001/GoogleSansCode-v7.001.zip",
+      "sha256": "74642762fae66d5883077794a763e1086394b8cb72f2623e456e06359dc5c64b",
+      "bytes": 268264,
+      "archive_member": "GoogleSansCode[MONO,wght].ttf",
+      "archive_sha256": "eebba2a438882396e8530cad6d6cb80182b0afb6e9e0ad07b7340359a53ba2e9"
+    },
+    {
+      "file": "GoogleSansCode-VariableItalic.ttf",
+      "source": "https://github.com/googlefonts/googlesans-code/releases/download/v7.001/GoogleSansCode-v7.001.zip",
+      "sha256": "57d0d5fb5868b33a5802fed8a36197197f95014dd775836e176045cf81e60dfe",
+      "bytes": 284556,
+      "archive_member": "GoogleSansCode-Italic[MONO,wght].ttf",
+      "archive_sha256": "eebba2a438882396e8530cad6d6cb80182b0afb6e9e0ad07b7340359a53ba2e9"
+    }
+  ],
+  "families": [
+    {
+      "id": "AnthropicSans",
+      "title": "Anthropic Sans",
+      "group": "Anthropic",
+      "regular": "AnthropicSans-Variable.woff2",
+      "selectionId": "1b75c8ee81a05fa77331366e9602b82072bb5223593c928a6488dfe6fd023f1b",
+      "italic": "AnthropicSans-VariableItalic.woff2"
+    },
+    {
+      "id": "AnthropicSerif",
+      "title": "Anthropic Serif",
+      "group": "Anthropic",
+      "regular": "AnthropicSerif-Variable.woff2",
+      "selectionId": "e96fe97bb7ba2190a9a227d27380e0c79894408bfc6acea5a511774d93a16f69",
+      "italic": "AnthropicSerif-VariableItalic.woff2"
+    },
+    {
+      "id": "GoogleSans",
+      "title": "Google Sans",
+      "group": "Google",
+      "regular": "GoogleSans-Variable.ttf",
+      "selectionId": "d0a87d835a944b8b40d0e82a5651bb59ab97b936a2aeed5946eb57e7b2a3a90a",
+      "italic": "GoogleSans-VariableItalic.ttf"
+    },
+    {
+      "id": "GoogleSansFlex",
+      "title": "Google Sans Flex",
+      "group": "Google",
+      "regular": "GoogleSansFlex-Variable.ttf",
+      "selectionId": "7551c307350329c6cf05de9cda1add37277b31e130d46c3532fd4914955df3bf"
+    },
+    {
+      "id": "GoogleSansCode",
+      "title": "Google Sans Code",
+      "group": "Google",
+      "regular": "GoogleSansCode-Variable.ttf",
+      "selectionId": "74642762fae66d5883077794a763e1086394b8cb72f2623e456e06359dc5c64b",
+      "italic": "GoogleSansCode-VariableItalic.ttf"
+    }
+  ]
+}

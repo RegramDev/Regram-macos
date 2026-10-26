@@ -8,9 +8,18 @@ import AudioPlayerUI
 import AudioPlayerCore
 import PeerInfoUI
 import QrStudioUI
+import RegramCore
 
 extension PremiumConfiguration: PeerInfoPremiumConfiguration {
 
+}
+
+@available(macOS 10.15, *)
+private func regramCanShowPeerBalance(context: AccountContext, peer: Peer) -> Bool {
+    if context.walletContext != nil { return true }
+    guard peer.id == context.peerId else { return false }
+    let state = RGLocalGiftsStore.shared.state(account: RGLocalGiftsStore.accountKey(accountId: context.peerId.toInt64(), testingEnvironment: context.account.testingEnvironment))
+    return state.enabled && state.walletCardEnabled
 }
 
 private func makePeerInfoWalletHooks() -> Any? {
@@ -27,10 +36,8 @@ private func makePeerInfoWalletHooks() -> Any? {
             preloadWalletPeerCard(context: context as! AccountContext, card: card)
         }, showPeerBalance: { context, peer, morphSource in
             let context = context as! AccountContext
-            guard let walletContext = context.walletContext else {
-                return
-            }
-            showWalletPeerBalance(context: context, walletContext: walletContext, peer: peer, morphSource: morphSource)
+            guard regramCanShowPeerBalance(context: context, peer: peer) else { return }
+            showWalletPeerBalance(context: context, walletContext: context.walletContext, peer: peer, morphSource: morphSource)
         })
         hooks.sendMoneyWithContext = { context, peer in
             let context = context as! AccountContext
@@ -39,8 +46,8 @@ private func makePeerInfoWalletHooks() -> Any? {
         }
         hooks.showPeerBalanceWithContext = { context, peer, morphSource in
             let context = context as! AccountContext
-            guard let walletContext = context.walletContext else { return }
-            showWalletPeerBalance(context: context, walletContext: walletContext, peer: peer, morphSource: morphSource)
+            guard regramCanShowPeerBalance(context: context, peer: peer) else { return }
+            showWalletPeerBalance(context: context, walletContext: context.walletContext, peer: peer, morphSource: morphSource)
         }
         return hooks
     } else {

@@ -416,7 +416,7 @@ public func PeerMediaSavedMessagesController<Context: AccountContextProtocol>(co
         }
     }))
     
-    let historyView: Signal<HistoryView, NoError> = combineLatest(history, statePromise.get()) |> map { update, state -> HistoryView in
+    let historyView: Signal<HistoryView, NoError> = combineLatest(history, statePromise.get(), regramMessageFilterChanges(accountId: context.peerId.toInt64())) |> map { update, state, _ -> HistoryView in
         let isLoading: Bool
         let view: MessageHistoryView?
         let initialData: ChatHistoryCombinedInitialData
@@ -441,7 +441,7 @@ public func PeerMediaSavedMessagesController<Context: AccountContextProtocol>(co
                 effectiveEntries = view.entries
             }
             
-            let messages: [ChatHistoryEntry] = messageEntries(effectiveEntries, renderType: theme.bubbled ? .bubble : .list, pollAnswersLoading: state.pollAnswers, groupingPhotos: true, searchState: state.searchMessages?.resultState, chatTheme: state.appearance.presentation, mediaRevealed: state.mediaRevealed, automaticDownload: initialData.autodownloadSettings, accountPeerId: context.peerId, contentConfig: context.contentConfig).reversed()
+            let messages: [ChatHistoryEntry] = messageEntries(effectiveEntries.filter { !regramShouldHideMessage($0.message, accountId: context.peerId.toInt64()) }, renderType: theme.bubbled ? .bubble : .list, pollAnswersLoading: state.pollAnswers, groupingPhotos: true, searchState: state.searchMessages?.resultState, chatTheme: state.appearance.presentation, mediaRevealed: state.mediaRevealed, automaticDownload: initialData.autodownloadSettings, accountPeerId: context.peerId, contentConfig: context.contentConfig).reversed()
             
             
             let entries = messages.map {

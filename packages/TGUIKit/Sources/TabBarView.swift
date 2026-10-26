@@ -18,11 +18,17 @@ struct FloatingTabBarLayout {
         return NSMakeRect(floorToScreenPixels((size.width - width) / 2), max(0, size.height - height - bottomGap), width, height)
     }
 
-    init(size: NSSize, count: Int) {
-        let width = max(0, size.width - Self.innerInset * 2)
+    init(size: NSSize, count: Int, externalIndex: Int? = nil) {
+        let external = externalIndex.flatMap { (0..<count).contains($0) ? $0 : nil }
+        let externalWidth: CGFloat = external == nil ? 0 : min(size.height + 12, size.width / CGFloat(max(1, count)))
+        let gap: CGFloat = external == nil ? 0 : 10
+        let width = max(0, size.width - Self.innerInset * 2 - externalWidth - gap)
+        let mainCount = max(1, count - (external == nil ? 0 : 1))
         itemFrames = (0 ..< max(0, count)).map { index in
-            let left = floorToScreenPixels(Self.innerInset + width * CGFloat(index) / CGFloat(count))
-            let right = floorToScreenPixels(Self.innerInset + width * CGFloat(index + 1) / CGFloat(count))
+            if index == external { return NSMakeRect(max(0, size.width - externalWidth), Self.innerInset, externalWidth - Self.innerInset, max(0, size.height - Self.innerInset * 2)) }
+            let index = external.map { index > $0 ? index - 1 : index } ?? index
+            let left = floorToScreenPixels(Self.innerInset + width * CGFloat(index) / CGFloat(mainCount))
+            let right = floorToScreenPixels(Self.innerInset + width * CGFloat(index + 1) / CGFloat(mainCount))
             return NSMakeRect(left, Self.innerInset, right - left, max(0, size.height - Self.innerInset * 2))
         }
     }
@@ -112,6 +118,10 @@ public class TabBarView: View {
 
     private let glass = LiquidGlassView(frame: .zero, cornerRadius: FloatingTabBarLayout.height / 2, tintAlpha: 0.15)
     private let selectionView = View()
+    private let externalGlass = LiquidGlassView(frame: .zero, cornerRadius: 24, tintAlpha: 0.15)
+    private var labels: [NSTextField] = []
+    var showsLabels = false { didSet { updateLabels(); needsLayout = true } }
+    var externalTabIndex: Int? { didSet { needsLayout = true } }
     private let liftedGlass = LiquidGlassView(frame: .zero, cornerRadius: 28, hasShadow: true, hasBorder: true, tintAlpha: 0.1)
     private var gesture: SelectionGesture?
     private var escapeMonitor: Any?
@@ -120,7 +130,7 @@ public class TabBarView: View {
     var reduceMotion: () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
 
     private var itemLayout: FloatingTabBarLayout {
-        return FloatingTabBarLayout(size: bounds.size, count: tabs.count)
+        return FloatingTabBarLayout(size: bounds.size, count: tabs.count, externalIndex: externalTabIndex)
     }
 
     var selectionFrame: NSRect {
@@ -139,6 +149,7 @@ public class TabBarView: View {
         layer?.masksToBounds = false
         glass.isEventLess = true
         selectionView.isEventLess = true
+        externalGlass.isEventLess = true
         selectionView.layer?.masksToBounds = false
         liftedGlass.isEventLess = true
         addSubview(glass)
@@ -190,8 +201,12 @@ public class TabBarView: View {
         let previous = tabs[index]
         tabs[index] = tab
         let control = itemControls[index]
+        if previous.controller !== tab.controller || ObjectIdentifier(type(of: previous)) != ObjectIdentifier(type(of: tab)) {
+            control.subviews.first?.removeFromSuperview()
+            control.addSubview(tab.makeView(), positioned: .below, relativeTo: control.subviews.first)
+        }
         if previous.subNode?.view !== tab.subNode?.view {
-            previous.subNode?.view?.removeFromSuperview()
+            if let previousBadge = previous.subNode?.view, previousBadge.superview === control { previousBadge.removeFromSuperview() }
             if let badge = tab.subNode?.view {
                 control.addSubview(badge)
             }
@@ -303,6 +318,7 @@ public class TabBarView: View {
     private func updateMetadata(for control: Control, tab: TabItem) {
         control.setAccessibilityLabel(tab.accessibilityTitle)
         control.toolTip = tab.accessibilityTitle
+        updateLabels()
     }
 
     public override func updateLocalizationAndTheme(theme: PresentationTheme) {
@@ -327,16 +343,50 @@ public class TabBarView: View {
         updateLayout()
     }
 
+    private func updateLabels() {
+        guard showsLabels else {
+            for label in labels { label.removeFromSuperview() }
+            labels.removeAll()
+            return
+        }
+        while labels.count > itemControls.count { labels.removeLast().removeFromSuperview() }
+        while labels.count < itemControls.count {
+            let label = NSTextField(labelWithString: "")
+            label.alignment = .center
+            label.lineBreakMode = .byTruncatingTail
+            label.font = .systemFont(ofSize: 10, weight: .medium)
+            labels.append(label)
+        }
+        for (index, label) in labels.enumerated() {
+            if label.superview !== itemControls[index] { label.removeFromSuperview(); itemControls[index].addSubview(label) }
+            label.stringValue = tabs[index].accessibilityTitle ?? ""
+            label.textColor = presentation.colors.text
+            label.isHidden = !showsLabels
+        }
+    }
+
     private func updateLayout() {
-        glass.frame = bounds
-        glass.updateLayout(size: bounds.size, transition: .immediate)
-        for (index, frame) in itemLayout.itemFrames.enumerated() {
+        let layout = itemLayout
+        if let external = externalTabIndex, layout.itemFrames.indices.contains(external) {
+            let externalFrame = layout.itemFrames[external].insetBy(dx: -2, dy: -FloatingTabBarLayout.innerInset)
+            if externalGlass.superview == nil { addSubview(externalGlass, positioned: .below, relativeTo: selectionView) }
+            externalGlass.isHidden = false
+            externalGlass.frame = externalFrame
+            externalGlass.cornerRadius = externalFrame.height / 2
+            externalGlass.updateLayout(size: externalFrame.size, transition: .immediate)
+            glass.frame = NSMakeRect(0, 0, max(0, externalFrame.minX - 10), bounds.height)
+        } else { externalGlass.removeFromSuperview(); glass.frame = bounds }
+        glass.updateLayout(size: glass.frame.size, transition: .immediate)
+        updateLabels()
+        for (index, frame) in layout.itemFrames.enumerated() {
             let control = itemControls[index]
-            if control.frame != frame {
-                control.frame = frame
-                control.subviews.first?.center()
-                tabs[index].subNode?.update()
+            control.frame = frame
+            if let icon = control.subviews.first {
+                icon.center()
+                if showsLabels { icon.setFrameOrigin(NSMakePoint(icon.frame.minX, max(0, (frame.height - icon.frame.height - 13) / 2))) }
             }
+            if labels.indices.contains(index) { labels[index].frame = NSMakeRect(3, max(0, frame.height - 17), max(0, frame.width - 6), 14) }
+            tabs[index].subNode?.update()
         }
         updateLens(transition: .immediate)
     }

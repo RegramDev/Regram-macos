@@ -1,3 +1,4 @@
+import RegramCore
 import Cocoa
 import TGUIKit
 import UniqueGiftBackground
@@ -1743,6 +1744,10 @@ public class SelectColorControllerCollectData {
 
 public func SelectColorController(context: any AccountContextProtocol, peer: Peer, callback: SelectColorCallback? = nil, destination: SelectColorControllerDestination = .profile, dataCollector: SelectColorControllerCollectData? = nil) -> InputDataController {
 
+    let isLocalAccount = peer.id == context.peerId && peer is TelegramUser
+    var beganLocally = isLocalAccount && regramLocalGiftsEnabled(context: context)
+    let peer = isLocalAccount ? regramLocalAppearancePeer(context: context, peer: EnginePeer(peer))._asPeer() : peer
+
     let source: SelectColorSource
     if peer.isGroup || peer.isSupergroup {
         source = .group(peer)
@@ -1753,6 +1758,7 @@ public func SelectColorController(context: any AccountContextProtocol, peer: Pee
     }
     
     let actionsDisposable = DisposableSet()
+    actionsDisposable.add(regramLocalGiftsState(context: context).start(next: { if isLocalAccount && $0.enabled { beganLocally = true } }))
     let saveAction = SelectColorSaveAction()
     let resaleContextDisposable = MetaDisposable()
     actionsDisposable.add(resaleContextDisposable)
@@ -1771,7 +1777,8 @@ public func SelectColorController(context: any AccountContextProtocol, peer: Pee
     let giftsSignal = context.engine.payments.cachedStarGifts()
     let peerSignal = context.engine.data.get(TelegramEngine.EngineData.Item.Peer.Peer(id: peer.id))
     
-    actionsDisposable.add(combineLatest(peerSignal, giftsSignal).start(next: { peer, gifts in
+    actionsDisposable.add(combineLatest(peerSignal, giftsSignal, regramLocalAppearanceState(context: context)).start(next: { peer, gifts, local in
+        let peer = peer.map { regramLocalAppearancePeer(context: context, peer: $0, localState: local) }
         updateState { current in
             var current = current
             if let peer {
@@ -1861,7 +1868,7 @@ public func SelectColorController(context: any AccountContextProtocol, peer: Pee
     case let .account(peer):
         
         if destination == .all || destination == .profile {
-            if destination == .profile, peer.id == context.peerId, !peer.isPremium {
+            if destination == .profile, peer.id == context.peerId, !peer.isPremium, !regramLocalGiftsEnabled(context: context) {
                 profileGiftsContext = nil
             } else {
                 profileGiftsContext = ProfileGiftsContext(account: context.account, peerId: context.account.peerId, filter:[.All, .unique], limit: 100)
@@ -1874,10 +1881,11 @@ public func SelectColorController(context: any AccountContextProtocol, peer: Pee
         
 
         if let giftsContext {
-            actionsDisposable.add(giftsContext.state.start(next: { state in
+            actionsDisposable.add(combineLatest(giftsContext.state, regramLocalAppearanceState(context: context)).start(next: { state, local in
                 updateState { current in
                     var current = current
-                    current.wearable = state.filteredGifts.compactMap { $0.gift.unique }
+                    let additions = regramLocalUniqueGifts(context: context, localState: local).filter { destination != .name || $0.peerColor != nil }
+                    current.wearable = additions + state.filteredGifts.compactMap { $0.gift.unique }
                     return current
                 }
             }))
@@ -1886,6 +1894,16 @@ public func SelectColorController(context: any AccountContextProtocol, peer: Pee
         break
     }
     
+    if isLocalAccount {
+        actionsDisposable.add(regramLocalAppearanceState(context: context).start(next: { local in
+            updateState { current in
+                var current = current
+                let additions = regramLocalUniqueGifts(context: context, localState: local).filter { destination != .name || $0.peerColor != nil }
+                current.wearable = additions + current.wearable.filter { !regramIsLocalGift(.unique($0)) }
+                return current
+            }
+        }))
+    }
     var backgroundEmojiId: Int64? = nil
     var color: PeerColor?
     var layer: InlineStickerItemLayer?
@@ -2080,7 +2098,34 @@ public func SelectColorController(context: any AccountContextProtocol, peer: Pee
     var getController:(()->InputDataController?)? = nil
 
     
+    func applyLocalPurchasedGift(_ stored: StarGift?, needClose: Bool) {
+        guard case let .unique(unique) = stored else { return }
+        let applied = destination == .name ? regramUseLocalGiftNameColor(context: context, gift: unique) : regramWearLocalGift(context: context, gift: unique, wear: true)
+        guard applied else { showModalText(for: context.window, text: regramLocalizedString("LocalGifts.Disabled", languageCode: appCurrentLanguage.primaryLanguage.languageCode)); return }
+        updateState { current in
+            var current = current
+            current.selectedCollection = .all
+            current.selected_Gift = unique
+            if destination == .name, let color = unique.peerColor {
+                current.selected = .collectible(color)
+                current.backgroundEmojiId = color.backgroundEmojiId
+            } else {
+                current.emojiStatus = regramLocalGiftEmojiStatus(unique)
+                current.emojiStatusGift = unique
+            }
+            return current
+        }
+        if needClose { close?() }
+    }
+
     let buyResellGift:(StarGift.UniqueGift, EnginePeer, BotPaymentForm, BotPaymentForm, ResaleGiftsContext, Bool)->Void = { gift, peer, starsForm, tonForm, resaleContext, needClose in
+        if isLocalAccount && (beganLocally || regramLocalGiftsEnabled(context: context)) {
+            regramPresentLocalGiftResale(context: context, gift: gift, window: context.window, completion: { stored in
+                applyLocalPurchasedGift(stored, needClose: needClose)
+            })
+            return
+        }
+        guard !regramIsLocalGift(.unique(gift)) else { return }
         
         let state = stateValue.with { $0 }
         
@@ -2125,7 +2170,13 @@ public func SelectColorController(context: any AccountContextProtocol, peer: Pee
        
         
         showModalAlert(for: context.window, data: getData(), completion: { result in
-            
+            if isLocalAccount && (beganLocally || regramLocalGiftsEnabled(context: context)) {
+                regramPresentLocalGiftResale(context: context, gift: gift, window: context.window, completion: { stored in
+                    applyLocalPurchasedGift(stored, needClose: needClose)
+                })
+                return
+            }
+            guard !regramIsLocalGift(.unique(gift)) else { return }
             let myBalance: StarsAmount
             if buyForSelected == .stars {
                 myBalance = state.myBalance ?? .init(value: 0, nanos: 0)
@@ -2446,7 +2497,13 @@ public func SelectColorController(context: any AccountContextProtocol, peer: Pee
     //    controller?.tableView.scroll(to: .top(id: InputDataEntryId.custom(_id_collections), innerId: nil, animated: true, focus: .init(focus: false), inset: -30))
         
     }, buyAndApply: { gift, needClose in
-        
+        if isLocalAccount && (beganLocally || regramLocalGiftsEnabled(context: context)) {
+            regramPresentLocalGiftResale(context: context, gift: gift, window: context.window, completion: { stored in
+                applyLocalPurchasedGift(stored, needClose: needClose)
+            })
+            return
+        }
+        guard !regramIsLocalGift(.unique(gift)) else { return }
         let state = stateValue.with { $0 }
         
         guard let collectionId = state.selectedCollection.stableId else {
@@ -2521,7 +2578,12 @@ public func SelectColorController(context: any AccountContextProtocol, peer: Pee
         let profileBackgroundEmojiId = state.backgroundEmojiId_profile
         let emojiStatus = state.emojiStatus
         let emojiStatusGift = state.emojiStatusGift
-        
+        if isLocalAccount && (beganLocally || regramLocalGiftsEnabled(context: context)) {
+            if regramSaveLocalGiftAppearance(context: context, nameColor: nameColor, profileColor: profileColor?.nameColor, replyFileId: backgroundEmojiId, backgroundFileId: profileBackgroundEmojiId, emojiStatus: emojiStatus) { close?() }
+            else { showModalText(for: window, text: regramLocalizedString("LocalGifts.Disabled", languageCode: appCurrentLanguage.primaryLanguage.languageCode)) }
+            return
+        }
+        guard (emojiStatus?.fileId ?? 0) >= 0, !regramIsLocalGiftAppearance(nameColor: nameColor, emojiStatus: emojiStatus), (backgroundEmojiId ?? 0) >= 0, (profileBackgroundEmojiId ?? 0) >= 0, emojiStatusGift.map({ !regramIsLocalGift(.unique($0)) }) ?? true else { close?(); return }
         let wallpaper = state.wallpaper
         let actualWallpaper = state.actualWallpaper
         

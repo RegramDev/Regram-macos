@@ -25,6 +25,7 @@ import ObjcUtils
 
 public class MGalleryPeerPhotoItem: MGalleryItem {
     public let media:TelegramMediaImage
+    private var fullRepresentation: TelegramMediaImageRepresentation? { galleryFullImageRepresentation(media.representations) }
     public override init(_ context: any AccountContextProtocol, _ entry: GalleryEntry, _ pagerSize: NSSize) {
         
         self.media = entry.photo!
@@ -36,21 +37,21 @@ public class MGalleryPeerPhotoItem: MGalleryItem {
     }
     
     public override var sizeValue: NSSize {
-        if let largest = media.representationForDisplayAtSize(PixelDimensions(1280, 1280)) {
+        if let largest = fullRepresentation {
             return largest.dimensions.size.fitted(pagerSize)
         }
         return NSZeroSize
     }
     
     public override func smallestValue(for size: NSSize) -> NSSize {
-        if let largest = media.representationForDisplayAtSize(PixelDimensions(1280, 1280)) {
+        if let largest = fullRepresentation {
             return largest.dimensions.size.fitted(size)
         }
         return pagerSize
     }
     
     public override var status:Signal<MediaResourceStatus, NoError> {
-        if let largestRepresentation = media.representationForDisplayAtSize(PixelDimensions(1280, 1280)) {
+        if let largestRepresentation = fullRepresentation {
             return context.account.postbox.mediaBox.resourceStatus(largestRepresentation.resource)
         } else {
             return .never()
@@ -78,15 +79,7 @@ public class MGalleryPeerPhotoItem: MGalleryItem {
         let media = self.media
         let entry = self.entry
         
-        let magnify = self.magnify.get()
-        
-        let sizeValue: Signal<NSSize, NoError> = size.get() |> mapToSignal { size in
-            return magnify |> take(1) |> map { magnify in
-                return NSMakeSize(floorToScreenPixels(System.backingScale, size.width / magnify), floorToScreenPixels(System.backingScale, size.height / magnify))
-            }
-        } |> distinctUntilChanged(isEqual: { lhs, rhs -> Bool in
-            return lhs == rhs
-        })
+        let sizeValue = size.get() |> distinctUntilChanged
         
         
         let result = combineLatest(sizeValue, rotate.get()) |> mapToSignal { [weak self] size, orientation -> Signal<(NSSize, ImageOrientation?), NoError> in
@@ -98,26 +91,30 @@ public class MGalleryPeerPhotoItem: MGalleryItem {
                 }
             }
             return .single((newSize, orientation))
-         } |> mapToSignal { size, orientation -> Signal<(NSImage?, ImageOrientation?), NoError> in
-            return chatGalleryPhoto(account: context.account, imageReference: entry.imageReference(media), toRepresentationSize: NSMakeSize(1280, 1280), peer: entry.peer, scale: System.backingScale, synchronousLoad: true)
+         }
+        let representation = fullRepresentation
+        let rendered = combineLatest(result, magnify.get() |> distinctUntilChanged, displayScale.get()) |> mapToSignal { value, magnify, scale -> Signal<(NSImage?, ImageOrientation?), NoError> in
+            let (originalSize, orientation) = value
+            let size = NSMakeSize(ceil(originalSize.width * magnify), ceil(originalSize.height * magnify))
+            return chatGalleryPhoto(account: context.account, imageReference: entry.imageReference(media), toRepresentationSize: representation?.dimensions.size ?? size, peer: entry.peer, scale: scale, synchronousLoad: true, fullRepresentation: representation)
                     |> deliverOn(graphicsThreadPool)
                     |> map { transform in
                         let image = transform(TransformImageArguments(corners: ImageCorners(), imageSize: size, boundingSize: size, intrinsicInsets: NSEdgeInsets()))
                         if let orientation = orientation {
                             let transformed = image?.createMatchingBackingDataWithImage(orienation: orientation, keepColorSpace: true)
                             if let transformed = transformed {
-                                return (NSImage(cgImage: transformed, size: transformed.size), orientation)
+                                return (NSImage(cgImage: transformed, size: size), orientation)
                             }
                         }
                         if let image = image {
-                            return (NSImage(cgImage: image, size: image.size), orientation)
+                            return (NSImage(cgImage: image, size: size), orientation)
                         } else {
                             return (nil, nil)
                         }
                 }
         }
 
-        if let representation = media.representationForDisplayAtSize(PixelDimensions(1280, 1280))  {
+        if let representation = fullRepresentation  {
             path.set(context.account.postbox.mediaBox.resourceData(representation.resource) |> mapToSignal { (resource) -> Signal<String, NoError> in
                 
                 if resource.complete {
@@ -127,14 +124,14 @@ public class MGalleryPeerPhotoItem: MGalleryItem {
             })
         } 
         
-        self.image.set(result |> map { GPreviewValueClass(.image($0.0, $0.1)) } |> deliverOnMainQueue)
+        self.image.set(rendered |> map { GPreviewValueClass(.image($0.0, $0.1)) } |> deliverOnMainQueue)
         
         
         fetch()
     }
     
     public override func fetch() -> Void {
-        let resource = self.entry.peerPhotoResource()
+        let resource = self.entry.peerPhotoResource(representation: fullRepresentation)
         let id = self.entry.peer?.id ?? self.entry.message?.id.peerId
         let userLocation: MediaResourceUserLocation
         if let id = id {
@@ -147,7 +144,7 @@ public class MGalleryPeerPhotoItem: MGalleryItem {
     
     public override func cancel() -> Void {
         super.cancel()
-        if let representation = media.representationForDisplayAtSize(PixelDimensions(1280, 1280))  {
+        if let representation = fullRepresentation  {
             cancelFreeMediaFileInteractiveFetch(context: context, resource: representation.resource)
         }
         fetching.set(nil)

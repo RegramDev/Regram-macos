@@ -1,3 +1,5 @@
+import ChatHistoryModel
+import RegramCore
 import Foundation
 import Cocoa
 import TelegramCore
@@ -357,6 +359,9 @@ private func entries(_ state: State, arguments: Arguments) -> [InputDataEntry] {
                         arguments.addToCollection(collection, nil)
                     }
                 }, contextMenu: { option in
+                    if let profile = option.nativeProfileGift, regramLocalGiftPurchaseId(gift: profile) != nil || regramIsLocalGift(profile.gift) {
+                        return [ContextMenuItem(regramGiftString("LocalGifts.Details"), handler: { arguments.open(profile, nil) }, itemImage: MenuAnimation.menu_show_info.value)]
+                    }
                     if let profile = option.nativeProfileGift, let _ = profile.reference {
                         var items: [ContextMenuItem] = []
                         
@@ -596,7 +601,7 @@ public func PeerMediaGiftsController(context: any AccountContextProtocol, peerId
     let collectionsLimit = context.appConfiguration.getGeneralValue("stargifts_collections_limit", orElse: 10)
     let collectionGiftsLimit = context.appConfiguration.getGeneralValue("stargifts_collection_gifts_limit", orElse: 500)
     
-    actionsDisposable.add(combineLatest(queue: .mainQueue(), giftsContext.state, peer, context.starsContext.state, collectionsContext.state).startStrict(next: { [weak collectionsDisposable] gifts, peer, starsState, collectionsState in
+    actionsDisposable.add(combineLatest(queue: .mainQueue(), regramLocalGiftProfileState(context: context, peerId: peerId, profileGifts: giftsContext, canSelect: false), peer, context.starsContext.state, collectionsContext.state).startStrict(next: { [weak collectionsDisposable] gifts, peer, starsState, collectionsState in
         updateState { current in
             var current = current
             current.collectionsState[State.Collection.all.stableId] = gifts
@@ -709,6 +714,7 @@ public func PeerMediaGiftsController(context: any AccountContextProtocol, peerId
             return
         }
         
+        if let gift, regramLocalGiftPurchaseId(gift: gift) != nil || regramIsLocalGift(gift.gift) { return }
         switch collection {
         case let .collection(value):
             if let gift, let reference = gift.reference {
@@ -770,7 +776,14 @@ public func PeerMediaGiftsController(context: any AccountContextProtocol, peerId
     }
 
     let arguments = Arguments(context: context, open: { option, morphSource in
-
+        if let id = regramLocalGiftPurchaseId(gift: option) {
+            showModal(with: RegramLocalGiftController(context: context, purchaseId: id, profileGifts: takeContext()), for: window, morphSource: morphSource)
+            return
+        }
+        if regramIsLocalGift(option.gift) {
+            showModal(with: RegramLocalGiftController(context: context, purchaseId: regramLocalGiftPurchaseId(context: context, gift: option.gift)), for: window)
+            return
+        }
         let toPeer = stateValue.with { $0.peer }
         let fromPeer = option.fromPeer
         
@@ -792,6 +805,10 @@ public func PeerMediaGiftsController(context: any AccountContextProtocol, peerId
         
 
     }, togglePin: { option in
+        if regramLocalGiftPurchaseId(gift: option) != nil || regramIsLocalGift(option.gift) {
+            showModal(with: RegramLocalGiftController(context: context, purchaseId: regramLocalGiftPurchaseId(gift: option) ?? regramLocalGiftPurchaseId(context: context, gift: option.gift), profileGifts: takeContext()), for: window)
+            return
+        }
         if let reference = option.reference {
             var pinned = stateValue.with { $0.state?.gifts.filter({ $0.pinnedToTop }) ?? [] }
             if !option.pinnedToTop {
@@ -803,11 +820,19 @@ public func PeerMediaGiftsController(context: any AccountContextProtocol, peerId
             takeContext()?.updatePinnedToTopStarGifts(references: pinned.compactMap(\.reference))
         }
     }, toggleWear: { option in
+        if regramLocalGiftPurchaseId(gift: option) != nil || regramIsLocalGift(option.gift) {
+            showModal(with: RegramLocalGiftController(context: context, purchaseId: regramLocalGiftPurchaseId(gift: option) ?? regramLocalGiftPurchaseId(context: context, gift: option.gift), profileGifts: takeContext()), for: window)
+            return
+        }
         let peer = stateValue.with({ $0.peer?._asPeer() })
         if let peer, let unique = option.gift.unique, let file = unique.file {
             context.reactions.setStatus(file, peer: peer, timestamp: context.timestamp, timeout: nil, fromRect: nil, starGift: unique)
         }
     }, transfer: { option in
+        if regramLocalGiftPurchaseId(gift: option) != nil || regramIsLocalGift(option.gift) {
+            showModal(with: RegramLocalGiftController(context: context, purchaseId: regramLocalGiftPurchaseId(gift: option) ?? regramLocalGiftPurchaseId(context: context, gift: option.gift), profileGifts: takeContext()), for: window)
+            return
+        }
         let state = stateValue.with { $0 }
         let canExportDate: Int32? = option.canExportDate
         let transferStars: Int64? = option.transferStars
@@ -826,10 +851,18 @@ public func PeerMediaGiftsController(context: any AccountContextProtocol, peerId
             _ = (showModalSuccess(for: context.window, icon: theme.icons.successModalProgress, delay: 1.5)).start()
         })
     }, toggleVisibility: { option in
+        if regramLocalGiftPurchaseId(gift: option) != nil || regramIsLocalGift(option.gift) {
+            showModal(with: RegramLocalGiftController(context: context, purchaseId: regramLocalGiftPurchaseId(gift: option) ?? regramLocalGiftPurchaseId(context: context, gift: option.gift), profileGifts: takeContext()), for: window)
+            return
+        }
         if let reference = option.reference {
             takeContext()?.updateStarGiftAddedToProfile(reference: reference, added: !option.savedToProfile)
         }
     }, copy: { option in
+        if regramLocalGiftPurchaseId(gift: option) != nil || regramIsLocalGift(option.gift) {
+            showModal(with: RegramLocalGiftController(context: context, purchaseId: regramLocalGiftPurchaseId(gift: option) ?? regramLocalGiftPurchaseId(context: context, gift: option.gift), profileGifts: takeContext()), for: window)
+            return
+        }
         copyToClipboard(option.gift.unique!.link(context))
         showModalText(for: window, text: strings().contextAlertCopied)
     }, collection: { collection, gift in

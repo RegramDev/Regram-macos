@@ -16,6 +16,7 @@ if [ -z "$SOURCE_DIR" ] || [ -z "$BUILD_DIR" ] || [ -z "$PACKAGE_DIR" ]; then
 fi
 
 DEPLOYMENT_TARGET="10.15"
+export CARGO_PROFILE_RELEASE_STRIP=none
 
 if [ ! -f "$SOURCE_DIR/Cargo.toml" ]; then
     echo "wallet-engine sources are missing at $SOURCE_DIR"

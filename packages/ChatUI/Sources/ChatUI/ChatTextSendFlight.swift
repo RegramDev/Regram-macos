@@ -34,12 +34,16 @@ final class ChatTextSendFlight {
     private final class Flight {
         let container: View
         weak var rowItemView: ChatRowView?
+        weak var targetItem: ChatMessageItem?
+        let targetGeometry: ChatRowGeometry.SendFlightTarget
         var layers: [CALayer] = []
         var rowViewClips: Bool = true
 
-        init(container: View, rowItemView: ChatRowView) {
+        init(container: View, rowItemView: ChatRowView, targetItem: ChatMessageItem, targetGeometry: ChatRowGeometry.SendFlightTarget) {
             self.container = container
             self.rowItemView = rowItemView
+            self.targetItem = targetItem
+            self.targetGeometry = targetGeometry
         }
     }
 
@@ -63,6 +67,8 @@ final class ChatTextSendFlight {
             return
         }
         self.flights.remove(at: index)
+        flight.container.layer?.mask = nil
+        flight.container.layer?.removeAllAnimations()
         for layer in flight.layers {
             for key in layer.animationKeys() ?? [] where key.hasPrefix("textFlight") {
                 layer.removeAnimation(forKey: key)
@@ -145,7 +151,8 @@ final class ChatTextSendFlight {
             return
         }
         for flight in self.flights {
-            if let rowItemView = flight.rowItemView, rowItemView.convert(rowItemView.bounds, to: view) == flight.container.frame {
+            if let rowItemView = flight.rowItemView, let item = rowItemView.item as? ChatMessageItem,
+               flight.targetGeometry.canContinue(with: self.targetGeometry(rowItemView, item: item, in: view), sameItem: item === flight.targetItem) {
                 continue
             }
             self.finish(flight)
@@ -179,6 +186,10 @@ final class ChatTextSendFlight {
         NSAnimationContext.current.allowsImplicitAnimation = false
         self.start(source: pending, rowItemView: target, view: view)
         NSAnimationContext.endGrouping()
+    }
+
+    private func targetGeometry(_ rowItemView: ChatRowView, item: ChatRowItem, in view: ChatControllerView) -> ChatRowGeometry.SendFlightTarget {
+        ChatRowGeometry.SendFlightTarget(rowFrame: rowItemView.convert(rowItemView.bounds, to: view), bubbleFrame: rowItemView.bubbleFrame(item), contentFrame: rowItemView.contentFrameModifier(item), timestampFrame: rowItemView.rightFrame(item))
     }
 
     private func start(source: Source, rowItemView: ChatMessageView, view: ChatControllerView) {
@@ -216,7 +227,7 @@ final class ChatTextSendFlight {
         rowView.frame = rowViewFrame
         rowView.layer?.removeAllAnimations()
 
-        let flight = Flight(container: container, rowItemView: rowItemView)
+        let flight = Flight(container: container, rowItemView: rowItemView, targetItem: item, targetGeometry: self.targetGeometry(rowItemView, item: item, in: view))
         flight.rowViewClips = rowView.layer?.masksToBounds ?? true
         rowView.layer?.masksToBounds = false
         self.flights.append(flight)

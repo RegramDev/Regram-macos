@@ -202,7 +202,7 @@ open class PeerMediaGifsController<Context: AccountContextProtocol>: TelegramGen
             return chatHistoryViewForLocation(location, context: context, chatLocation: .peer(peerId), fixedCombinedReadStates: nil, tag: .tag(.gif))
         }
         
-        self.historyDisposable.set(history.start(next: { update in
+        self.historyDisposable.set((combineLatest(history, regramMessageFilterChanges(accountId: context.peerId.toInt64())) |> map { update, _ in update }).start(next: { update in
             
             let isLoading: Bool
             let view: MessageHistoryView?
@@ -231,7 +231,7 @@ open class PeerMediaGifsController<Context: AccountContextProtocol>: TelegramGen
             }
             // Rich messages keep their gifs in an instant page; expand each into one synthetic message
             // per gif so every animation gets its own cell.
-            let messages = expandSharedMediaMessages(view?.entries.map { $0.message } ?? [], where: sharedMediaPredicate(for: .gif))
+            let messages = expandSharedMediaMessages(regramVisibleMessages(view?.entries.map { $0.message } ?? [], accountId: context.peerId.toInt64()), where: sharedMediaPredicate(for: .gif))
 
             updateState { _ in
                 return PeerMediaGifsState(isLoading: isLoading, messages: messages)

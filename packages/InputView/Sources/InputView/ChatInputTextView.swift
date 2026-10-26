@@ -1194,7 +1194,6 @@ public final class InputTextView: BaseTextView, NSLayoutManagerDelegate, NSTextS
 
         return menu
     }
-    
 
     var transformItems: [NSMenuItem] {
         
@@ -1339,9 +1338,26 @@ public final class InputTextView: BaseTextView, NSLayoutManagerDelegate, NSTextS
         onRedraw?()
     }
 
+    public override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if window?.firstResponder === self, isEnterEvent(event), event.modifierFlags.contains(.command) {
+            if hasMarkedText() {
+                super.keyDown(with: event)
+            } else {
+                super.insertNewline(self)
+            }
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+
     public override func keyDown(with theEvent: NSEvent) {
         if let delegate = self.customDelegate {
             if delegate.inputViewIsEnabled(theEvent) {
+
+                if isEnterEvent(theEvent), self.hasMarkedText() {
+                    super.keyDown(with: theEvent)
+                    return
+                }
 
                 if isEnterEvent(theEvent) && !self.hasMarkedText() {
 

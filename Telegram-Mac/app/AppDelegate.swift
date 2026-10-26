@@ -1,4 +1,7 @@
 import Cocoa
+import RegramCore
+import RegramUI
+import InputDataUI
 import FFMpegBinding
 import SwiftSignalKit
 import Postbox
@@ -387,7 +390,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         
         self.containerUrl = containerUrl.path
 
-        try! PasscodeEnvironment.shared.configure(PasscodeConfiguration(appGroupIdentifier: ApiEnvironment.group, processRole: .mainApp, biometricKeychainService: walletBiometricKeychainService, keychainScope: ApiEnvironment.prefix == "debug" ? "debug" : nil), privateAccessGroup: { ApiEnvironment.group })
+        try! PasscodeEnvironment.shared.configure(PasscodeConfiguration(appGroupIdentifier: ApiEnvironment.group, processRole: .mainApp, biometricKeychainService: walletBiometricKeychainService, keychainScope: "\(ApiEnvironment.bundleId).\(ApiEnvironment.prefix)"), privateAccessGroup: { ApiEnvironment.group })
         
         TempBox.initializeShared(basePath: self.containerUrl, processType: "app", launchSpecificId: arc4random64())
         
@@ -1149,7 +1152,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                             #endif
                             if let executeUrlAfterLogin = self.executeUrlAfterLogin {
                                 self.executeUrlAfterLogin = nil
-                                execute(inapp: inApp(for: executeUrlAfterLogin.nsstring, context: context.context))
+                                self.processURL(executeUrlAfterLogin)
                             }
                             #if !APP_STORE
                             networkDisposable.set((context.context.account.postbox.preferencesView(keys: [PreferencesKeys.networkSettings]) |> delay(5.0, queue: Queue.mainQueue()) |> deliverOnMainQueue).start(next: { settings in
@@ -1326,6 +1329,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
 
 
     @IBAction func checkForUpdates(_ sender: Any) {
+        guard Bundle.main.object(forInfoDictionaryKey: "RegramUpdatesDisabled") as? Bool != true else { return }
         #if !APP_STORE
             showModal(with: InputDataModalController(AppUpdateViewController()), for: window)
             #if STABLE
@@ -1341,6 +1345,9 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
     }
     
     override func awakeFromNib() {
+        if Bundle.main.object(forInfoDictionaryKey: "RegramUpdatesDisabled") as? Bool == true, let menu = NSApp.mainMenu?.item(at: 0)?.submenu, let item = menu.item(withTag: 1000) {
+            menu.removeItem(item)
+        }
         #if APP_STORE
         if let menu = NSApp.mainMenu?.item(at: 0)?.submenu, let sparkleItem = menu.item(withTag: 1000) {
             menu.removeItem(sparkleItem)
@@ -1411,6 +1418,9 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
     }
     
     private func crashRecoveryUpdate() -> CrashRecoveryUpdate {
+        if Bundle.main.object(forInfoDictionaryKey: "RegramUpdatesDisabled") as? Bool == true {
+            return .manual(title: regramString("manualInstall.title"), detail: regramString("manualInstall.detail"))
+        }
         #if APP_STORE
         return .appStore
         #elseif GITHUB || DEBUG
@@ -1432,10 +1442,18 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         AppDelegate.eventProcessed = url
         
         if let url = AppDelegate.eventProcessed {
+            if let parsed = URL(string: url), parsed.scheme?.lowercased() == "regram", RegramSettingsRoute(url: parsed) == nil {
+                AppDelegate.eventProcessed = nil
+                return
+            }
             NSApp.activate(ignoringOtherApps: true)
             self.window.deminiaturize(self)
             if let context = self.contextValue?.context {
                 AppDelegate.eventProcessed = nil
+                if let parsed = URL(string: url), let route = RegramSettingsRoute(url: parsed) {
+                    if let controller = FeatureNavigationHooks.shared.makeRegramController(context, route.destination) { context.bindings.rootNavigation().push(controller) }
+                    return
+                }
                 let link = inApp(for: url as NSString, context: context, openInfo: { (peerId, isChat, postId, action) in
                     context.bindings.rootNavigation().push(ChatController(context: context, chatLocation: .peer(peerId), focusTarget: .init(messageId: postId), initialAction:action), true)
                 }, applyProxy: { proxy in
@@ -1443,6 +1461,11 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                 })
                 execute(inapp: link, isExternal: true)
             } else if let authContext = self.authContextValue {
+                if let parsed = URL(string: url), RegramSettingsRoute(url: parsed) != nil {
+                    self.executeUrlAfterLogin = url
+                    AppDelegate.eventProcessed = nil
+                    return
+                }
                 let settings = proxySettings(from: url)
                 if settings.1 {
                     AppDelegate.eventProcessed = nil

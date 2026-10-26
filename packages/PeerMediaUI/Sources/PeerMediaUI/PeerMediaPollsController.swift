@@ -260,7 +260,7 @@ public func PeerMediaPollsController<Context: AccountContextProtocol>(context: C
 
     let appearance: Signal<Appearance, NoError> = appearanceSignal |> map { $0 }
 
-    let historyView: Signal<PollsHistoryView, NoError> = combineLatest(history, statePromise.get()) |> map { update, state -> PollsHistoryView in
+    let historyView: Signal<PollsHistoryView, NoError> = combineLatest(history, statePromise.get(), regramMessageFilterChanges(accountId: context.peerId.toInt64())) |> map { update, state, _ -> PollsHistoryView in
         let isLoading: Bool
         let view: MessageHistoryView?
         let initialData: ChatHistoryCombinedInitialData
@@ -275,7 +275,7 @@ public func PeerMediaPollsController<Context: AccountContextProtocol>(context: C
             isLoading = false
         }
         if let view = view {
-            let messages: [ChatHistoryEntry] = messageEntries(view.entries, renderType: theme.bubbled ? .bubble : .list, pollAnswersLoading: state.pollAnswers, groupingPhotos: false, chatTheme: state.appearance.presentation, mediaRevealed: state.mediaRevealed, automaticDownload: initialData.autodownloadSettings, accountPeerId: context.peerId, contentConfig: context.contentConfig).reversed()
+            let messages: [ChatHistoryEntry] = messageEntries(view.entries.filter { !regramShouldHideMessage($0.message, accountId: context.peerId.toInt64()) }, renderType: theme.bubbled ? .bubble : .list, pollAnswersLoading: state.pollAnswers, groupingPhotos: false, chatTheme: state.appearance.presentation, mediaRevealed: state.mediaRevealed, automaticDownload: initialData.autodownloadSettings, accountPeerId: context.peerId, contentConfig: context.contentConfig).reversed()
             let entries = messages.map {
                 ChatWrappedEntry(appearance: AppearanceWrapperEntry(entry: $0, appearance: state.appearance), tag: nil)
             }

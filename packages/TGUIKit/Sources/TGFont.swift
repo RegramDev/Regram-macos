@@ -29,6 +29,7 @@ public struct FontCacheKey : Hashable {
     let size: CGFloat
     
     public static func initializeCache() {
+        InterfaceFontProvider.withNativeFonts {
         let all:[Font] = [.normal, .medium, .bold, .italic, .light, .ultralight, .bolditalic, .avatar, .semibold, .digitalRound, .code, .menlo, .blockchain, .italicmonospace, .semiboldItalicMonospace, .semiboldMonospace, .roundTimer, .normalMonospaced]
         for i in 10 ..< 20 {
             let fontSize = CGFloat(i)
@@ -74,10 +75,12 @@ public struct FontCacheKey : Hashable {
             }
         }
     }
+    }
 }
 
 
 public func systemFont(_ size:CGFloat) ->NSFont {
+    if let font = InterfaceFontProvider.font(size: size, weight: .regular) { return font }
     if let font = caches[.init(type: .normal, size: size)] {
         return font
     }
@@ -87,6 +90,7 @@ public func systemFont(_ size:CGFloat) ->NSFont {
 public extension NSFont {
     
     static func normal(_ size:FontSize) ->NSFont {
+        if let font = InterfaceFontProvider.font(size: size, weight: .regular) { return font }
         if let font = caches[.init(type: .normal, size: size)] {
             return font
         }
@@ -108,12 +112,14 @@ public extension NSFont {
     }
     
     static func light(_ size:FontSize) ->NSFont {
+        if let font = InterfaceFontProvider.font(size: size, weight: .light) { return font }
         if let font = caches[.init(type: .light, size: size)] {
             return font
         }
         return NSFont.systemFont(ofSize: size, weight: NSFont.Weight.light)
     }
     static func ultraLight(_ size:FontSize) ->NSFont {
+        if let font = InterfaceFontProvider.font(size: size, weight: .ultraLight) { return font }
         if let font = caches[.init(type: .ultralight, size: size)] {
             return font
         }
@@ -121,6 +127,7 @@ public extension NSFont {
     }
     
     static func italic(_ size: FontSize) -> NSFont {
+        if let font = InterfaceFontProvider.font(size: size, weight: .regular, italic: true) { return font }
         if let font = caches[.init(type: .italic, size: size)] {
             return font
         }
@@ -128,6 +135,7 @@ public extension NSFont {
     }
     
     static func boldItalic(_ size: FontSize) -> NSFont {
+        if let font = InterfaceFontProvider.font(size: size, weight: .medium, italic: true) { return font }
         if let font = caches[.init(type: .bolditalic, size: size)] {
             return font
         }
@@ -223,6 +231,7 @@ public extension NSFont {
     }
 
     static func medium(_ size:FontSize) ->NSFont {
+        if let font = InterfaceFontProvider.font(size: size, weight: .medium) { return font }
         if let font = caches[.init(type: .medium, size: size)] {
             return font
         }
@@ -234,6 +243,7 @@ public extension NSFont {
         
     }
     static func semibold(_ size:FontSize) ->NSFont {
+        if let font = InterfaceFontProvider.font(size: size, weight: .semibold) { return font }
         if let font = caches[.init(type: .semibold, size: size)] {
             return font
         }
@@ -243,6 +253,7 @@ public extension NSFont {
     
     
     static func bold(_ size:FontSize) ->NSFont {
+        if let font = InterfaceFontProvider.font(size: size, weight: .semibold) { return font }
         if let font = caches[.init(type: .bold, size: size)] {
             return font
         }

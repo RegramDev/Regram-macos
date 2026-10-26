@@ -69,6 +69,15 @@ Only the modules you will touch most. Find anything else with `grep -rn "func Na
 - `BETA`/`STABLE`/`ALPHA`/`APP_STORE` are false in packages in Xcode UI builds; only `buildbox/build-mac.sh` sets them
 - App extensions like `Peer.isForum` and `Peer.displayLetters` shadow TelegramCore members; in a package call them through hooks
 
+## Local Regram Testing and Updates
+
+- Test the Release configuration, with STABLE passed to Swift packages; do not launch Debug builds for user testing
+- Use `scripts/install-regram-release.py` to build, verify and install `/Applications/Regram.app`; launch the installed copy
+- Keep the signing identity fixed in ignored `Telegram-Mac/Signing.local.json`; do not use ad-hoc signing for updates
+- Remove the replaced application and temporary build app bundles after a successful installation; retain build caches
+- Preserve local data on updates unless the user explicitly requests a reset
+- Keep Regram keychain scopes separate from Telegram; do not migrate or delete Telegram credentials
+
 
 ## Shipping a Beta
 A beta build starts when `beta` is pushed to `origin`.

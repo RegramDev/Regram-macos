@@ -1,3 +1,5 @@
+import ChatHistoryModel
+import RegramCore
 import Cocoa
 import Foundation
 import TGUIKit
@@ -870,10 +872,14 @@ public func GiftingController(context: (any AccountContextProtocol), peerId: Pee
     }, executeLink: { link in
         
     }, openGift: { option in
-        
+        let beganLocally = regramLocalGiftsEnabled(context: context) || regramIsLocalGift(option.native)
         let open:()->Void = {
             let state = stateValue.with { $0 }
             if let peer = state.peer {
+                if beganLocally || regramLocalGiftsEnabled(context: context) {
+                    showModal(with: PreviewStarGiftController(context: context, option: .starGift(option: option), peer: peer, disallowedGifts: state.disallowedGifts, starGiftsProfile: starGiftsContext, localPurchaseOnly: true), for: window)
+                    return
+                }
                 guard let gift = option.native.generic else {
                     return
                 }
@@ -972,6 +978,10 @@ public func GiftingController(context: (any AccountContextProtocol), peerId: Pee
             }
         }
         
+        if beganLocally {
+            open()
+            return
+        }
         if let gift = option.native.generic,
            let lockedUntilDate = gift.lockedUntilDate,
            Int32(Date().timeIntervalSince1970) < lockedUntilDate {
@@ -1006,7 +1016,10 @@ public func GiftingController(context: (any AccountContextProtocol), peerId: Pee
             prem(with: PremiumBoardingController(context: context), for: window)
         }
     }, transfer: { gift in
-        
+        if regramLocalGiftPurchaseId(gift: gift) != nil || regramIsLocalGift(gift.gift) {
+            showModal(with: RegramLocalGiftController(context: context, purchaseId: regramLocalGiftPurchaseId(gift: gift)), for: window)
+            return
+        }
         let unique = gift.gift.unique
         let state = stateValue.with { $0 }
         let peer = state.peer

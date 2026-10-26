@@ -29,3 +29,6 @@ core-xprojects/tlottie/build
 .swiftpm/
 .ci-build-logs/
 *.profraw
+Telegram-Mac/ApiCredentials.local.xcconfig
+Telegram-Mac/Signing.local.json
+/docs/regram-macos-port/

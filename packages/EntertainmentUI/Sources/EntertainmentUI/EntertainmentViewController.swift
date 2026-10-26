@@ -16,6 +16,7 @@ import ChatModeTypes
 import InlineStickerLayer
 import PremiumStatusUI
 import InputDataUI
+import RegramCore
 
 
 public enum ESearchCommand {
@@ -283,6 +284,8 @@ public class EntertainmentViewController<Context: AccountContextProtocol>: Teleg
         let state: EntertainmentState
         if mode == .selectAvatar {
             state = .stickers
+        } else if RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["forceEmojiTab"].bool {
+            state = .emoji
         } else {
             state = FastSettings.entertainmentState
         }
@@ -382,7 +385,7 @@ public class EntertainmentViewController<Context: AccountContextProtocol>: Teleg
         
 
         let index: Int
-        if mode == .selectAvatar {
+        if mode == .selectAvatar || RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["forceEmojiTab"].bool {
             index = 0
         } else {
             index = Int(FastSettings.entertainmentState.rawValue)
@@ -431,6 +434,10 @@ public class EntertainmentViewController<Context: AccountContextProtocol>: Teleg
     
     public override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        if mode != .selectAvatar, RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["forceEmojiTab"].bool {
+            section.select(0, false)
+            genericView.updateSelected(.emoji, mode: mode, animated: false)
+        }
         section.viewWillAppear(animated)
         updateLocalizationAndTheme(theme: presentation ?? theme)
     }

@@ -1,3 +1,4 @@
+import RegramCore
 import Cocoa
 import TGUIKit
 import TelegramCore
@@ -220,7 +221,9 @@ public final class ChatListRevealView : TableStickView {
             return
         }
         
+        let regramSettings = RegramPreferences.shared.settings(accountId: context.peerId.toInt64())
         let generateIcon:(ChatListFilter?)->CGImage? = { tab in
+            if regramSettings["features.hideFolderUnreadCount"].bool { return nil }
             let unreadCount:ChatListFilterBadge? = item.counters.count(for: tab)
             let icon: CGImage?
             if let unreadCount = unreadCount, unreadCount.count > 0 {
@@ -260,6 +263,7 @@ public final class ChatListRevealView : TableStickView {
         let segmentTheme = ScrollableSegmentTheme(background: .clear, border: item.presentation.colors.border, selector: item.presentation.colors.accent, inactiveText: item.presentation.colors.grayText, activeText: item.presentation.colors.text, textFont: .normal(.text))
 
         segmentView.theme = segmentTheme
+        segmentView.fitToWidth = !regramSettings["compactFolderNames"].bool
 
         var index: Int = 0
         let insets = NSEdgeInsets(left: 10, right: 10)
@@ -267,14 +271,19 @@ public final class ChatListRevealView : TableStickView {
         for tab in item.tabs {
             let unreadCount = item.counters.count(for: tab)
             let icon: CGImage? = generateIcon(tab)
-            let title: String = tab.title
+            let folderIcon: String
+            if case let .filter(_, _, emoticon, _) = tab { folderIcon = emoticon ?? "📁" } else { folderIcon = "💬" }
+            let title = RegramChatListPolicy.folderTitle(text: tab.title, icon: folderIcon, allChats: tab == .allChats, shortAllChats: regramLocalizedString("ios.Native.All", languageCode: appCurrentLanguage.primaryLanguage.languageCode), longAllChats: regramLocalizedString("ios.Native.AllChats", languageCode: appCurrentLanguage.primaryLanguage.languageCode), settings: regramSettings)
             let selected = item.selected == tab
 
-            let segmentItem = ScrollableSegmentItem(title: title, index: index, uniqueId: Int64(ChatListUIHooks.shared.chatListFilterId(tab)), selected: selected, insets: insets, icon: icon, theme: segmentTheme, equatable: UIEquatable(unreadCount), customTextView: {
+            let badgePresentation = RegramFolderBadgePresentation(count: unreadCount?.count ?? 0, hasUnmutedUnread: unreadCount?.hasUnmutedUnread ?? false, hidden: regramSettings["features.hideFolderUnreadCount"].bool)
+            let segmentItem = ScrollableSegmentItem(title: title, index: index, uniqueId: Int64(ChatListUIHooks.shared.chatListFilterId(tab)), selected: selected, insets: insets, icon: icon, theme: segmentTheme, equatable: UIEquatable(badgePresentation), customTextView: {
                 
                 let attr = NSMutableAttributedString()
                 attr.append(string: title, color: selected ? segmentTheme.activeText : segmentTheme.inactiveText, font: segmentTheme.textFont)
-                InlineStickerItem.apply(to: attr, associatedMedia: [:], entities: tab.entities, isPremium: context.isPremium, playPolicy: tab.enableAnimations ? nil : .framesCount(1))
+                let prefixLength = regramSettings["features.chatListFolderTabDisplayMode"].string == "both" ? folderIcon.utf16.count + 1 : 0
+                let entities = regramSettings["features.chatListFolderTabDisplayMode"].string == "icon" ? [] : tab.entities.map { MessageTextEntity(range: ($0.range.lowerBound + prefixLength)..<($0.range.upperBound + prefixLength), type: $0.type) }
+                InlineStickerItem.apply(to: attr, associatedMedia: [:], entities: entities, isPremium: context.isPremium, playPolicy: tab.enableAnimations ? nil : .framesCount(1))
 
                 let layout = TextViewLayout(attr)
                 layout.measure(width: .greatestFiniteMagnitude)
@@ -286,7 +295,7 @@ public final class ChatListRevealView : TableStickView {
                 
                 return textView
             })
-            let accessibilityUnreadCount = unreadCount?.count
+            let accessibilityUnreadCount = regramSettings["features.hideFolderUnreadCount"].bool ? nil : unreadCount?.count
             segmentItem.accessibilityLabel = {
                 return ChatListRevealItem.accessibilityTabTitle(title, unreadCount: accessibilityUnreadCount)
             }
@@ -295,6 +304,7 @@ public final class ChatListRevealView : TableStickView {
         }
         
         segmentView.updateItems(items, animated: animated)
+        guard !items.isEmpty else { segmentView.resortRange = nil; return }
         let range: NSRange
         if context.isPremium {
             range = NSMakeRange(0, items.count)

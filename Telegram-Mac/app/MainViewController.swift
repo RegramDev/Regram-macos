@@ -1,3 +1,5 @@
+import RegramCore
+import RegramSignals
 import Cocoa
 import TGUIKit
 import TelegramCore
@@ -212,6 +214,7 @@ final class UpdateTabController: GenericViewController<UpdateTabView> {
         
         genericView.set(background: .clear, for: .Normal)
         genericView.isHidden = true
+        guard Bundle.main.object(forInfoDictionaryKey: "RegramUpdatesDisabled") as? Bool != true else { return }
         
         #if APP_STORE
         
@@ -387,6 +390,9 @@ class MainViewController: TelegramGenericViewController<MainController_View> {
     private let updateController: UpdateTabController
     private let connectingStatusView: ConnectingStatusView = ConnectingStatusView(frame: NSRect(origin: .zero, size: ConnectingStatusView.collapsedSize))
     private let connectingStatusDisposable = MetaDisposable()
+    private var regramTabs: [RegramBottomBarItemId: TabItem] = [:]
+    private var regramVisibleTabs: [RegramBottomBarItemId] = []
+    private var rebuildingNavigation = false
 
     override var containerCornerRadius: CGFloat {
         return 0
@@ -497,19 +503,16 @@ class MainViewController: TelegramGenericViewController<MainController_View> {
             self.layoutConnectingStatusView()
         }))
                 
-        tabController.add(tab: TabAnimatedItem(.tab_contacts, image: theme.icons.tab_contacts, selectedImage: theme.icons.tab_contacts_active, controller: contacts))
-        
-        tabController.add(tab: TabAnimatedItem(.tab_calls, image: theme.icons.tab_calls, selectedImage: theme.icons.tab_calls_active, controller: phoneCalls))
-        
-        tabController.add(tab: TabBadgeItem(context, controller: navigation, image: theme.icons.tab_chats, selectedImage: theme.icons.tab_chats_active, longHoverHandler: { [weak self] control in
+        regramTabs[.contacts] = TabAnimatedItem(.tab_contacts, image: theme.icons.tab_contacts, selectedImage: theme.icons.tab_contacts_active, controller: contacts)
+        regramTabs[.calls] = TabAnimatedItem(.tab_calls, image: theme.icons.tab_calls, selectedImage: theme.icons.tab_calls_active, controller: phoneCalls)
+        regramTabs[.chats] = TabBadgeItem(context, controller: navigation, image: theme.icons.tab_chats, selectedImage: theme.icons.tab_chats_active, longHoverHandler: { [weak self] control in
             self?.showFastChatSettings(control)
-        }))
-        
-        tabController.add(tab: TabAllBadgeItem(context, image: theme.icons.tab_settings, selectedImage: theme.icons.tab_settings_active, controller: settings, longHoverHandler: { [weak self] control in
+        })
+        regramTabs[.settings] = TabAllBadgeItem(context, image: theme.icons.tab_settings, selectedImage: theme.icons.tab_settings_active, controller: settings, longHoverHandler: { [weak self] control in
             self?.showFastSettings(control)
-        }))
-        
-        
+        })
+        rebuildNavigationTabs()
+
         tabController.updateLocalizationAndTheme(theme: theme)
 
         updateTabAccessibility()
@@ -532,6 +535,7 @@ class MainViewController: TelegramGenericViewController<MainController_View> {
         }))
         
         tabController.didChangedIndex = { [weak self] index in
+            guard self?.rebuildingNavigation == false else { return }
             self?.checkSettings(index)
             self?.updateChatListBottomOverlays()
         }
@@ -542,16 +546,40 @@ class MainViewController: TelegramGenericViewController<MainController_View> {
         settings.loadViewIfNeeded(bounds)
     }
 
-    private func showCallsTab() {
-        tabController.insert(tab: TabAnimatedItem(.tab_calls, image: theme.icons.tab_calls, selectedImage: theme.icons.tab_calls_active, controller: phoneCalls), at: 1)
-        previousIndex = tabController.selectedIndex
+    private func rebuildNavigationTabs() {
+        let settings = RegramPreferences.shared.settings(accountId: context.peerId.toInt64())
+        let configuration = RegramBottomBarSettings(settings: settings)
+        for (identifier, item) in regramTabs { item.accessibilityTitle = navigationTabTitle(identifier) }
+        var visible = configuration.bottomItems.filter { $0.isNavigationItem && configuration.isVisible($0) && ($0 != .calls || showCallTabs) && ($0 != .contacts || settings["native.showContactsTab"].bool) }
+        if !visible.contains(.chats) { visible.append(.chats) }
+        if !visible.contains(.settings) { visible.append(.settings) }
+        if visible != regramVisibleTabs {
+            let selected = regramVisibleTabs.first(where: { regramTabs[$0]?.controller === tabController.current }) ?? .chats
+            rebuildingNavigation = true
+            while tabController.count > visible.count { tabController.remove(at: tabController.count - 1) }
+            for (index, tab) in visible.enumerated() {
+                guard let item = regramTabs[tab] else { continue }
+                if index < tabController.count { tabController.replace(tab: item, at: index) }
+                else { tabController.add(tab: item) }
+            }
+            regramVisibleTabs = visible
+            let target = visible.firstIndex(of: selected) ?? visible.firstIndex(of: .chats) ?? 0
+            tabController.select(index: target)
+            previousIndex = target
+            rebuildingNavigation = false
+        }
         updateTabAccessibility()
+        let searchEnabled = configuration.isVisible(.search)
+        tabController.updatePresentation(TabBarPresentation(showsLabels: true, width: .fraction(CGFloat(max(50, configuration.buttonWidthFillRatio)) / 100), accessoryImage: searchEnabled ? theme.icons.chatSearch : nil, accessoryTitle: strings().searchFieldSearch, accessoryAction: searchEnabled ? { [weak self] in
+            guard let self else { return }
+            if self.tabController.current === self.settings { self.settings.searchView.change(state: .Focus, true) }
+            else { self.tabController.select(index: self.chatIndex); self.context.bindings.mainViewController.focusSearch(animated: true, text: "") }
+        } : nil))
+        tabController.hideTabView(context.layout == .minimisize)
+        updateChatListBottomOverlays()
+        layoutConnectingStatusView()
     }
-    private func hideCallsTab() {
-        tabController.remove(at: 1)
-        previousIndex = tabController.selectedIndex
-    }
-    
+
     override var removeAfterDisapper: Bool {
         return false
     }
@@ -563,16 +591,19 @@ class MainViewController: TelegramGenericViewController<MainController_View> {
                 
         tabController.navigationController = navigation
                 
-        prefDisposable.set((baseAppSettings(accountManager: context.sharedContext.accountManager) |> deliverOnMainQueue).start(next: { [weak self] settings in
-            guard let `self` = self else {return}
-            if settings.showCallsTab != self.showCallTabs {
-                self.showCallTabs = settings.showCallsTab
-                if self.showCallTabs {
-                    self.showCallsTab()
-                } else {
-                    self.hideCallsTab()
+        prefDisposable.set((combineLatest(baseAppSettings(accountManager: context.sharedContext.accountManager), regramPreferenceChanges(accountId: context.peerId.toInt64())) |> deliverOnMainQueue).start(next: { [weak self] settings, preferences in
+            guard let self else { return }
+            if preferences.values["bottomBarLayout"] == nil, preferences.values["sidebarOrder"] != nil || preferences.values["sidebarHiddenTabs"] != nil {
+                let migrated = RegramBottomBarSettings(settings: preferences)
+                RegramPreferences.shared.update(accountId: self.context.peerId.toInt64()) {
+                    migrated.apply(to: &$0)
+                    $0["native.showContactsTab"] = .bool(migrated.isVisible(.contacts))
+                    $0["native.showCallsTab"] = .bool(migrated.isVisible(.calls))
                 }
+                _ = updateBaseAppSettingsInteractively(accountManager: self.context.sharedContext.accountManager) { $0.withUpdatedShowCallsTab(migrated.isVisible(.calls)) }.startStandalone()
             }
+            self.showCallTabs = settings.showCallsTab
+            self.rebuildNavigationTabs()
         }))
 
     }
@@ -671,7 +702,7 @@ class MainViewController: TelegramGenericViewController<MainController_View> {
         case .none:
             items.append(ContextMenuItem(strings().fastSettingsSetPasscode, handler: { [weak self] in
                 guard let `self` = self else {return}
-                self.tabController.select(index: self.tabController.count - 1)
+                self.tabController.select(index: self.settingsIndex)
                 self.context.bindings.rootNavigation().push(PasscodeSettingsViewController(self.context))
             }, itemImage: MenuAnimation.menu_lock.value))
         default:
@@ -722,22 +753,26 @@ class MainViewController: TelegramGenericViewController<MainController_View> {
         //#endif
 
         updateTabsIfNeeded()
+        if !regramTabs.isEmpty { rebuildNavigationTabs() }
         self.tabController.view.needsLayout = true
     }
     
     private func updateTabsIfNeeded() {
         if !tabController.isEmpty && (previousTheme?.colors != theme.colors ||  previousIconColor != theme.colors.accentIcon) {
-            var index: Int = 0
-            tabController.replace(tab: tabController.tab(at: index).withUpdatedImages(theme.icons.tab_contacts, theme.icons.tab_contacts_active), at: index)
-            index += 1
-            if showCallTabs {
-                tabController.replace(tab: tabController.tab(at: index).withUpdatedImages(theme.icons.tab_calls, theme.icons.tab_calls_active), at: index)
-                index += 1
+            for tab in RegramBottomBarItemId.allCases where tab.isNavigationItem {
+                guard let previous = regramTabs[tab] else { continue }
+                let images: (CGImage, CGImage)
+                switch tab {
+                case .contacts: images = (theme.icons.tab_contacts, theme.icons.tab_contacts_active)
+                case .calls: images = (theme.icons.tab_calls, theme.icons.tab_calls_active)
+                case .chats: images = (theme.icons.tab_chats, theme.icons.tab_chats_active)
+                case .settings: images = (theme.icons.tab_settings, theme.icons.tab_settings_active)
+                case .search: continue
+                }
+                let item = previous.withUpdatedImages(images.0, images.1)
+                regramTabs[tab] = item
+                if let index = regramVisibleTabs.firstIndex(of: tab) { tabController.replace(tab: item, at: index) }
             }
-            
-            tabController.replace(tab: tabController.tab(at: index).withUpdatedImages(theme.icons.tab_chats, theme.icons.tab_chats_active), at: index)
-            index += 1
-            tabController.replace(tab: tabController.tab(at: index).withUpdatedImages(theme.icons.tab_settings, theme.icons.tab_settings_active), at: index)
         }
         self.previousTheme = theme
         self.previousIconColor = theme.colors.accentIcon
@@ -746,22 +781,18 @@ class MainViewController: TelegramGenericViewController<MainController_View> {
 
     private func updateTabAccessibility() {
         for index in 0 ..< tabController.count {
+            guard regramVisibleTabs.indices.contains(index) else { continue }
             let tab = tabController.tab(at: index)
-            let title: String
-            if tab.controller === contacts {
-                title = strings().contactsContacsSeparator
-            } else if tab.controller === phoneCalls {
-                title = strings().telegramLayoutRecentCallsViewController
-            } else if tab.controller === settings {
-                title = strings().telegramLayoutAccountController
-            } else {
-                title = strings().peerMediaSavedMessages
-            }
+            let title = navigationTabTitle(regramVisibleTabs[index])
             tab.accessibilityTitle = title
             let control = tabController.control(for: index)
             control.setAccessibilityLabel(title)
             control.toolTip = title
         }
+    }
+
+    private func navigationTabTitle(_ identifier: RegramBottomBarItemId) -> String {
+        regramLocalizedString("RG.BottomBarLayout.Item." + identifier.rawValue, languageCode: appCurrentLanguage.primaryLanguage.languageCode)
     }
     
     private var previousIndex: Int? = nil
@@ -775,7 +806,7 @@ class MainViewController: TelegramGenericViewController<MainController_View> {
             self.previousIndex = index
             quickController?.popover?.hide()
         } else {
-            if previousIndex == tabController.count - 1 || isSettings {
+            if previousIndex == settingsIndex || isSettings {
                 if isSettings && context.layout != .single {
                     navigation.push(GeneralSettingsViewController(context), false)
                 } else {
@@ -907,19 +938,10 @@ class MainViewController: TelegramGenericViewController<MainController_View> {
         super.didRemovedFromStack()
     }
     
-    var chatIndex: Int {
-        if showCallTabs {
-            return 2
-        } else {
-            return 1
-        }
-    }
-    
-    var settingsIndex: Int {
-        return chatIndex + 1
-    }
-    
-    
+    var chatIndex: Int { regramVisibleTabs.firstIndex(of: .chats) ?? 0 }
+
+    var settingsIndex: Int { regramVisibleTabs.firstIndex(of: .settings) ?? max(0, tabController.count - 1) }
+
     func openChat(_ index: Int, force: Bool = false) {
         if self.tabController.current == navigation {
             let controller = navigation.controller
@@ -941,17 +963,16 @@ class MainViewController: TelegramGenericViewController<MainController_View> {
     }
 
     func showCalls() {
-        if showCallTabs {
-            context.bindings.switchSplitLayout(.dual)
-            if self.context.layout != .minimisize {
-                if self.context.layout == .single {
-                    self.navigationController?.close()
-                }
-                self.tabController.select(index: 1)
-            }
+        context.bindings.switchSplitLayout(.dual)
+        guard context.layout != .minimisize else { return }
+        if context.layout == .single { navigationController?.close() }
+        if let index = regramVisibleTabs.firstIndex(of: .calls) { tabController.select(index: index) }
+        else {
+            tabController.select(index: chatIndex)
+            context.bindings.rootNavigation().push(RecentCallsViewController(context))
         }
     }
-    
+
     var effectiveNavigation: NavigationViewController {
         return self.navigation
     }

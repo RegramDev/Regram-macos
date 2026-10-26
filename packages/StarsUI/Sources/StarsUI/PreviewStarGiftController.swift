@@ -1,3 +1,5 @@
+import ChatHistoryModel
+import RegramCore
 import Cocoa
 import Foundation
 import TGUIKit
@@ -1271,9 +1273,12 @@ public enum PreviewGiftSource : Equatable {
     case premium(option: PremiumGiftProduct, starOption: PremiumGiftProduct?)
 }
 
-public func PreviewStarGiftController(context: (any AccountContextProtocol), option: PreviewGiftSource, peer: EnginePeer, disallowedGifts: TelegramDisallowedGifts, starGiftsProfile: ProfileGiftsContext? = nil) -> InputDataModalController {
+public func PreviewStarGiftController(context: (any AccountContextProtocol), option: PreviewGiftSource, peer: EnginePeer, disallowedGifts: TelegramDisallowedGifts, starGiftsProfile: ProfileGiftsContext? = nil, localPurchaseOnly: Bool = false) -> InputDataModalController {
+
+    var beganLocally = localPurchaseOnly || regramLocalGiftsEnabled(context: context)
 
     let actionsDisposable = DisposableSet()
+    actionsDisposable.add(regramLocalGiftsState(context: context).start(next: { if $0.enabled { beganLocally = true } }))
     let paymentDisposable = MetaDisposable()
     
     let starGiftsProfile: ProfileGiftsContext = starGiftsProfile ?? ProfileGiftsContext(account: context.account, peerId: peer.id)
@@ -1295,7 +1300,7 @@ public func PreviewStarGiftController(context: (any AccountContextProtocol), opt
   
     switch option {
     case let .starGift(option):
-        if let gift = option.native.generic, gift.isAuction {
+        if let gift = option.native.generic, gift.isAuction, !beganLocally {
             auctionContext = GiftAuctionContext(account: context.account, gift: .generic(gift))
             actionsDisposable.add(context.giftAuctionsManager.auctionContext(for: .giftId(gift.id)).startStandalone(next: { value in
                 auctionContext = value
@@ -1563,6 +1568,12 @@ public func PreviewStarGiftController(context: (any AccountContextProtocol), opt
         
         let state = stateValue.with { $0 }
         
+        if case let .starGift(option) = state.option, beganLocally || regramLocalGiftsEnabled(context: context) || regramIsLocalGift(option.native) {
+            regramPresentLocalGiftPurchase(context: context, gift: option.native, price: option.native.generic?.price ?? option.stars, window: window, completion: { success in
+                if success { close?() }
+            })
+            return .none
+        }
         guard let starsState = state.starsState else {
             return .none
         }
@@ -1585,8 +1596,10 @@ public func PreviewStarGiftController(context: (any AccountContextProtocol), opt
             let source: BotPaymentInvoiceSource = .starGift(hideName: state.isAnonymous, includeUpgrade: state.includeUpgrade, peerId: state.peer.id, giftId: option.native.generic!.id, text: state.textState.string, entities: state.textState.textInputState().messageTextEntities())
             
             let make:()->Signal<SendBotPaymentResult, BotPaymentFormRequestError> = {
-                return  context.engine.payments.fetchBotPaymentForm(source: source, themeParams: nil) |> mapToSignal {
-                    return context.engine.payments.sendStarsPaymentForm(formId: $0.id, source: source) |> mapError { _ in
+                guard !beganLocally, !regramLocalGiftsEnabled(context: context), !regramIsLocalGift(option.native) else { return .fail(.generic) }
+                return context.engine.payments.fetchBotPaymentForm(source: source, themeParams: nil) |> deliverOnMainQueue |> mapToSignal { form in
+                    guard !beganLocally, !regramLocalGiftsEnabled(context: context), !regramIsLocalGift(option.native) else { return .fail(.generic) }
+                    return context.engine.payments.sendStarsPaymentForm(formId: form.id, source: source) |> mapError { _ in
                         return .generic
                     }
                 }
@@ -1648,7 +1661,7 @@ public func PreviewStarGiftController(context: (any AccountContextProtocol), opt
     let updateRightHeader:()->Void = { [weak modalController, weak controller] in
         switch option {
         case let .starGift(option):
-            if let gift = option.native.generic, gift.availability != nil, !gift.flags.contains(.requiresPremium), !gift.isAuction  {
+            if let gift = option.native.generic, gift.availability != nil, !gift.flags.contains(.requiresPremium), !gift.isAuction, !beganLocally, !regramLocalGiftsEnabled(context: context) {
                 let count = stateValue.with { $0.count }
                 controller?.rightModalHeader = ModalHeaderData(image: generateTextIcon(.initialize(string: "\(count)x", color: theme.colors.accent, font: .medium(.title))), contextMenu: {
                     let count = stateValue.with { $0.count }

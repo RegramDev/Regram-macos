@@ -539,7 +539,7 @@ public class GalleryPageController : NSObject, NSPageControllerDelegate {
             return self?.controller.selectedViewController?.view
         }, with: self, priority: .high)
         
-        window.set(mouseHandler: { [weak self] (_) -> KeyHandlerResult in
+        window.set(mouseHandler: { [weak self] event -> KeyHandlerResult in
             if let strongSelf = self {
                 if strongSelf.lockedTransition {
                     return .invoked

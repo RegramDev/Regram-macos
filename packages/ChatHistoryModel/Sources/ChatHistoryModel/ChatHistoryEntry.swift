@@ -11,6 +11,7 @@ import TelegramUtils
 import ChatModeTypes
 import MessageUtils
 import Localization
+import RegramCore
 
 
 public struct ChatPollStateData : Equatable {
@@ -123,6 +124,7 @@ public struct MessageEntryAdditionalData : Equatable {
     public let canHighlightLinks: Bool
     public let summarize: ChatLiveTranslateContext.State.SummarizeResult?
     public let walletFiatRate: WalletFiatRateProjection?
+    public let regramRevision: Int64
 
     public var transcribeTranslate: String? {
         return transcriptionTranslate?.text
@@ -133,7 +135,7 @@ public struct MessageEntryAdditionalData : Equatable {
         }
         return false
     }
-    public init(pollStateData: ChatPollStateData = ChatPollStateData(), highlightFoundText: HighlightFoundText? = nil, isThreadLoading: Bool = false, updatingMedia: ChatUpdatingMessageMedia? = nil, chatTheme: TelegramPresentationTheme? = nil, reactions: ReactionsProjection? = nil, transribeState:TranscribeAudioState? = nil, transcriptionTranslate: ChatLiveTranslateContext.State.TranscriptionResult? = nil, eventLog: AdminLogEvent? = nil, isRevealed: Bool? = nil, translate: ChatLiveTranslateContext.State.Result? = nil, replyTranslate: ChatLiveTranslateContext.State.Result? = nil, storyReadMaxId: Int32? = nil, authorStoryStats: PeerStoryStats? = nil, cachedData: CachedDataProjection? = nil, recommendedChannels: RecommendedChannels? = nil, automaticDownload: AutoDownloadProjection = AutoDownloadProjection(.defaultSettings), savedMessageTags: SavedMessageTags? = nil, codeSyntaxData: [CodeSyntaxKey : CodeSyntaxResult] = [:], messageEffect: AvailableMessageEffects.MessageEffect? = nil, factCheckRevealed: Bool = false, solutionRevealed: Bool = false, quoteRevealed: Set<Int> = Set(), detailsExpanded: Set<Int> = Set(), monoforumState: MonoforumUIState? = nil, canHighlightLinks: Bool = true, summarize: ChatLiveTranslateContext.State.SummarizeResult? = nil, walletFiatRate: WalletFiatRateProjection? = nil) {
+    public init(pollStateData: ChatPollStateData = ChatPollStateData(), highlightFoundText: HighlightFoundText? = nil, isThreadLoading: Bool = false, updatingMedia: ChatUpdatingMessageMedia? = nil, chatTheme: TelegramPresentationTheme? = nil, reactions: ReactionsProjection? = nil, transribeState:TranscribeAudioState? = nil, transcriptionTranslate: ChatLiveTranslateContext.State.TranscriptionResult? = nil, eventLog: AdminLogEvent? = nil, isRevealed: Bool? = nil, translate: ChatLiveTranslateContext.State.Result? = nil, replyTranslate: ChatLiveTranslateContext.State.Result? = nil, storyReadMaxId: Int32? = nil, authorStoryStats: PeerStoryStats? = nil, cachedData: CachedDataProjection? = nil, recommendedChannels: RecommendedChannels? = nil, automaticDownload: AutoDownloadProjection = AutoDownloadProjection(.defaultSettings), savedMessageTags: SavedMessageTags? = nil, codeSyntaxData: [CodeSyntaxKey : CodeSyntaxResult] = [:], messageEffect: AvailableMessageEffects.MessageEffect? = nil, factCheckRevealed: Bool = false, solutionRevealed: Bool = false, quoteRevealed: Set<Int> = Set(), detailsExpanded: Set<Int> = Set(), monoforumState: MonoforumUIState? = nil, canHighlightLinks: Bool = true, summarize: ChatLiveTranslateContext.State.SummarizeResult? = nil, walletFiatRate: WalletFiatRateProjection? = nil, regramRevision: Int64 = 0) {
         self.pollStateData = pollStateData
         self.highlightFoundText = highlightFoundText
         self.isThreadLoading = isThreadLoading
@@ -162,10 +164,12 @@ public struct MessageEntryAdditionalData : Equatable {
         self.canHighlightLinks = canHighlightLinks
         self.summarize = summarize
         self.walletFiatRate = walletFiatRate
+        self.regramRevision = regramRevision
     }
 
 
     public static func ==(lhs: MessageEntryAdditionalData, rhs: MessageEntryAdditionalData) -> Bool {
+        if lhs.regramRevision != rhs.regramRevision { return false }
         if lhs.isThreadLoading != rhs.isThreadLoading { return false }
         if lhs.factCheckRevealed != rhs.factCheckRevealed { return false }
         if lhs.solutionRevealed != rhs.solutionRevealed { return false }
@@ -655,6 +659,16 @@ private var index = 0
 
 public func messageEntries(_ messagesEntries: [MessageHistoryEntry], location: ChatLocation? = nil, maxReadIndex:MessageIndex? = nil, includeHoles: Bool = true, dayGrouping: Bool = false, renderType: ChatItemRenderType = .list, includeBottom:Bool = false, timeDifference: TimeInterval = 0, ranks:CachedChannelAdminRanks? = nil, pollAnswersLoading: [MessageId : ChatPollStateData] = [:], threadLoading: MessageId? = nil, groupingPhotos: Bool = false, autoplayMedia: AutoplayMediaPreferences? = nil, searchState: SearchMessagesResultState? = nil, animatedEmojiStickers: [String: StickerPackItem] = [:], topFixedMessages: [Message]? = nil, customChannelDiscussionReadState: MessageId? = nil, customThreadOutgoingReadState: MessageId? = nil, addRepliesHeader: Bool = false, addWelcomeMessagesHeader: Bool = false, addTopThreadInset: CGFloat? = nil, updatingMedia: [MessageId: ChatUpdatingMessageMedia] = [:], adMessage:Message? = nil, dynamicAdMessages: [Message] = [], chatTheme: TelegramPresentationTheme = theme, reactions: AvailableReactions? = nil, transribeState: [MessageId : TranscribeAudioState] = [:], topicCreatorId: PeerId? = nil, mediaRevealed: Set<MessageId> = Set(), translate: ChatLiveTranslateContext.State? = nil, storyState: PeerExpiringStoryListContext.State? = nil, peerStoryStats: [PeerId : PeerStoryStats] = [:], cachedData: CachedPeerData? = nil, peer: Peer? = nil, holeLater: Bool = false, holeEarlier: Bool = false, recommendedChannels: RecommendedChannels? = nil, includeJoin: Bool = false, earlierId: MessageIndex? = nil, laterId: MessageIndex? = nil, automaticDownload: AutomaticMediaDownloadSettings = .defaultSettings, savedMessageTags: SavedMessageTags? = nil, contentSettings: ContentSettings? = nil, codeSyntaxData: [CodeSyntaxKey : CodeSyntaxResult] = [:], messageEffects: AvailableMessageEffects? = nil, factCheckRevealed: Set<MessageId> = Set(), solutionRevealed: Set<MessageId> = Set(), quoteRevealed: Set<QuoteMessageIndex> = Set(), detailsExpanded: Set<DetailsMessageIndex> = Set(), peerStatus: PeerStatusSettings? = nil, commonGroups: GroupsInCommonState? = nil, monoforumState: MonoforumUIState? = nil, accountPeerId: PeerId? = nil, contentConfig: ContentSettingsConfiguration = .default, walletFiatRate: WalletFiatRateProjection? = nil) -> [ChatHistoryEntry] {
     var entries: [ChatHistoryEntry] = []
+    let regramRevision = accountPeerId.map { RegramPreferences.shared.revision(accountId: $0.toInt64()) &+ RegramQuickTranslationTasks.shared.revision(accountId: $0.toInt64()) } ?? 0
+    let regramSettings = accountPeerId.map { RegramPreferences.shared.settings(accountId: $0.toInt64()) } ?? RegramAccountSettings()
+    let adMessage = regramSettings["disableAllAds"].bool ? nil : adMessage
+    let dynamicAdMessages = regramSettings["disableAllAds"].bool ? [] : dynamicAdMessages
+    let topFixedMessages = topFixedMessages?.filter { message in
+        guard let accountPeerId else { return true }
+        return !regramShouldHideMessage(message, accountId: accountPeerId.toInt64())
+    }
+
+
     
 
 
@@ -662,6 +676,10 @@ public func messageEntries(_ messagesEntries: [MessageHistoryEntry], location: C
     var groupInfo: MessageGroupInfo?
         
     var messagesEntries = messagesEntries
+    if let accountPeerId {
+        let accountId = accountPeerId.toInt64()
+        messagesEntries.removeAll { regramShouldHideMessage($0.message, accountId: accountId) }
+    }
     
     if let cachedData = cachedData as? CachedChannelData, cachedData.isNotAccessible {
         messagesEntries = []
@@ -1239,14 +1257,25 @@ public func messageEntries(_ messagesEntries: [MessageHistoryEntry], location: C
                 replyTranslate = nil
             }
             if translateCanTranslate, translateTranslate {
-                if canDisplayTranslation, let _ = message.translationAttribute(toLang: translateTo) {
+                if canDisplayTranslation, regramTranslationMatches(message, settings: regramSettings, tone: translate.tone), let _ = message.translationAttribute(toLang: translateTo) {
                     messageTranslate = .complete(toLang: translateTo)
                 }
                 if let reply = message.replyAttribute, let replyMessage = message.associatedMessages[reply.messageId] {
-                    if let _ = replyMessage.translationAttribute(toLang: translateTo) {
+                    if regramTranslationMatches(replyMessage, settings: regramSettings, tone: translate.tone), let _ = replyMessage.translationAttribute(toLang: translateTo) {
                         replyTranslate = .complete(toLang: translateTo)
                     }
                 }
+            }
+        }
+
+        if let accountPeerId, canDisplayTranslation {
+            let key = RGBookmarkMessageId(peerId: message.id.peerId.toInt64(), namespace: message.id.namespace, id: message.id.id)
+            if let task = RegramQuickTranslationTasks.shared.task(accountId: accountPeerId.toInt64(), messageId: key) {
+                messageTranslate = .loading(toLang: task.language)
+            } else if let language = regramQuickTranslationLanguage(message, settings: regramSettings) {
+                messageTranslate = .complete(toLang: language)
+            } else if let stamp = message.attributes.compactMap({ $0 as? RegramTranslationMessageAttribute }).first, stamp.configuration == regramSettings.translationIdentity, stamp.quickToLang == "" {
+                messageTranslate = nil
             }
         }
 
@@ -1276,7 +1305,7 @@ public func messageEntries(_ messagesEntries: [MessageHistoryEntry], location: C
             entryWalletFiatRate = nil
         }
 
-        additionalData = MessageEntryAdditionalData(pollStateData: pollData, highlightFoundText: highlightFoundText, isThreadLoading: threadLoading == message.id, updatingMedia: updatingMedia[message.id], chatTheme: chatTheme, reactions: sharedReactionsProjection, transribeState: transribeState[message.id], transcriptionTranslate: transcriptionTranslate, isRevealed: mediaRevealed.contains(message.id), translate: messageTranslate, replyTranslate: replyTranslate, storyReadMaxId: (message.media.first is TelegramMediaStory) ? storyState?.maxReadId : nil, authorStoryStats: message.author.flatMap { peerStoryStats[$0.id] }, cachedData: sharedCachedDataProjection, automaticDownload: sharedAutoDownloadProjection, savedMessageTags: savedMessageTags, codeSyntaxData: entryCodeSyntax, messageEffect: messageEffect, factCheckRevealed: factCheckRevealed.contains(message.id), solutionRevealed: solutionRevealed.contains(message.id), quoteRevealed: entryQuoteRevealed, detailsExpanded: entryDetailsExpanded, monoforumState: monoforumState, canHighlightLinks: canHighlightLinksDefault, summarize: summarize, walletFiatRate: entryWalletFiatRate)
+        additionalData = MessageEntryAdditionalData(pollStateData: pollData, highlightFoundText: highlightFoundText, isThreadLoading: threadLoading == message.id, updatingMedia: updatingMedia[message.id], chatTheme: chatTheme, reactions: sharedReactionsProjection, transribeState: transribeState[message.id], transcriptionTranslate: transcriptionTranslate, isRevealed: regramSettings["automaticallyRevealSpoilers"].bool || mediaRevealed.contains(message.id), translate: messageTranslate, replyTranslate: replyTranslate, storyReadMaxId: (message.media.first is TelegramMediaStory) ? storyState?.maxReadId : nil, authorStoryStats: message.author.flatMap { peerStoryStats[$0.id] }, cachedData: sharedCachedDataProjection, automaticDownload: sharedAutoDownloadProjection, savedMessageTags: savedMessageTags, codeSyntaxData: entryCodeSyntax, messageEffect: messageEffect, factCheckRevealed: factCheckRevealed.contains(message.id), solutionRevealed: solutionRevealed.contains(message.id), quoteRevealed: entryQuoteRevealed, detailsExpanded: entryDetailsExpanded, monoforumState: monoforumState, canHighlightLinks: canHighlightLinksDefault, summarize: summarize, walletFiatRate: entryWalletFiatRate, regramRevision: regramRevision)
         let data = ChatHistoryEntryData(entry.location, additionalData, autoplayMedia)
         
        

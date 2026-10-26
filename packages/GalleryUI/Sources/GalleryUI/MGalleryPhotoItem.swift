@@ -41,6 +41,7 @@ public class MGalleryPhotoItem: MGalleryItem {
     private let livePhotoRotateDisposable = MetaDisposable()
     private let livePhotoFetching = MetaDisposable()
     public override init(_ context: any AccountContextProtocol, _ entry: GalleryEntry, _ pagerSize: NSSize) {
+        var originalResource: MediaResource?
         switch entry {
         case .message(let entry):
             // Rich messages carry their media inside the instant page (`message.media` is empty),
@@ -54,6 +55,7 @@ public class MGalleryPhotoItem: MGalleryItem {
                 if case let .Loaded(content) = webpage.content, let image = content.image {
                     self.media = image
                 } else if case let .Loaded(content) = webpage.content, let media = content.file  {
+                    originalResource = media.resource
                     let represenatation = TelegramMediaImageRepresentation(dimensions: media.dimensions ?? PixelDimensions(0, 0), resource: media.resource, progressiveSizes: [], immediateThumbnailData: nil, hasVideo: false, isPersonal: false)
                     var representations = media.previewRepresentations
                     representations.append(represenatation)
@@ -64,6 +66,7 @@ public class MGalleryPhotoItem: MGalleryItem {
                 }
             } else {
                 if let media = media as? TelegramMediaFile {
+                    originalResource = media.resource
                     let represenatation = TelegramMediaImageRepresentation(dimensions: media.dimensions ?? PixelDimensions(0, 0), resource: media.resource, progressiveSizes: [], immediateThumbnailData: nil, hasVideo: false, isPersonal: false)
                     var representations = media.previewRepresentations
                     representations.append(represenatation)
@@ -86,7 +89,7 @@ public class MGalleryPhotoItem: MGalleryItem {
             fatalError("photo item not supported entry type")
         }
         
-        self.representation = media.representationForDisplayAtSize(PixelDimensions(NSMakeSize(1280, 1280)))!
+        self.representation = galleryFullImageRepresentation(media.representations, preferredResource: originalResource)!
         if let message = entry.message, !message.containsSecretMedia {
             self.livePhotoVideo = media.video
         } else {
@@ -265,7 +268,7 @@ public class MGalleryPhotoItem: MGalleryItem {
     }
     
     public override var status:Signal<MediaResourceStatus, NoError> {
-        return chatMessagePhotoStatus(account: context.account, photo: media)
+        return context.account.postbox.mediaBox.resourceStatus(representation.resource)
     }
     
     private var hasRequested: Bool = false
@@ -318,10 +321,11 @@ public class MGalleryPhotoItem: MGalleryItem {
                 }
             }
             
-            let result = combineLatest(signal, self.magnify.get() |> distinctUntilChanged) |> mapToSignal { [weak self] data, magnify -> Signal<Data, NoError> in
+            let fullRepresentation = representation
+            let result = combineLatest(signal, self.magnify.get() |> distinctUntilChanged, displayScale.get()) |> mapToSignal { [weak self] data, magnify, scale -> Signal<Data, NoError> in
                 
                 let (size, orientation) = data
-                return chatGalleryPhoto(account: context.account, imageReference: entry.imageReference(media), scale: System.backingScale, secureIdAccessContext: secureIdAccessContext, synchronousLoad: true, drawChessboard: true)
+                return chatGalleryPhoto(account: context.account, imageReference: entry.imageReference(media), toRepresentationSize: fullRepresentation.dimensions.size, scale: scale, secureIdAccessContext: secureIdAccessContext, synchronousLoad: true, drawChessboard: true, fullRepresentation: fullRepresentation)
                     |> deliverOn(graphicsThreadPool)
                     |> map { [weak self] transform in
                         
@@ -332,7 +336,7 @@ public class MGalleryPhotoItem: MGalleryItem {
                             let newSize = image.size.aspectFitted(size)
                             if newSize != size {
                                 size = newSize
-                                let modifiedSize = NSMakeSize(image.size.width * System.backingScale, image.size.height * System.backingScale)
+                                let modifiedSize = image.size
                                 Queue.mainQueue().async {
                                     self?.modifiedSize = modifiedSize
                                 }
@@ -383,7 +387,8 @@ public class MGalleryPhotoItem: MGalleryItem {
         if let message = entry.message, let file = entry.message?.anyMedia as? TelegramMediaFile {
             fetching.set(messageMediaFileInteractiveFetched(context: context, messageId: message.id, messageReference: .init(message), file: file, userInitiated: true).start())
         } else {
-            fetching.set(chatMessagePhotoInteractiveFetched(account: context.account, imageReference: entry.imageReference(media)).start())
+            let reference = entry.imageReference(media)
+            fetching.set(fetchedMediaResource(mediaBox: context.account.postbox.mediaBox, userLocation: reference.userLocation, userContentType: reference.userContentType, reference: reference.resourceReference(representation.resource), statsCategory: .image).start())
         }
         if let video = livePhotoVideo, let message = entry.message {
             livePhotoFetching.set(messageMediaFileInteractiveFetched(context: context, messageId: message.id, messageReference: .init(message), file: video, userInitiated: true).start())
@@ -393,7 +398,7 @@ public class MGalleryPhotoItem: MGalleryItem {
     public override func cancel() -> Void {
         super.cancel()
         livePhotoFetching.set(nil)
-        chatMessagePhotoCancelInteractiveFetch(account: context.account, photo: media)
+        context.account.postbox.mediaBox.cancelInteractiveResourceFetch(representation.resource)
     }
 
     public override func releaseResources() {

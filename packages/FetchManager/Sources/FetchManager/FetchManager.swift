@@ -157,5 +157,7 @@ public protocol FetchManager {
     func toggleInteractiveFetchPaused(resourceId: String, isPaused: Bool)
     func raisePriority(resourceId: String)
     func fetchStatus(category: FetchManagerCategory, location: FetchManagerLocation, locationKey: FetchManagerLocationKey, resource: MediaResource) -> Signal<MediaResourceStatus, NoError>
+    func setRegramChatMediaPriority(owner: Int64, visibleResourceIds: [String], preloadResourceIds: [String])
+    func acquireRegramStreamingPriority(resourceId: String) -> Disposable
 }
 

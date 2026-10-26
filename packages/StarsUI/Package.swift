@@ -3,6 +3,8 @@
 import PackageDescription
 
 let deps: [(String, String)] = [
+    ("ChatHistoryModel", "../ChatHistoryModel"),
+    ("RegramCore", "../RegramCore"),
     ("TGUIKit", "../TGUIKit"),
     ("ChatModeTypes", "../ChatModeTypes"),
     ("InlineStickerLayer", "../InlineStickerLayer"),

@@ -1,4 +1,6 @@
 import Cocoa
+import RegramCore
+import ChatHistoryModel
 
 import SwiftSignalKit
 import TelegramCore
@@ -623,6 +625,12 @@ private let dataDetector = try? NSDataDetector(types: NSTextCheckingResult.Check
                 }
             }
             
+            let regramSettings = RegramPreferences.shared.settings(accountId: context.peerId.toInt64())
+            if regramSettings["disableLinkPreview"].bool {
+                subscriber.putNext((nil, .single({ _ in nil })))
+                subscriber.putCompletion()
+                return EmptyDisposable
+            }
             if detectedUrl != currentQuery {
                 if let detectedUrl = detectedUrl {
                     let link = ChatInterfaceHooks.shared.urlPreviewInAppLink(detectedUrl, context)
@@ -631,7 +639,7 @@ private let dataDetector = try? NSDataDetector(types: NSTextCheckingResult.Check
                     let invoke:(ChatInterfaceInAppLink)->Void = { link in
                         switch link {
                         case let .external(detectedUrl, _), let .joinchat(detectedUrl, _, _, _), let .wallpaper(detectedUrl, _, _), let .theme(detectedUrl, _, _), let .instantView(detectedUrl, _, _):
-                            subscriber.putNext((detectedUrl, webpagePreview(account: context.account, urls: [detectedUrl]) |> filter { $0 != .progress } |> map { value in
+                            subscriber.putNext((detectedUrl, webpagePreview(account: context.account, urls: [RegramLinkMetadata.shared.previewUrl(detectedUrl, settings: regramSettings)]) |> filter { $0 != .progress } |> map { value in
                                 return { _ in return value.result }
                             }))
                         case let .followResolvedName(_, username, _, _, _, _, _):
@@ -639,7 +647,7 @@ private let dataDetector = try? NSDataDetector(types: NSTextCheckingResult.Check
                                 subscriber.putNext((nil, .single({ _ in return nil })))
                                 subscriber.putCompletion()
                             } else {
-                                subscriber.putNext((detectedUrl, webpagePreview(account: context.account, urls: [detectedUrl]) |> filter { $0 != .progress } |> map { value in
+                                subscriber.putNext((detectedUrl, webpagePreview(account: context.account, urls: [RegramLinkMetadata.shared.previewUrl(detectedUrl, settings: regramSettings)]) |> filter { $0 != .progress } |> map { value in
                                     return { _ in return value.result }
                                 }))
                             }

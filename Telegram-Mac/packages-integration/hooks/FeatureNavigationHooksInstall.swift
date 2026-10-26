@@ -1,3 +1,7 @@
+import RegramUI
+import RegramCore
+import Localization
+import SelectPeersUI
 import TelegramContext
 import Cocoa
 import TGUIKit
@@ -100,6 +104,8 @@ private func makeFeatureDateSelector(context: any AccountContextProtocol, defaul
 
 func installFeatureNavigationHooks() {
     var hooks = FeatureNavigationHooks()
+    hooks.fileSizeLimitExceed = { context, size in fileSizeLimitExceed(context: context, fileSize: size) }
+    hooks.showFileLimit = { context, size in showFileLimit(context: context, fileSize: size) }
     hooks.showPremiumBoarding = { context, window, source, openFeatures, presentation in
         prem(with: PremiumBoardingController(context: context, source: (source ?? .settings).logSource, openFeatures: openFeatures, presentation: presentation ?? theme), for: window)
     }
@@ -340,5 +346,89 @@ func installFeatureNavigationHooks() {
         guard let interaction = interaction as? ChatInteraction else { return nil }
         return PreviewSenderController(urls: urls, chatInteraction: interaction, asMedia: asMedia, attributedString: attributedString, presentation: presentation)
     }
+    hooks.regramSettingsIcon = { RegramSettingsArtwork.entry(dark: theme.colors.isDark) }
+    hooks.captureRegramMedia = { context, previewEnabled, completion in
+        showModal(with: RegramMediaCaptureController(context: context, previewEnabled: previewEnabled, completion: completion), for: context.window)
+    }
+    hooks.presentRegramFolderAfterJoining = { context, peerId in RegramPresentFolderPickerAfterJoining(context: context, peerId: peerId) }
+    hooks.makeRegramController = { context, page in
+        let parts = page?.split(separator: "/", omittingEmptySubsequences: false).map(String.init) ?? []
+        if parts.count == 4, parts[0] == "authorMessages", let chatPeerId = Int64(parts[1]), let authorPeerId = Int64(parts[2]), let threadId = Int64(parts[3]), threadId >= 0 {
+            return RegramAuthorMessagesController(context: context, chatPeerId: PeerId(chatPeerId), authorPeerId: PeerId(authorPeerId), threadId: threadId == 0 ? nil : threadId)
+        }
+        if parts.count == 2, parts[0] == "commonGroupMessages", let authorPeerId = Int64(parts[1]) {
+            return RegramCommonGroupMessagesController(context: context, authorPeerId: PeerId(authorPeerId))
+        }
+        if parts.count == 2, ["settings.appearance", "pro.appearance"].contains(parts[0]), parts[1] == "appIcon" {
+            return AppAppearanceViewController(context: context, focusOnItemTag: .dockIcon)
+        }
+        if parts.count == 2, let id = Int64(parts[1]) {
+            switch parts[0] {
+            case "chat": return RegramChatSettingsController(context: context, peerId: PeerId(id))
+            case "remark": return RegramGroupRemarkController(context: context, peerId: PeerId(id))
+            case "outgoingTranslation": return RegramOutgoingLanguageController(context: context, peerId: PeerId(id))
+            default: break
+            }
+        }
+        return RegramSettingsController(context: context, page: page)
+    }
+    hooks.makeRegramMessageController = { context, message in RegramEditHistoryController(context: context, message: message) }
+    hooks.makeRegramFilterImportController = { context, data in RegramFilterImportController(context: context, data: data) }
+    hooks.makeRegramSummaryController = { context, messages, permitsTimeRange in
+        RegramMessageSummaryController(context: context, messages: messages, permitsTimeRange: permitsTimeRange)
+    }
+    hooks.makeRegramSummaryRangeController = { context, peerId, threadId, selectedMessages in
+        RegramMessageSummaryRangeController(context: context, peerId: peerId, threadId: threadId, selectedMessages: selectedMessages)
+    }
+    hooks.makeRegramWebTranslationController = { context, url in RegramWebTranslationController(context: context, url: url) }
+    var regramHooks = RegramUIHooks()
+    regramHooks.restartApplication = { restartRegramApplication() }
+    regramHooks.eraseAllData = { _ in requestRegramFullWipe(language: appCurrentLanguage.primaryLanguage.languageCode) }
+    regramHooks.selectChat = { context, selected in
+        selectModalPeers(window: context.window, context: context, title: regramLocalizedString("ChatPreferences.SelectChat", languageCode: appCurrentLanguage.primaryLanguage.languageCode), settings: [.contacts, .remote, .groups, .channels], limit: 1, selectedPeerIds: Set(selected.map { [$0] } ?? []))
+        |> mapToSignal { ids in ids.first.map { .single($0) } ?? .complete() }
+    }
+    regramHooks.openPeerInfo = { context, peerId in
+        guard let context = context as? AccountContext else { return }
+        PeerInfoController.push(navigation: context.bindings.rootNavigation(), context: context, peerId: peerId)
+    }
+    regramHooks.selectChats = { context, selected in
+        selectModalPeers(window: context.window, context: context, title: "Regram", settings: [.contacts, .remote, .groups, .channels], selectedPeerIds: Set(selected))
+    }
+    regramHooks.openPeer = { context, peerId in
+        navigateToChat(navigation: context.bindings.rootNavigation(), context: context as! AccountContext, chatLocation: .peer(peerId))
+    }
+    regramHooks.openMessage = { context, messageId, threadId in
+        guard let context = context as? AccountContext else { return }
+        let openChat = {
+            navigateToChat(navigation: context.bindings.rootNavigation(), context: context, chatLocation: .peer(messageId.peerId), focusTarget: .init(messageId: messageId))
+        }
+        guard let threadId else { openChat(); return }
+        _ = (context.account.postbox.transaction { $0.getPeer(messageId.peerId) } |> deliverOnMainQueue).start(next: { peer in
+            guard let channel = peer as? TelegramChannel else { openChat(); return }
+            if channel.flags.contains(.isMonoforum) {
+                _ = ForumUI.openTopic(threadId, peerId: messageId.peerId, context: context, messageId: messageId, animated: true, isMonoforum: true).start()
+            } else if channel.flags.contains(.isForum) {
+                _ = ForumUI.openTopic(threadId, peerId: messageId.peerId, context: context, messageId: messageId, animated: true).start()
+            } else {
+                openChat()
+            }
+        })
+    }
+    regramHooks.openNativeSettings = { context, page in
+        let controller: ViewController
+        switch page {
+        case "media": controller = SettingsNavigationHooks.shared.makeDataAndStorageController(context, nil)
+        case "translation": controller = LanguageController(context, focusOnItemTag: .doNotTranslate)
+        case "appearance": controller = AppAppearanceViewController(context: context)
+        case "appIcon": controller = AppAppearanceViewController(context: context, focusOnItemTag: .dockIcon)
+        case "privacy": controller = SettingsNavigationHooks.shared.makePasscodeSettingsController(context)
+        case "tools": controller = SettingsNavigationHooks.shared.makeRecentSessionsController(context)
+        case "network": controller = SettingsNavigationHooks.shared.makeProxyListController(context, { _ in }, { context.bindings.rootNavigation().push($0) })
+        default: controller = GeneralSettingsViewController(context as! AccountContext)
+        }
+        context.bindings.rootNavigation().push(controller)
+    }
+    RegramUIHooks.shared = regramHooks
     FeatureNavigationHooks.install(hooks)
 }

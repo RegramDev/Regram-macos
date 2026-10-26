@@ -1,3 +1,5 @@
+import RegramCore
+import RegramSignals
  import Cocoa
  import TGUIKit
  import TelegramCore
@@ -928,7 +930,8 @@
     }
     
     private let isProfileIntended: Bool
-     private var initialMode: PeerMediaCollectionMode?
+     private let regramUserSelectedPane = Atomic(value: false)
+    private var initialMode: PeerMediaCollectionMode?
     
     private let editing: ValuePromise<Bool> = ValuePromise(false, ignoreRepeated: true)
     public override var state:ViewControllerState {
@@ -1355,6 +1358,7 @@
         let threadInfo = self.threadInfo
         let isProfileIntended = self.isProfileIntended
         let initialMode = self.initialMode
+        let regramUserSelectedPane = self.regramUserSelectedPane
         
         let membersTab:Signal<(tag: PeerMediaCollectionMode, exists: Bool, hasLoaded: Bool), NoError>
         let storiesTab:Signal<(tag: PeerMediaCollectionMode, exists: Bool, hasLoaded: Bool), NoError>
@@ -1544,9 +1548,15 @@
             return general
         }
         
-        let tabSignal = combineLatest(queue: .mainQueue(), mergedTabs, modeValue.get())
-        |> map { tabs, selected -> (tabs: [PeerMediaCollectionMode], selected: PeerMediaCollectionMode?, hasLoaded: Bool) in
-            var selectedValue = selected
+        let tabSignal = combineLatest(queue: .mainQueue(), mergedTabs, modeValue.get(), regramPreferenceChanges(accountId: context.peerId.toInt64()))
+        |> map { tabs, selected, _ -> (tabs: [PeerMediaCollectionMode], selected: PeerMediaCollectionMode?, hasLoaded: Bool) in
+            let regramSettings = RegramPreferences.shared.settings(accountId: context.peerId.toInt64())
+            let preferGroups = regramSettings["profileDefaultTabGroupsInCommon"].bool
+            let hideStories = regramSettings["hideStories"].bool
+            let tabs = tabs.filter { !hideStories || ($0.tag != .stories && $0.tag != .archiveStories) }
+            let preferCommon = initialMode == nil && preferGroups && !regramUserSelectedPane.with({ $0 }) && tabs.contains(where: { $0.exists && $0.tag == .commonGroups })
+            var selectedValue = preferCommon ? PeerMediaCollectionMode.commonGroups : selected
+            if preferCommon { return (tabs: tabs.filter { $0.exists }.map { $0.tag }, selected: selectedValue, hasLoaded: tabs.first?.hasLoaded ?? false) }
             if selected == nil || !tabs.contains(where: { $0.exists && $0.tag == selected }) {
                 if let selected = selected {
                     let index = tabsOrder.firstIndex(of: selected)!
@@ -1610,6 +1620,7 @@
             if let index = self.genericView.tabsView.index(of: id) {
                 self.genericView.tabsView.setSelection(position: CGFloat(index), animated: true)
             }
+            _ = self.regramUserSelectedPane.swap(true)
             self.modeValue.set(newMode)
         }
         
@@ -2286,6 +2297,7 @@
         if let target = target, let index = self.currentTabs?.tabs.firstIndex(of: target) {
             self.interactiveSwitchMode = target
             self.genericView.tabsView.setSelection(position: CGFloat(index), animated: true)
+            _ = self.regramUserSelectedPane.swap(true)
             self.modeValue.set(target)
         } else {
             self.genericView.view.cancelSwipe(animated: true)

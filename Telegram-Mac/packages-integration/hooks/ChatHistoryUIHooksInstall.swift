@@ -413,15 +413,15 @@ func installChatHistoryUIHooks() {
     hooks.makeTranslateModalWithContext = { context, from, toLang, text, entities, source, onToneChanged, translateEntireChat in
         switch source {
         case let .richMessage(id, page):
-            return TranslateModalController(context: context.concrete, from: from, toLang: toLang, text: text, entities: entities, canBreak: true, messageId: id, isRichMessage: true, richMessagePage: page, dismissOnly: true, onToneChanged: onToneChanged, translateEntireChat: translateEntireChat)
+            return TranslateModalController(context: context.concrete, from: from, toLang: toLang, text: text, entities: entities, canBreak: true, messageId: id, isRichMessage: true, richMessagePage: page, dismissOnly: true, onToneChanged: onToneChanged, translateEntireChat: translateEntireChat, source: source)
         case let .poll(id):
-            return TranslateModalController(context: context.concrete, from: from, toLang: toLang, text: text, entities: entities, canBreak: false, messageId: id, dismissOnly: true, onToneChanged: onToneChanged, translateEntireChat: translateEntireChat)
+            return TranslateModalController(context: context.concrete, from: from, toLang: toLang, text: text, entities: entities, canBreak: false, messageId: id, dismissOnly: true, onToneChanged: onToneChanged, translateEntireChat: translateEntireChat, source: source)
         case let .message(id):
-            return TranslateModalController(context: context.concrete, from: from, toLang: toLang, text: text, entities: entities, messageId: id, dismissOnly: true, onToneChanged: onToneChanged, translateEntireChat: translateEntireChat)
+            return TranslateModalController(context: context.concrete, from: from, toLang: toLang, text: text, entities: entities, messageId: id, dismissOnly: true, onToneChanged: onToneChanged, translateEntireChat: translateEntireChat, source: source)
         case .selectedText:
-            return TranslateModalController(context: context.concrete, from: from, toLang: toLang, text: text, entities: entities, dismissOnly: true, onToneChanged: onToneChanged, translateEntireChat: translateEntireChat)
+            return TranslateModalController(context: context.concrete, from: from, toLang: toLang, text: text, entities: entities, dismissOnly: true, onToneChanged: onToneChanged, translateEntireChat: translateEntireChat, source: source)
         case let .transcription(id):
-            return TranslateModalController(context: context.concrete, from: from, toLang: toLang, text: text, messageId: id, dismissOnly: true, onToneChanged: onToneChanged, translateEntireChat: translateEntireChat)
+            return TranslateModalController(context: context.concrete, from: from, toLang: toLang, text: text, messageId: id, dismissOnly: true, onToneChanged: onToneChanged, translateEntireChat: translateEntireChat, source: source)
         }
     }
     hooks.executeLinkWithContext = { link in

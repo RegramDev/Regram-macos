@@ -26,6 +26,7 @@ public final class HashtagSearchGlobalChatContents: ChatCustomContentsProtocol {
         private var sourceHistoryView: MessageHistoryView?
         
         private var historyViewDisposable: Disposable?
+        private let filterDisposable = MetaDisposable()
         let historyViewStream = ValuePipe<(MessageHistoryView, ViewUpdateType)>()
         var hashtagSearchResultsUpdate: ((SearchMessagesResult, SearchMessagesState)) -> Void = { _ in } {
             didSet {
@@ -56,10 +57,14 @@ public final class HashtagSearchGlobalChatContents: ChatCustomContentsProtocol {
             } else {
                 self.updateHistoryViewRequest(reload: false)
             }
+            filterDisposable.set((regramMessageFilterChanges(accountId: context.peerId.toInt64()) |> deliverOn(queue)).start(next: { [weak self] in
+                if self?.sourceHistoryView != nil { self?.updateHistoryView(updateType: .Generic) }
+            }))
         }
         
         deinit {
             self.historyViewDisposable?.dispose()
+            filterDisposable.dispose()
         }
         
         private func updateHistoryViewRequest(reload: Bool) {
@@ -101,7 +106,7 @@ public final class HashtagSearchGlobalChatContents: ChatCustomContentsProtocol {
         }
         
         private func updateHistoryView(updateType: ViewUpdateType) {
-            var entries = self.sourceHistoryView?.entries ?? []
+            var entries = (self.sourceHistoryView?.entries ?? []).filter { !regramShouldHideMessage($0.message, accountId: context.peerId.toInt64()) }
             entries.sort(by: { $0.message.index < $1.message.index })
             
             let mergedHistoryView = MessageHistoryView(tag: nil, namespaces: .just(Set([Namespaces.Message.Cloud])), entries: entries, holeEarlier: false, holeLater: false, isLoading: false)

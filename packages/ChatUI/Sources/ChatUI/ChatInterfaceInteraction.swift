@@ -22,6 +22,9 @@ import StarsUI
 import BoostUI
 import AudioPlayerCore
 import ShortPeerRow
+import RegramCore
+import RegramServices
+import InputDataUI
 
 struct ChatMediaReplacementRequest {
     fileprivate let id: UUID
@@ -41,6 +44,9 @@ public final class ReplyMarkupInteractions {
 
 
 public final class ChatInteraction : InterfaceObserver  {
+    public let regramServiceDisposable = MetaDisposable()
+    var regramQuickTranslationRequests: [MessageId: MetaDisposable] = [:]
+
     
     public var chatLocation: ChatLocation {
         return self.presentation.chatLocation
@@ -591,6 +597,13 @@ public final class ChatInteraction : InterfaceObserver  {
         self.update({$0.updatedInterfaceState({$0.withUpdatedInputState(ChatTextInputState())})})
     }
     public func clearContextQuery() {
+        let text = presentation.effectiveInput.inputText
+        let accountId = context.peerId.toInt64()
+        if RGAutomaticInlineBots.match(text, enabled: RegramPreferences.shared.settings(accountId: accountId)["features.autoInlineBotEnabled"].bool) != nil {
+            RGAutomaticInlineBotDismissals.shared.dismiss(text, accountId: accountId, peerId: peerId.toInt64(), threadId: chatLocation.threadId)
+            update { $0.updatedInputQueryResult { _ in nil } }
+            return
+        }
         if case let .contextRequest(addressName, _) = self.presentation.inputContext {
             let str = "@" + addressName + " "
             let state = ChatTextInputState(inputText: str, selectionRange: str.length ..< str.length, attributes: [])
@@ -1154,10 +1167,14 @@ public final class ChatInteraction : InterfaceObserver  {
     
 
     deinit {
+        regramServiceDisposable.dispose()
        clean()
     }
     
     public func clean() {
+        let quickTranslationRequests = regramQuickTranslationRequests
+        regramQuickTranslationRequests.removeAll()
+        for request in quickTranslationRequests.values { request.dispose() }
         invalidateDeferredSendActions()
         dateHeaderActions.reset()
         forwardSelection.reset()
@@ -1373,6 +1390,24 @@ public func sendMessageMenuItems(chatInteraction: ChatInteraction, send: @escapi
     }
 
     var items:[ContextMenuItem] = []
+
+    if !peer.isSecretChat, presentation.interfaceState.editState == nil, chatInteraction.richTextDraft == nil, !presentation.effectiveInput.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        let settings = RegramPreferences.shared.settings(accountId: context.peerId.toInt64())
+        let target = RegramOutgoingTranslationPolicy.language(settings: settings, accountId: context.peerId.id._internalGetInt64Value(), peerId: peer.id.id._internalGetInt64Value())
+        let language = target.flatMap { Locale(identifier: appCurrentLanguage.primaryLanguage.languageCode).localizedString(forIdentifier: $0) } ?? target ?? "…"
+        let chooseLanguage = {
+            guard deferredSendAction.isAvailable, let controller = FeatureNavigationHooks.shared.makeRegramController(context, "outgoingTranslation/" + String(peer.id.toInt64())) else { return }
+            context.bindings.rootNavigation().push(controller)
+        }
+        items.append(ContextMenuItem(strings().chatTranslateTo(language), handler: {
+            guard deferredSendAction.isAvailable else { return }
+            guard target != nil else { chooseLanguage(); return }
+            _ = regramPresentOutgoingTranslation(context: context, interaction: chatInteraction, applyToDraft: true, completion: { translated in
+                chatInteraction.update { $0.withUpdatedEffectiveInputState(translated) }
+            })
+        }, itemImage: MenuAnimation.menu_translate.value))
+        items.append(ContextMenuItem(regramLocalizedString("outgoingTranslation.changeLanguage", languageCode: appCurrentLanguage.primaryLanguage.languageCode), handler: chooseLanguage, itemImage: MenuAnimation.menu_translate.value))
+    }
 
     if peer.id != context.account.peerId {
         items.append(ContextMenuItem(strings().chatSendWithoutSound, handler: {

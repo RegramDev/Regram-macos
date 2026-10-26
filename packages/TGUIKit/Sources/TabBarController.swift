@@ -3,12 +3,28 @@ import AppKit
 
 private class TabBarViewController : View {
     let tabView:TabBarView
+    private let accessory = ImageButton()
+    var presentation = TabBarPresentation() {
+        didSet {
+            tabView.showsLabels = presentation.showsLabels
+            tabView.externalTabIndex = presentation.externalTabIndex
+            accessory.isHidden = presentation.accessoryAction == nil || tabView.isHidden
+            if let image = presentation.accessoryImage { accessory.set(image: image, for: .Normal) }
+            accessory.setAccessibilityLabel(presentation.accessoryTitle)
+            accessory.toolTip = presentation.accessoryTitle
+            needsLayout = true
+        }
+    }
 
     
     required init(frame frameRect: NSRect) {
         tabView = TabBarView(frame: FloatingTabBarLayout.frame(in: frameRect.size))
         super.init(frame: frameRect)
         addSubview(tabView)
+        accessory.isHidden = true
+        accessory.scaleOnClick = true
+        accessory.set(handler: { [weak self] _ in self?.presentation.accessoryAction?() }, for: .Click)
+        addSubview(accessory)
     }
     
     override func updateLocalizationAndTheme(theme: PresentationTheme) {
@@ -25,15 +41,16 @@ private class TabBarViewController : View {
     }
     
     func updateFrame(_ frame: NSRect, transition: ContainedViewLayoutTransition) {
-        for subview in subviews {
-            if let subview = subview as? TabBarView {
-                transition.updateFrame(view: subview, frame: FloatingTabBarLayout.frame(in: frame.size))
-            } else {
-                transition.updateFrame(view: subview, frame: frame.size.bounds)
-            }
+        let tabFrame = presentation.frame(in: frame.size, count: tabView.count)
+        transition.updateFrame(view: tabView, frame: tabFrame)
+        accessory.isHidden = presentation.accessoryAction == nil || tabView.isHidden
+        transition.updateFrame(view: accessory, frame: NSMakeRect(tabFrame.maxX + 8, tabFrame.minY, presentation.height, presentation.height))
+        accessory.layer?.cornerRadius = presentation.height / 2
+        for subview in subviews where subview !== tabView && subview !== accessory {
+            transition.updateFrame(view: subview, frame: frame.size.bounds)
         }
     }
-    
+
     override func layout() {
         super.layout()
         updateFrame(frame, transition: .immediate)
@@ -48,7 +65,7 @@ public class TabBarController: ViewController, TabViewDelegate {
         return genericView.tabView.selectedIndex
     }
     public var contentBottomInset: CGFloat {
-        return genericView.tabView.isHidden ? 0 : FloatingTabBarLayout.height + FloatingTabBarLayout.bottomGap
+        return genericView.tabView.isHidden ? 0 : genericView.presentation.height + FloatingTabBarLayout.bottomGap
     }
     
     public weak var current:ViewController? {
@@ -125,6 +142,15 @@ public class TabBarController: ViewController, TabViewDelegate {
         }
     }
     
+    public func updatePresentation(_ presentation: TabBarPresentation) {
+        genericView.presentation = presentation
+        genericView.updateFrame(bounds, transition: .immediate)
+        genericView.tabView.enumerateItems { item in
+            item.controller.updateContainerContentInsets(self.contentInsetsForTabs, transition: .immediate)
+            return false
+        }
+    }
+
     public func scrollup() {
         current?.scrollup()
     }
@@ -135,6 +161,7 @@ public class TabBarController: ViewController, TabViewDelegate {
     
     public func hideTabView(_ hide:Bool) {
         genericView.tabView.isHidden = hide
+        genericView.needsLayout = true
         current?.view.frame = bounds
         genericView.tabView.enumerateItems { item in
             item.controller.updateContainerContentInsets(self.contentInsetsForTabs, transition: .immediate)
@@ -185,7 +212,7 @@ public class TabBarController: ViewController, TabViewDelegate {
         return genericView.tabView.tab(at: index)
     }
     public func replace(tab: TabItem, at index:Int) -> Void {
-        if tab.accessibilityTitle == nil, (0 ..< count).contains(index) {
+        if tab.accessibilityTitle == nil, (0 ..< count).contains(index), self.tab(at: index).controller === tab.controller {
             tab.accessibilityTitle = self.tab(at: index).accessibilityTitle
         }
         genericView.tabView.replaceTab(tab, at: index)

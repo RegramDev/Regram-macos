@@ -1,4 +1,5 @@
 import Cocoa
+import RegramCore
 import Postbox
 import TelegramCore
 
@@ -1095,6 +1096,51 @@ enum GroupInfoEntry<Context: AccountContextProtocol>: PeerInfoEntry {
     case removeFromCommunity(section: Int, communityId: PeerId, viewType: GeneralViewType)
     case section(Int)
     
+    var regramViewType: GeneralViewType {
+        switch self {
+        case let .info(_, _, _, _, viewType): return viewType
+        case let .setTitle(_, _, viewType): return viewType
+        case let .scam(_, _, _, viewType): return viewType
+        case let .about(_, _, viewType): return viewType
+        case let .addressName(_, _, viewType): return viewType
+        case let .verifiedInfo(_, _, viewType): return viewType
+        case let .peerId(_, _, viewType): return viewType
+        case let .sharedMedia(_, viewType): return viewType
+        case let .balance(_, _, _, viewType): return viewType
+        case let .notifications(_, _, viewType): return viewType
+        case let .usersHeader(_, _, viewType): return viewType
+        case let .addMember(_, _, viewType): return viewType
+        case let .groupTypeSetup(_, _, viewType): return viewType
+        case let .autoDeleteMessages(_, _, viewType): return viewType
+        case let .inviteLinks(_, _, viewType): return viewType
+        case let .requests(_, _, viewType): return viewType
+        case let .linkedChannel(_, _, _, viewType): return viewType
+        case let .reactions(_, _, _, _, viewType): return viewType
+        case let .welcomeMessages(_, _, viewType): return viewType
+        case let .color(_, _, viewType): return viewType
+        case let .groupDescriptionSetup(_, _, viewType): return viewType
+        case let .groupAboutDescription(_, viewType): return viewType
+        case let .groupStickerset(_, _, viewType): return viewType
+        case let .preHistory(_, _, viewType): return viewType
+        case let .toggleForum(_, _, _, _, viewType): return viewType
+        case let .forumInfo(_, _, viewType): return viewType
+        case let .groupManagementInfoLabel(_, _, viewType): return viewType
+        case let .members(_, _, viewType): return viewType
+        case let .administrators(_, _, viewType): return viewType
+        case let .recentActions(_, viewType): return viewType
+        case let .permissions(_, _, viewType): return viewType
+        case let .blocked(_, _, viewType): return viewType
+        case let .member(_, _, _, _, _, _, _, _, _, _, _, viewType, _): return viewType
+        case let .showMore(_, _, viewType): return viewType
+        case let .leave(_, _, viewType): return viewType
+        case let .media(_, _, _, viewType): return viewType
+        case let .addToCommunity(_, viewType): return viewType
+        case let .community(_, _, viewType): return viewType
+        case let .removeFromCommunity(_, _, viewType): return viewType
+        case .section: return .separator
+        }
+    }
+
     func withUpdatedViewType(_ viewType: GeneralViewType) -> GroupInfoEntry {
         switch self {
         case let .info(section, view, editingState, updatingPhotoState, _): return .info(section: section, view: view, editingState: editingState, updatingPhotoState: updatingPhotoState, viewType: viewType)
@@ -2010,9 +2056,11 @@ enum GroupInfoSection : Int {
 }
 
 
-func groupInfoEntries<Context: AccountContextProtocol>(view: PeerView, arguments: PeerInfoArguments<Context>, inputActivities: [PeerId: PeerInputActivity], channelMembers: [RenderedChannelParticipant] = [], mediaTabsData: PeerMediaTabsData, inviteLinksCount: Int32, joinRequestsCount: Int32, availableReactions: AvailableReactions?, revenueState: StarsRevenueStatsContextState?) -> [PeerInfoEntry] {
+func groupInfoEntries<Context: AccountContextProtocol>(view: PeerView, arguments: PeerInfoArguments<Context>, inputActivities: [PeerId: PeerInputActivity], channelMembers: [RenderedChannelParticipant] = [], mediaTabsData: PeerMediaTabsData, inviteLinksCount: Int32, joinRequestsCount: Int32, availableReactions: AvailableReactions?, revenueState: StarsRevenueStatsContextState?, exposeProfileSettings: Bool = true, forceEditing: Bool = false) -> [PeerInfoEntry] {
     var entries: [GroupInfoEntry<Context>] = []
-    if let group = peerViewMainPeer(view), let arguments = arguments as? GroupInfoArguments<Context>, let state = arguments.state as? GroupInfoState {
+    if let group = peerViewMainPeer(view), let arguments = arguments as? GroupInfoArguments<Context>, let currentState = arguments.state as? GroupInfoState {
+        let about = (view.cachedData as? CachedGroupData)?.about ?? (view.cachedData as? CachedChannelData)?.about ?? ""
+        let state = forceEditing ? currentState.withUpdatedEditingState(GroupInfoEditingState(editingName: group.displayTitle, editingDescriptionText: about)) : currentState
         
         let access = group.groupAccess
         let canChangeInfo: Bool
@@ -2369,6 +2417,18 @@ func groupInfoEntries<Context: AccountContextProtocol>(view: PeerView, arguments
             entries.append(.media(section: GroupInfoSection.media.rawValue, controller: controller, isVisible: state.editingState == nil, viewType: .singleItem))
         }
         
+        if exposeProfileSettings && state.editingState == nil {
+            let settings = RegramPreferences.shared.settings(accountId: arguments.context.peerId.toInt64())
+            if !settings["features.groupProfileSettingItems"].string.isEmpty {
+                let editing = groupInfoEntries(view: view, arguments: arguments, inputActivities: inputActivities, channelMembers: channelMembers, mediaTabsData: mediaTabsData, inviteLinksCount: inviteLinksCount, joinRequestsCount: joinRequestsCount, availableReactions: availableReactions, revenueState: revenueState, exposeProfileSettings: false, forceEditing: true)
+                var known = Set(entries.map { $0.stableId.hashValue })
+                for item in editing.compactMap({ $0 as? GroupInfoEntry<Context> }) {
+                    guard let key = item.regramProfileSettingItem, key.isVisible(settings: settings), known.insert(item.stableId.hashValue).inserted else { continue }
+                    entries.append(item)
+                }
+            }
+        }
+
         var items:[GroupInfoEntry<Context>] = []
         var sectionId:Int = 0
         for (i, entry) in entries.enumerated() {
@@ -2387,7 +2447,49 @@ func groupInfoEntries<Context: AccountContextProtocol>(view: PeerView, arguments
     }
     
     
-    return entries.sorted(by: { p1, p2 -> Bool in
+    var sorted = entries.sorted(by: { p1, p2 -> Bool in
         return p1.isOrderedBefore(p2)
     })
+    if exposeProfileSettings, !forceEditing, (arguments.state as? GroupInfoState)?.editingState == nil {
+        var indices: [Int] = []
+        func finishGroup() {
+            let block = indices.map { sorted[$0] }
+            for (index, position) in indices.enumerated() {
+                sorted[position] = block[index].withUpdatedViewType(bestGeneralViewType(block, for: index))
+            }
+            indices.removeAll()
+        }
+        for position in sorted.indices {
+            let entry = sorted[position]
+            guard [.singleItem, .firstItem, .innerItem, .lastItem].contains(entry.regramViewType) else { finishGroup(); continue }
+            if let previous = indices.last, sorted[previous].sectionId != entry.sectionId { finishGroup() }
+            indices.append(position)
+        }
+        finishGroup()
+    }
+    return sorted
+}
+
+private extension GroupInfoEntry {
+    var regramProfileSettingItem: RegramGroupProfileSettingItem? {
+        switch self {
+        case .groupTypeSetup: return .groupType
+        case .inviteLinks: return .inviteLinks
+        case .linkedChannel: return .linkedChannel
+        case .reactions: return .reactions
+        case .color: return .appearance
+        case .preHistory: return .history
+        case .toggleForum: return .topics
+        case .members: return .members
+        case .permissions: return .permissions
+        case .administrators: return .admins
+        case .requests: return .memberRequests
+        case .blocked: return .removedUsers
+        case .recentActions: return .recentActions
+        case .addToCommunity, .community, .removeFromCommunity: return .community
+        case .leave: return .deleteGroup
+        case .autoDeleteMessages, .welcomeMessages, .groupStickerset, .balance: return .other
+        default: return nil
+        }
+    }
 }

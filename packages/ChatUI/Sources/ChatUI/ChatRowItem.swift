@@ -1,3 +1,4 @@
+import RegramCore
 import Cocoa
 import TGUIKit
 import TelegramCore
@@ -72,6 +73,13 @@ public final class ChatHistoryBottomRowItem: GeneralRowItem {
 
 
 public class ChatRowItem: TableRowItem {
+    private var regramQuickTranslationEligibility: Bool?
+    public var regramCanQuickTranslate: Bool {
+        if let value = regramQuickTranslationEligibility { return value }
+        let value = regramQuickTranslationIsAvailable(self)
+        regramQuickTranslationEligibility = value
+        return value
+    }
     
     public override var canBeAnchor: Bool {
         return !self.entry.isFakeMessage
@@ -316,6 +324,11 @@ public class ChatRowItem: TableRowItem {
         return 450
     }
     
+    private var regramUsesWideChannelPosts: Bool {
+        guard let message, let channel = message.peers[message.id.peerId] as? TelegramChannel, case .broadcast = channel.info else { return false }
+        return RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["wideChannelPosts"].bool
+    }
+
     public var blockWidth:CGFloat {
         
         var widthForContent: CGFloat = 0
@@ -330,18 +343,19 @@ public class ChatRowItem: TableRowItem {
             if isLikable {
                 tempWidth -= 35
             }
-            widthForContent = min(tempWidth, min_block_width)
+            widthForContent = regramUsesWideChannelPosts ? max(1, tempWidth) : min(tempWidth, min_block_width)
             
             
         } else {
             if case .Full = itemType {
                 let additionWidth:CGFloat = date?.layoutSize.width ?? 20
-                widthForContent = min(800, width) - self.contentOffset.x - 44 - additionWidth
+                widthForContent = (regramUsesWideChannelPosts ? width : min(800, width)) - self.contentOffset.x - 44 - additionWidth
             } else {
-                widthForContent = min(800, width) - self.contentOffset.x - rightSize.width - 44
+                widthForContent = (regramUsesWideChannelPosts ? width : min(800, width)) - self.contentOffset.x - rightSize.width - 44
             }
         }
         
+        if regramCanQuickTranslate, !isSharable, !hasSource { widthForContent -= 35 }
         if forwardType != nil {
             widthForContent -= leftContentInset
         }
@@ -371,6 +385,7 @@ public class ChatRowItem: TableRowItem {
     }
 
     public var rightSize:NSSize {
+        if hidesStickerTimestamp { return .zero }
         if let _ = message?.adAttribute {
             return .zero
         }
@@ -395,6 +410,10 @@ public class ChatRowItem: TableRowItem {
     public var isSticker: Bool {
         let file = message?.anyMedia as? TelegramMediaFile
         return file?.isStaticSticker == true || file?.isAnimatedSticker == true  || file?.isVideoSticker == true
+    }
+
+    public var hidesStickerTimestamp: Bool {
+        return isSticker && !RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["stickerTimestamp"].bool
     }
     
 
@@ -481,7 +500,8 @@ public class ChatRowItem: TableRowItem {
             }
         }
         
-        return max(rightSize.height + 8, height)
+        let minimumHeight = regramCanQuickTranslate && (shareVisible || hasSource) ? ChatRowGeometry.translationStackMinimumHeight : 0
+        return max(minimumHeight, max(rightSize.height + 8, height))
     }
     
     public var defaultReplyMarkupInset: CGFloat {
@@ -1758,6 +1778,7 @@ public class ChatRowItem: TableRowItem {
     
     private var _reactionsLayout: ChatReactionsLayout?
     public var reactionsLayout: ChatReactionsLayout? {
+        if RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["hideReactions"].bool { return nil }
         if let value = _reactionsLayout {
             return value
         } else if let message = self.messages.first {
@@ -2506,7 +2527,13 @@ public class ChatRowItem: TableRowItem {
                 guestChatBadge = layout
             }
             
-            let dateFormatter = DateSelectorUtil.chatDateFormatter
+            let regramSettings = RegramPreferences.shared.settings(accountId: context.peerId.toInt64())
+            let dateFormatter = DateSelectorUtil.chatDateFormatter.copy() as! DateFormatter
+            if regramSettings["secondsInMessages"].bool, !dateFormatter.dateFormat.contains("ss") {
+                if let minutes = dateFormatter.dateFormat.range(of: "mm") {
+                    dateFormatter.dateFormat.insert(contentsOf: ":ss", at: minutes.upperBound)
+                }
+            }
             let dateColor = isStateOverlayLayout ? stateOverlayTextColor : (!hasBubble ? theme.colors.grayText : theme.chat.grayText(isIncoming, object.renderType == .bubble))
             
             let dateFont: NSFont = renderType == .bubble ? .normal(.small) : .normal(.short)
@@ -2530,6 +2557,20 @@ public class ChatRowItem: TableRowItem {
                 
                 let attr: NSMutableAttributedString = NSAttributedString.initialize(string: dateFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(time))), color: dateColor, font: dateFont).mutableCopy() as! NSMutableAttributedString
                 
+                if message.rgIsRevoked {
+                    let marker = RegramRevokedMarker(settings: regramSettings)
+                    if let label = marker.label(defaultText: regramLocalizedString("RevokedMarker.DefaultText", languageCode: appAppearance.languageCode)) {
+                        let color = RegramRevokedMarker.rgb(marker.color).map { NSColor(calibratedRed: CGFloat(($0 >> 16) & 255) / 255, green: CGFloat(($0 >> 8) & 255) / 255, blue: CGFloat($0 & 255) / 255, alpha: 1) } ?? dateColor
+                        attr.insert(.initialize(string: label + " ", color: color, font: dateFont), at: 0)
+                    }
+                }
+                if regramSettings["showMessageId"].bool, message.id.peerId.namespace == Namespaces.Peer.CloudChannel || message.id.peerId.namespace == Namespaces.Peer.CloudGroup {
+                    attr.insert(.initialize(string: "#\(message.id.id) ", color: dateColor, font: dateFont), at: 0)
+                }
+                if regramSettings["showForwardedMessageDate"].bool, let forward = message.forwardInfo {
+                    let original = dateFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(forward.date)))
+                    attr.insert(.initialize(string: original + " → ", color: dateColor, font: dateFont), at: 0)
+                }
                 if let attribute = message.inlineBotAttribute, let peerId = attribute.peerId, let peer = message.peers[peerId] {
                     attr.insert(.initialize(string: "\(attribute.title ?? peer.displayTitle), ", color: dateColor, font: dateFont), at: 0)
                 }
@@ -2988,7 +3029,7 @@ public class ChatRowItem: TableRowItem {
         }
 
 
-        self.rightFrames = isIncomingTypingDraft ? nil : ChatRightView.Frames(self, size: NSMakeSize(.greatestFiniteMagnitude, rightHeight))
+        self.rightFrames = isIncomingTypingDraft || hidesStickerTimestamp ? nil : ChatRightView.Frames(self, size: NSMakeSize(.greatestFiniteMagnitude, rightHeight))
 
         let cachedRightSize = rightSize
         let cachedBlockWidth = blockWidth

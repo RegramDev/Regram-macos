@@ -1,3 +1,5 @@
+import RegramCore
+import RegramSignals
 import Cocoa
 import TGUIKit
 import SwiftSignalKit
@@ -318,7 +320,7 @@ public enum UIChatListEntry : Identifiable, Comparable {
         public var active: [GiftAuctionContext.State]
     }
     
-    case chat(EngineChatList.Item, [PeerListState.InputActivities.Activity], UIChatAdditionalItem?, filter: ChatListFilter, generalStatus: ItemHideStatus?, selectedForum: PeerId?, appearMode: PeerListState.AppearMode, hideContent: Bool, folders: FilterData?, communityCategories: [PeerId: ChatListFilterPeerCategories], canPreviewChat: Bool)
+    case chat(EngineChatList.Item, [PeerListState.InputActivities.Activity], UIChatAdditionalItem?, filter: ChatListFilter, generalStatus: ItemHideStatus?, selectedForum: PeerId?, appearMode: PeerListState.AppearMode, hideContent: Bool, folders: FilterData?, communityCategories: [PeerId: ChatListFilterPeerCategories], canPreviewChat: Bool, regramRevision: Int64 = 0)
     case group(Int, EngineChatList.GroupItem, Bool, ItemHideStatus, PeerListState.AppearMode, Bool, EngineStorySubscriptions?)
     case reveal([ChatListFilter], ChatListFilter, ChatListFilterBadges)
     case empty(ChatListFilter, PeerListMode, SplitViewState, PeerEquatable?, hideContent: Bool)
@@ -333,8 +335,8 @@ public enum UIChatListEntry : Identifiable, Comparable {
     case loading(ChatListFilter)
     public static func == (lhs: UIChatListEntry, rhs: UIChatListEntry) -> Bool {
         switch lhs {
-        case let .chat(entry, activity, additionItem, filter, generalStatus, selectedForum, appearMode, hideContent, folders, communityCategories, canPreviewChat):
-            if case .chat(entry, activity, additionItem, filter, generalStatus, selectedForum, appearMode, hideContent, folders, communityCategories, canPreviewChat) = rhs {
+        case let .chat(entry, activity, additionItem, filter, generalStatus, selectedForum, appearMode, hideContent, folders, communityCategories, canPreviewChat, regramRevision):
+            if case .chat(entry, activity, additionItem, filter, generalStatus, selectedForum, appearMode, hideContent, folders, communityCategories, canPreviewChat, regramRevision) = rhs {
                return true
             } else {
                 return false
@@ -416,7 +418,7 @@ public enum UIChatListEntry : Identifiable, Comparable {
 
     public var index: ChatListIndex {
         switch self {
-        case let .chat(entry, _, additionItem, _, _, _, _, _, _, _, _):
+        case let .chat(entry, _, additionItem, _, _, _, _, _, _, _, _, _):
             if let additionItem = additionItem {
                 var current = MessageIndex.absoluteUpperBound().globalPredecessor()
                 for _ in 0 ..< additionItem.index {
@@ -480,7 +482,7 @@ public enum UIChatListEntry : Identifiable, Comparable {
     
     public var stableId: UIChatListEntryId {
         switch self {
-        case let .chat(entry, _, _, filterId, _, _, _, _, _, _, _):
+        case let .chat(entry, _, _, filterId, _, _, _, _, _, _, _, _):
             if entry.renderedPeer.peer.map({ TelegramUtilsHooks.shared.peerIsForum($0._asPeer()) }) == true, entry.threadData == nil {
                 return .forum(entry.renderedPeer.peerId)
             } else {
@@ -517,13 +519,13 @@ public enum UIChatListEntry : Identifiable, Comparable {
 
 
 
-fileprivate func prepareEntries(from:[AppearanceWrapperEntry<UIChatListEntry>]?, to:[AppearanceWrapperEntry<UIChatListEntry>], adIndex: UInt16?, arguments: Arguments, initialSize:NSSize, animated:Bool, scrollState:TableScrollState? = nil, groupId: EngineChatList.Group, listMode: PeerListMode) -> Signal<TableUpdateTransition, NoError> {
-    
+fileprivate func prepareEntries(from:[AppearanceWrapperEntry<UIChatListEntry>]?, to:[AppearanceWrapperEntry<UIChatListEntry>], adIndex: UInt16?, arguments: Arguments, initialSize:NSSize, animated:Bool, scrollState:TableScrollState? = nil, groupId: EngineChatList.Group, listMode: PeerListMode, regramPreviews: [UIChatListEntryId: [Message]] = [:], layoutPreferences: RegramChatListLayoutPreferences? = nil) -> Signal<TableUpdateTransition, NoError> {
+    let layoutPreferences = layoutPreferences ?? RegramChatListLayoutPreferences(settings: RegramPreferences.shared.settings(accountId: arguments.context.peerId.toInt64()))
     return Signal { subscriber in
                 
         func makeItem(_ entry: AppearanceWrapperEntry<UIChatListEntry>) -> TableRowItem {
             switch entry.entry {
-            case let .chat(item, activities, addition, filter, hideStatus, selectedForum, appearMode, hideContent, filterData, communityCategories, previewChat):
+            case let .chat(item, activities, addition, filter, hideStatus, selectedForum, appearMode, hideContent, filterData, communityCategories, previewChat, _):
                 var pinnedType: ChatListPinnedType = .some
                 if let addition = addition {
                     pinnedType = .ad(addition.item)
@@ -544,14 +546,14 @@ fileprivate func prepareEntries(from:[AppearanceWrapperEntry<UIChatListEntry>]?,
                     }
                 }
                 
-                return ChatListRowItem(initialSize, context: arguments.context, stableId: entry.entry.stableId, mode: mode, messages: messages, index: entry.entry.index, readState: item.readCounters, draft: item.draft, pinnedType: pinnedType, renderedPeer: item.renderedPeer, peerPresence: item.presence, forumTopicData: item.forumTopicData, forumTopicItems: item.topForumTopicItems, activities: activities, associatedGroupId: groupId, isMuted: item.isMuted, hasFailed: item.hasFailed, hasUnreadMentions: item.hasUnseenMentions, hasUnreadReactions: item.hasUnseenReactions, hasUnreadVotes: item.hasUnseenPollVotes, filter: filter, hideStatus: hideStatus, appearMode: appearMode, hideContent: hideContent, getHideProgress: arguments.getHideProgress, selectedForum: selectedForum, autoremoveTimeout: item.autoremoveTimeout, story: item.storyStats, openStory: arguments.openStory, isContact: item.isContact, displayAsTopics: item.displayAsTopicList, folders: filterData, communityCategories: communityCategories, canPreviewChat: previewChat)
+                return ChatListRowItem(initialSize, context: arguments.context, stableId: entry.entry.stableId, mode: mode, messages: messages, index: entry.entry.index, readState: item.readCounters, draft: item.draft, pinnedType: pinnedType, renderedPeer: item.renderedPeer, peerPresence: item.presence, forumTopicData: item.forumTopicData, forumTopicItems: item.topForumTopicItems, activities: activities, associatedGroupId: groupId, isMuted: item.isMuted, hasFailed: item.hasFailed, hasUnreadMentions: item.hasUnseenMentions, hasUnreadReactions: item.hasUnseenReactions, hasUnreadVotes: item.hasUnseenPollVotes, filter: filter, hideStatus: hideStatus, appearMode: appearMode, hideContent: hideContent, getHideProgress: arguments.getHideProgress, selectedForum: selectedForum, autoremoveTimeout: item.autoremoveTimeout, story: item.storyStats, openStory: arguments.openStory, isContact: item.isContact, displayAsTopics: item.displayAsTopicList, folders: filterData, communityCategories: communityCategories, canPreviewChat: previewChat, previewMessages: regramPreviews[entry.entry.stableId], layoutPreferences: layoutPreferences)
 
             case let .group(_, item, animated, hideStatus, appearMode, hideContent, storyState):
                 var messages:[Message] = []
                 if let message = item.topMessage {
                     messages.append(message._asMessage())
                 }
-                return ChatListRowItem(initialSize, context: arguments.context, stableId: entry.entry.stableId, pinnedType: .none, groupId: item.id, groupItems: item.items, messages: messages, unreadCount: item.unreadCount, animateGroup: animated, hideStatus: hideStatus, appearMode: appearMode, hideContent: hideContent, getHideProgress: arguments.getHideProgress, openStory: arguments.openStory, storyState: storyState)
+                return ChatListRowItem(initialSize, context: arguments.context, stableId: entry.entry.stableId, pinnedType: .none, groupId: item.id, groupItems: item.items, messages: messages, unreadCount: item.unreadCount, animateGroup: animated, hideStatus: hideStatus, appearMode: appearMode, hideContent: hideContent, getHideProgress: arguments.getHideProgress, openStory: arguments.openStory, storyState: storyState, layoutPreferences: layoutPreferences)
             case let .reveal(tabs, selected, counters):
                 return ChatListRevealItem(initialSize, context: arguments.context, tabs: tabs, selected: selected, counters: counters)
             case let .empty(filter, mode, state, peer, hideContent):
@@ -729,6 +731,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         }
         
         if changedFolder {
+            RegramChatListPolicy.recordSelectedFolderId(data.filter == .allChats ? -1 : data.filter.id, accountId: context.peerId.toInt64())
             self.removeRevealStateIfNeeded(nil)
             self.genericView.tableView.scroll(to: .up(true))
             self.folderUpdatesDisposable.set(context.engine.peers.pollChatFolderUpdates(folderId: ChatListUIHooks.shared.chatListFilterId(data.filter)).start())
@@ -755,6 +758,8 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
     
     private var didSuggestAutoarchive: Bool = false
     
+    private var regramPreviewCoordinator: RegramChatListPreviewCoordinator?
+    private var regramAppliedLayout: RegramChatListLayoutPreferences?
     private var preloadStorySubscriptionsDisposable: Disposable?
     private var preloadStoryResourceDisposables: [MediaId: Disposable] = [:]
 
@@ -775,6 +780,8 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         
         let initialSize = self.atomicSize
         let context = self.context
+        let regramPreviewCoordinator = RegramChatListPreviewCoordinator(postbox: context.account.postbox, accountId: context.peerId.toInt64())
+        self.regramPreviewCoordinator = regramPreviewCoordinator
         let previousChatList = self.previousChatList
         let first = Atomic<(hasEarlier: Bool, hasLater: Bool)>(value: (hasEarlier: false, hasLater: false))
         let scrollUp:Atomic<Bool> = self.first
@@ -802,7 +809,12 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         |> distinctUntilChanged
 
         
-        self.preloadStorySubscriptionsDisposable = (self.context.engine.messages.preloadStorySubscriptions(isHidden: self.mode.groupId == .archive, preferHighQuality: preferHighQualityStories)
+        self.preloadStorySubscriptionsDisposable = (regramPreferenceChanges(accountId: context.peerId.toInt64())
+                   |> map { $0["hideStories"].bool || $0["features.hideTopStories"].bool }
+                   |> distinctUntilChanged
+                   |> mapToSignal { hidden -> Signal<[EngineMedia.Id: StoryPreloadInfo], NoError> in
+                       hidden ? .single([:]) : context.engine.messages.preloadStorySubscriptions(isHidden: groupId == .archive, preferHighQuality: preferHighQualityStories)
+                   }
                    |> deliverOnMainQueue).start(next: { [weak self] resources in
                        guard let `self` = self else {
                            return
@@ -932,7 +944,9 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         
         let storyState: Signal<EngineStorySubscriptions?, NoError>
         if self.mode.groupId == .root {
-            storyState = context.engine.messages.storySubscriptions(isHidden: true) |> map(Optional.init)
+            storyState = regramPreferenceChanges(accountId: context.peerId.toInt64()) |> map { $0["hideStories"].bool } |> distinctUntilChanged |> mapToSignal { hidden in
+                hidden ? .single(nil) : context.engine.messages.storySubscriptions(isHidden: true) |> map(Optional.init)
+            }
         } else {
             storyState = .single(nil)
         }
@@ -977,7 +991,19 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         
         
         
-        let list:Signal<TableUpdateTransition, NoError> = combineLatest(queue: prepareQueue, chatHistoryView, appearanceSignal, stateUpdater |> map(ChatListStateProjection.init) |> distinctUntilChanged, appNotificationSettings(accountManager: context.sharedContext.accountManager), additionalSettings(accountManager: context.sharedContext.accountManager), storyState, suspiciousSession, suggestions, birthdays, myBirthday, subState, appConfiguration, context.giftAuctionsManager.state, PendingChatRemovals.get(context).hiddenPeerIds) |> mapToQueue { value, appearance, state, inAppSettings, additionalSettings, storyState, suspiciousSession, suggestionsAndCrashReport, birthdays, myBirthday, missingBalanceState, appConfiguration, activeAuctions, pendingRemovals -> Signal<TableUpdateTransition, NoError> in
+        let regramRestingNearTop = Atomic(value: true)
+        let regramRefreshRevision = Atomic<Int64>(value: 0)
+        let regramFilterRevision = Atomic<Int64>(value: 0)
+        let regramFilterChanges = regramPreferenceChanges(accountId: context.peerId.toInt64()) |> map { _ -> Int64 in regramFilterRevision.modify { $0 &+ 1 } }
+        let regramArchiveGroup: Signal<EngineChatList.GroupItem?, NoError> = combineLatest(regramPreferenceChanges(accountId: context.peerId.toInt64()), filterSignal) |> mapToSignal { settings, filter -> Signal<EngineChatList.GroupItem?, NoError> in
+            guard settings["features.showArchiveInFolders"].bool, !settings["features.hideSavedAndArchivedMessagesInList"].bool, filter.filter != .allChats else { return .single(nil) }
+            return chatListViewForLocation(chatListLocation: .chatList(groupId: .root), location: .Initial(1, nil), filter: .allChats, account: context.account) |> map { $0.list.groupItems.first(where: { $0.id == .archive }) }
+        }
+        let regramAppearance = combineLatest(appearanceSignal, regramFilterChanges, regramRemarkChanges(accountId: context.peerId.toInt64()), regramPreviewCoordinator.changes.get()) |> map { appearance, _, _, _ in
+            _ = regramRefreshRevision.modify { $0 &+ 1 }
+            return appearance
+        }
+        let list:Signal<TableUpdateTransition, NoError> = combineLatest(queue: prepareQueue, chatHistoryView, regramAppearance, stateUpdater |> map(ChatListStateProjection.init) |> distinctUntilChanged, appNotificationSettings(accountManager: context.sharedContext.accountManager), additionalSettings(accountManager: context.sharedContext.accountManager), storyState, suspiciousSession, suggestions, birthdays, myBirthday, subState, appConfiguration, context.giftAuctionsManager.state, PendingChatRemovals.get(context).hiddenPeerIds, regramArchiveGroup) |> mapToQueue { value, appearance, state, inAppSettings, additionalSettings, storyState, suspiciousSession, suggestionsAndCrashReport, birthdays, myBirthday, missingBalanceState, appConfiguration, activeAuctions, pendingRemovals, regramArchiveGroup -> Signal<TableUpdateTransition, NoError> in
             let (suggestions, crashReportCard) = suggestionsAndCrashReport
                                 
             let filterData = value.1
@@ -1001,11 +1027,15 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
                 prepare.append((value, nil))
             }
             
+            let regramSettings = RegramPreferences.shared.settings(accountId: context.peerId.toInt64())
+            if regramSettings["features.hideSavedAndArchivedMessagesInList"].bool {
+                prepare.removeAll { $0.0.renderedPeer.peerId == context.peerId }
+            }
             let hiddenItems: PeerListHiddenItems = state.hiddenItems
             
             if !update.list.hasLater, case .allChats = filterData.filter {
                 let items = update.list.additionalItems.filter {
-                    !hiddenItems.promo.contains($0.item.renderedPeer.peerId)
+                    !RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["disableAllAds"].bool && !hiddenItems.promo.contains($0.item.renderedPeer.peerId)
                 }
                 for (i, current) in items.enumerated() {
                     prepare.append((current.item, UIChatAdditionalItem(item: current, index: i + update.list.groupItems.count)))
@@ -1019,6 +1049,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
                     return false
                 })
             }
+            let regramRevision = RegramPreferences.shared.revision(accountId: context.peerId.toInt64()) &+ RGGroupRemarks.shared.revision(accountId: context.peerId.toInt64()) &+ regramRefreshRevision.with { $0 }
             var mapped: [UIChatListEntry] = prepare.map { item in
                 let space: PeerActivitySpace
                 var generalStatus: ItemHideStatus? = nil
@@ -1031,17 +1062,20 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
                 case let .chatList(peerId):
                     space = .init(peerId: peerId, category: .global)
                 }
-                return .chat(item.0, state.activities.activities[space] ?? [], item.1, filter: filterData.filter, generalStatus: generalStatus, selectedForum: state.selectedForum, appearMode: state.controllerAppear, hideContent: state.appear == .short, folders: rowFolders, communityCategories: update.communityCategories, canPreviewChat: additionalSettings.previewChats)
+                return .chat(item.0, state.activities.activities[space] ?? [], item.1, filter: filterData.filter, generalStatus: generalStatus, selectedForum: state.selectedForum, appearMode: state.controllerAppear, hideContent: state.appear == .short, folders: rowFolders, communityCategories: update.communityCategories, canPreviewChat: additionalSettings.previewChats, regramRevision: regramRevision)
             }
             
+            if let group = regramArchiveGroup, !update.list.hasLater, state.mode == .plain {
+                mapped.append(.group(update.list.groupItems.count, group, false, state.hiddenItems.archive, state.controllerAppear, state.appear == .short, storyState))
+            }
             if case .filter = filterData.filter, mapped.isEmpty {} else {
                 if !update.list.hasLater, state.appear != .short {
                     let hideStatus: ItemHideStatus = hiddenItems.archive
-                    for (i, group) in update.list.groupItems.reversed().enumerated() {
+                    for (i, group) in update.list.groupItems.reversed().enumerated() where !regramSettings["features.hideSavedAndArchivedMessagesInList"].bool {
                         mapped.append(.group(i, group, animateGroupNextTransition.swap(nil) == group.id, hideStatus, state.controllerAppear, state.appear == .short, storyState))
                     }
                     if state.mode == .plain, state.filterData.filter == .allChats, !update.list.hasLater {
-                        if update.list.groupItems.isEmpty, let storyState = storyState, !storyState.items.isEmpty {
+                        if !regramSettings["features.hideSavedAndArchivedMessagesInList"].bool, update.list.groupItems.isEmpty, let storyState = storyState, !storyState.items.isEmpty {
                             mapped.append(.group(0, .init(id: .archive, topMessage: nil, items: [], unreadCount: 0), animateGroupNextTransition.swap(nil) == .archive, hideStatus, state.controllerAppear, state.appear == .short, storyState))
                         }
                     }
@@ -1165,7 +1199,17 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
             }
             
             
-            return prepareEntries(from: previousEntries.swap(entries), to: entries, adIndex: nil, arguments: arguments, initialSize: initialSize.with { $0 }, animated: animated, scrollState: scroll, groupId: groupId, listMode: mode)
+            let previews = regramPreviewCoordinator.update(mapped, filterRevision: regramFilterRevision.with { $0 })
+            let previousList = previousEntries.swap(entries)
+            if regramSettings["features.keepNewChatsVisibleAtTop"].bool, regramRestingNearTop.with({ $0 }), let previousList, !previousList.isEmpty, !update.list.hasLater {
+                let oldIds = Set(previousList.map { $0.entry.stableId })
+                let hasNewChat = mapped.contains { entry in
+                    if case .chat = entry { return !oldIds.contains(entry.stableId) }
+                    return false
+                }
+                if hasNewChat, case .none = scroll { scroll = .up(false) }
+            }
+            return prepareEntries(from: previousList, to: entries, adIndex: nil, arguments: arguments, initialSize: initialSize.with { $0 }, animated: animated, scrollState: scroll, groupId: groupId, listMode: mode, regramPreviews: previews, layoutPreferences: RegramChatListLayoutPreferences(settings: regramSettings))
         }
         
         
@@ -1227,6 +1271,11 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         }
 
         genericView.tableView.setScrollHandler({ [weak self] scroll in
+            if let self {
+                let event = NSApp.currentEvent
+                let isTracking = event?.type == .scrollWheel && (event?.phase == .changed || event?.momentumPhase == .changed)
+                _ = regramRestingNearTop.swap(!isTracking && self.genericView.tableView.documentOffset.y >= 0 && self.genericView.tableView.documentOffset.y <= self.genericView.navigationHeight + 1)
+            }
             
             let view = previousChatList.modify({$0})
             self?.removeRevealStateIfNeeded(nil)
@@ -1273,7 +1322,10 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
             
         })
         
-        let filterView = chatListFilterPreferences(engine: context.engine) |> deliverOnMainQueue |> distinctUntilChanged
+        let filterView = combineLatest(chatListFilterPreferences(engine: context.engine), regramPreferenceChanges(accountId: context.peerId.toInt64())) |> map { filters, settings -> ChatListFolders in
+            let list = settings["allChatsHidden"].bool ? filters.list.filter { $0 != .allChats } : filters.list
+            return ChatListFolders(list: list, sidebar: filters.sidebar, showTags: filters.showTags)
+        } |> deliverOnMainQueue |> distinctUntilChanged
         let filterBadges = chatListFilterItems(engine: context.engine, accountManager: context.sharedContext.accountManager) |> deliverOnMainQueue |> distinctUntilChanged
         
         switch mode {
@@ -1314,7 +1366,9 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
                     current = current.withUpdatedTabs(filters.list)
                         .withUpdatedSidebar(filters.sidebar)
                         .withUpdatedShowTags(filters.showTags)
-                    if !first, let updated = filters.list.first(where: { ChatListUIHooks.shared.chatListFilterId($0) == ChatListUIHooks.shared.chatListFilterId(current.filter) }) {
+                    if first, let startupId = RegramChatListPolicy.startupFolderId(settings: RegramPreferences.shared.settings(accountId: context.peerId.toInt64()), accountId: context.peerId.toInt64()), let startup = filters.list.first(where: { $0.id == (startupId == -1 ? 0 : startupId) }) {
+                        current = current.withUpdatedFilter(startup)
+                    } else if !first, let updated = filters.list.first(where: { ChatListUIHooks.shared.chatListFilterId($0) == ChatListUIHooks.shared.chatListFilterId(current.filter) }) {
                         current = current.withUpdatedFilter(updated)
                     } else {
                         current = current.withUpdatedFilter(nil)
@@ -1395,10 +1449,20 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
     
     
     private func enqueueTransition(_ transition: TableUpdateTransition) {
+        let layout = (transition.updated + transition.inserted).compactMap { ($0.1 as? ChatListRowItem)?.regramLayoutPreferences }.first
         let applied = self.genericView.tableView.merge(with: transition)
         self.readyOnce()
         if !applied {
             return
+        }
+        if let layout {
+            let remeasure = regramAppliedLayout.map { $0.compact != layout.compact || $0.messageLines != layout.messageLines } ?? false
+            regramAppliedLayout = layout
+            if remeasure {
+                let visible = genericView.tableView.visibleItems()
+                genericView.tableView.reloadHeight()
+                genericView.tableView.saveScrollState(visible)
+            }
         }
         
         self.afterTransaction(transition)
@@ -1641,6 +1705,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
     }
     public override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        regramPreviewCoordinator?.refreshExhaustedEmpty()
         
         
         subContext?.load(force: true)
@@ -1704,8 +1769,34 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         context.window.add(swipe: { [weak self] direction, _ -> SwipeHandlerResult in
             guard let `self` = self, let window = self.window else {return .failed}
             let swipeState: SwipeState?
-            
-            
+            let swipePolicy = RegramChatListPolicy.swipeAction(settings: RegramPreferences.shared.settings(accountId: self.context.peerId.toInt64()))
+            let gestureState: SwipeState
+            let folderDelta: Int
+            switch direction { case let .left(state): gestureState = state; folderDelta = 1; case let .right(state): gestureState = state; folderDelta = -1; case .none: return .failed }
+            let folderContinuation: Bool
+            switch gestureState {
+            case let .swiping(_, controller), let .success(_, controller), let .failed(_, controller): folderContinuation = controller === self
+            case .start: folderContinuation = false
+            }
+            let gestureHit = self.genericView.hitTest(self.genericView.convert(window.mouseLocationOutsideOfEventStream, from: nil))
+            let overFolders = gestureHit?.isInSuperclassView(ChatListRevealView.self) == true
+            if !swipePolicy.allowsQuickActions || overFolders || folderContinuation {
+                guard swipePolicy.allowsFolderSwitch, self.mode == .plain, self.filterValue.tabs.count > 1 else { return .failed }
+                switch gestureState {
+                case .start: return .success(self)
+                case .success:
+                    let data = self.filterValue
+                    if let selected = data.tabs.firstIndex(of: data.filter) {
+                        let next = selected + folderDelta
+                        if data.tabs.indices.contains(next) {
+                            let selectedFilter = data.tabs[next]
+                            self.updateFilter { $0.withUpdatedFilter(selectedFilter) }
+                        }
+                    }
+                default: break
+                }
+                return .nothing
+            }
             let hitTestView = self.genericView.hitTest(self.genericView.convert(window.mouseLocationOutsideOfEventStream, from: nil))
             if let view = hitTestView, view.isInSuperclassView(ChatListRevealView.self) {
                 return .failed
@@ -1947,6 +2038,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
     
     
     deinit {
+        regramPreviewCoordinator?.dispose()
         removePeerIdGroupDisposable.dispose()
         disposable.dispose()
         reorderDisposable.dispose()

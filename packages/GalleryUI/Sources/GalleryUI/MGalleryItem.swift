@@ -25,6 +25,13 @@ import FoundationUtils
 import ObjcUtils
 import InlineStickerLayer
 
+func galleryFullImageRepresentation(_ representations: [TelegramMediaImageRepresentation], preferredResource: MediaResource? = nil) -> TelegramMediaImageRepresentation? {
+    if let preferredResource, let original = representations.first(where: { $0.resource.id == preferredResource.id }) { return original }
+    return representations.max { lhs, rhs in
+        Int64(lhs.dimensions.width) * Int64(lhs.dimensions.height) < Int64(rhs.dimensions.width) * Int64(rhs.dimensions.height)
+    }
+}
+
 public final class GPreviewValueClass {
     public let value: GPreviewValue
     public init(_ value: GPreviewValue) {
@@ -253,10 +260,10 @@ public enum GalleryEntry : Comparable, Identifiable {
         }
     }
     
-    public func peerPhotoResource() -> MediaResourceReference {
+    public func peerPhotoResource(representation: TelegramMediaImageRepresentation? = nil) -> MediaResourceReference {
         switch self {
         case let .photo(_, _, image, _, peer, message, _, _, _):
-            if let representation = image.representationForDisplayAtSize(PixelDimensions(1280, 1280)) {
+            if let representation = representation ?? image.representationForDisplayAtSize(PixelDimensions(1280, 1280)) {
                 if let message = message {
                     return .media(media: .message(message: MessageReference(message), media: image), resource: representation.resource)
                 }
@@ -417,6 +424,20 @@ private class Layer: CALayer {
 
 private final class MGalleryItemView : NSView {
     private var image: NSImage?
+    var displayScaleChanged: ((CGFloat) -> Void)?
+    private func updateDisplayScale() {
+        let scale = window?.backingScaleFactor ?? System.backingScale
+        layer?.contentsScale = scale
+        displayScaleChanged?(scale)
+    }
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        updateDisplayScale()
+    }
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        updateDisplayScale()
+    }
     public init() {
         super.init(frame: NSZeroRect)
         self.wantsLayer = true
@@ -503,6 +524,7 @@ public class MGalleryItem: NSObject, Comparable, Identifiable {
     public let view:Promise<NSView> = Promise()
     public let size:Promise<NSSize> = Promise()
     public let magnify:Promise<CGFloat> = Promise(1)
+    let displayScale = ValuePromise<CGFloat>(System.backingScale, ignoreRepeated: true)
     public let rotate: ValuePromise<ImageOrientation?> = ValuePromise(nil, ignoreRepeated: true)
     
     private let appearSignal = ValuePromise(false, ignoreRepeated: true)
@@ -694,7 +716,7 @@ public class MGalleryItem: NSObject, Comparable, Identifiable {
                     if value.rotation == nil {
                         size = value.size?.aspectFitted(self.sizeValue) ?? size
                     } else {
-                        size = value.size ?? size
+                        size = self.rotatedContentSize(for: value.rotation)
                     }
                 }
                 magnify.contentSize = size
@@ -721,7 +743,9 @@ public class MGalleryItem: NSObject, Comparable, Identifiable {
     }
     
     public func singleView() -> NSView {
-        return MGalleryItemView()
+        let view = MGalleryItemView()
+        view.displayScaleChanged = { [weak self] scale in self?.displayScale.set(scale) }
+        return view
     }
     
     public func request(immediately:Bool = true) {

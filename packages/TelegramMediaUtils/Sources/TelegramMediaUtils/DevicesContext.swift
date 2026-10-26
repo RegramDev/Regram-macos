@@ -82,54 +82,11 @@ public func sizeof <T> (_ value : [T]) -> Int
     return (MemoryLayout<T>.size * value.count)
 }
 
-public struct CaptureDeviceCandidate: Equatable {
-    public let uniqueID: String
-    public let isAvailable: Bool
-    public init(uniqueID: String, isAvailable: Bool) {
-        self.uniqueID = uniqueID
-        self.isAvailable = isAvailable
-    }
-}
-
-public typealias DevicesUpdate = (camera: String?, input: String?, output: String?, sampleUpdateIndex: Int?)
-
-public struct DevicesChangeTracker {
-    private var camera: String?
-    private var input: String?
-    private var output: String?
-    private var sampleIndex: Int?
-    
-    public init() {
-    }
-    
-    public mutating func update(camera: String?, input: String?, output: String?, sampleIndex: Int) -> DevicesUpdate {
-        let sampleChanged = self.sampleIndex != sampleIndex
-        var result: DevicesUpdate = (camera: nil, input: nil, output: nil, sampleUpdateIndex: nil)
-        if self.input != input || sampleChanged {
-            result.input = input
-        }
-        if self.camera != camera {
-            result.camera = camera
-        }
-        if self.output != output || sampleChanged {
-            result.output = output
-        }
-        if sampleChanged {
-            result.sampleUpdateIndex = sampleIndex
-        }
-        self.camera = camera
-        self.input = input
-        self.output = output
-        self.sampleIndex = sampleIndex
-        return result
-    }
-}
 
 private let sampleUpdater = ValuePromise(0, ignoreRepeated: false)
-private var index: Int = 0
+private let sampleIndex = Atomic(value: 0)
 private func incrementSampleIndex() {
-    index += 1
-    sampleUpdater.set(index)
+    sampleUpdater.set(sampleIndex.modify { $0 + 1 })
 }
 
 public final class DevicesContext : NSObject {
@@ -171,6 +128,7 @@ public final class DevicesContext : NSObject {
     }
     
     
+    private var observers: [NSObjectProtocol] = []
     private let disposable = MetaDisposable()
     private let updateSampler = MetaDisposable()
     private let devicesQueue = Queue(name: "devicesQueue")
@@ -205,12 +163,12 @@ public final class DevicesContext : NSObject {
         
 
     
-        NotificationCenter.default.addObserver(forName: NSNotification.Name.AVCaptureDeviceWasConnected, object: nil, queue: nil, using: { [weak self] _ in
+        observers.append(NotificationCenter.default.addObserver(forName: NSNotification.Name.AVCaptureDeviceWasConnected, object: nil, queue: nil, using: { [weak self] _ in
             self?.update()
-        })
-        NotificationCenter.default.addObserver(forName: NSNotification.Name.AVCaptureDeviceWasDisconnected, object: nil, queue: nil, using: { [weak self] _ in
+        }))
+        observers.append(NotificationCenter.default.addObserver(forName: NSNotification.Name.AVCaptureDeviceWasDisconnected, object: nil, queue: nil, using: { [weak self] _ in
             self?.update()
-        })
+        }))
         AudioListener.retainOutputListener()
         
 
@@ -219,22 +177,22 @@ public final class DevicesContext : NSObject {
         
         AudioObjectAddPropertyListener(AudioObjectID(kAudioObjectSystemObject), &AudioAddress.devices, AudioListener.devices, nil)
         
-        NotificationCenter.default.addObserver(forName: AudioNotification.audioDevicesDidChange.notificationName, object: nil, queue: nil, using: { [weak self] _ in
+        observers.append(NotificationCenter.default.addObserver(forName: AudioNotification.audioDevicesDidChange.notificationName, object: nil, queue: nil, using: { [weak self] _ in
             self?.update()
-        })
+        }))
 
         
-        NotificationCenter.default.addObserver(forName: AudioNotification.audioOutputDeviceDidChange.notificationName, object: nil, queue: nil, using: { [weak self] _ in
+        observers.append(NotificationCenter.default.addObserver(forName: AudioNotification.audioOutputDeviceDidChange.notificationName, object: nil, queue: nil, using: { [weak self] _ in
             self?.update()
-        })
+        }))
         
-        NotificationCenter.default.addObserver(forName: AudioNotification.audioInputDeviceDidChange.notificationName, object: nil, queue: nil, using: { [weak self] _ in
+        observers.append(NotificationCenter.default.addObserver(forName: AudioNotification.audioInputDeviceDidChange.notificationName, object: nil, queue: nil, using: { [weak self] _ in
             self?.update()
-        })
+        }))
         
-        NotificationCenter.default.addObserver(forName: AudioNotification.mixStereo.notificationName, object: nil, queue: nil, using: { [weak self] _ in
+        observers.append(NotificationCenter.default.addObserver(forName: AudioNotification.mixStereo.notificationName, object: nil, queue: nil, using: { [weak self] _ in
             self?.update()
-        })
+        }))
         
         
         
@@ -304,17 +262,11 @@ public final class DevicesContext : NSObject {
     }
     
     public static func resolveCaptureDeviceId(selectedId: String?, candidates: [CaptureDeviceCandidate], defaultId: String?) -> String? {
-        if let selectedId, let device = candidates.first(where: { $0.uniqueID == selectedId }), device.isAvailable {
-            return device.uniqueID
-        }
-        return defaultId
+        return DeviceSelectionPolicy.capture(selectedId: selectedId, candidates: candidates, defaultId: defaultId)
     }
     
     public static func resolveOutputDeviceId(selectedId: String?, available: [String], defaultId: String?) -> String? {
-        if let selectedId, available.contains(selectedId) {
-            return selectedId
-        }
-        return defaultId
+        return DeviceSelectionPolicy.output(selectedId: selectedId, available: available, defaultId: defaultId)
     }
     
     private static func candidates(_ devices: [AVCaptureDevice]) -> [CaptureDeviceCandidate] {
@@ -335,7 +287,7 @@ public final class DevicesContext : NSObject {
     }
     
     deinit {
-        NotificationCenter.default.removeObserver(self)
+        for observer in observers { NotificationCenter.default.removeObserver(observer) }
         AudioListener.releaseOutputListener()
         AudioObjectRemovePropertyListener(AudioObjectID(kAudioObjectSystemObject), &AudioAddress.inputDevice, AudioListener.input, nil)
         AudioObjectRemovePropertyListener(AudioObjectID(kAudioObjectSystemObject), &AudioAddress.devices, AudioListener.devices, nil)

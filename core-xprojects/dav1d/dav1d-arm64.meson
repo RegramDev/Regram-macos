@@ -1,5 +1,5 @@
 [binaries]
-c = ['clang', '-arch', 'arm64', '-isysroot', '/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk']
+c = ['@CLANG_PATH@', '-arch', 'arm64', '-isysroot', '@SDK_PATH@']
 ar = 'ar'
 strip = 'strip'
 

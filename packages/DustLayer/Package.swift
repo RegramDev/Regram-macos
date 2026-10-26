@@ -29,9 +29,6 @@ let package = Package(
                            .product(name: "MetalEngine", package: "MetalEngine", condition: nil),
                            .product(name: "TGUIKit", package: "TGUIKit", condition: nil),
                            .product(name: "TelegramTheme", package: "TelegramTheme", condition: nil)],
-            path: "Sources/",
-            resources: [.copy("DustEffectShaders.metal"),
-                        .copy("loki_header.metal"),
-                        .copy("loki.metal")])
+            path: "Sources/")
     ]
 )

@@ -42,7 +42,7 @@ final class SidebarUITests: XCTestCase {
         XCTAssertEqual(entries.map { $0.stableId }, [-2, -1, 20, 10])
         XCTAssertEqual(entries.map { $0.index }, [-1, 1, 2, 3])
         XCTAssertEqual(entries.sorted(), entries)
-        guard case let .folder(_, selected, _, count, unmuted) = entries[1] else { return XCTFail() }
+        guard case let .folder(_, selected, _, count, unmuted, _) = entries[1] else { return XCTFail() }
         XCTAssertTrue(selected)
         XCTAssertEqual(count, 0)
         XCTAssertFalse(unmuted)
@@ -52,12 +52,12 @@ final class SidebarUITests: XCTestCase {
         let entries = leftSidebarEntries(SidebarState(tabs: [filter(20), filter(10)], selectedFilterId: 10), badgeForFilter: { filter in
             return filter.sidebarId == 20 ? (7, true) : nil
         })
-        guard case let .folder(_, selected, filter, count, unmuted) = entries[1] else { return XCTFail() }
+        guard case let .folder(_, selected, filter, count, unmuted, _) = entries[1] else { return XCTFail() }
         XCTAssertEqual(filter.sidebarId, 20)
         XCTAssertFalse(selected)
         XCTAssertEqual(count, 7)
         XCTAssertTrue(unmuted)
-        guard case let .folder(_, secondSelected, _, secondCount, _) = entries[2] else { return XCTFail() }
+        guard case let .folder(_, secondSelected, _, secondCount, _, _) = entries[2] else { return XCTFail() }
         XCTAssertTrue(secondSelected)
         XCTAssertEqual(secondCount, 0)
     }
@@ -69,6 +69,21 @@ final class SidebarUITests: XCTestCase {
         XCTAssertEqual(sidebarReorderedFilters(folders, from: 2, to: 3, rangeLocation: 1, offset: 0).map { $0.sidebarId }, [-1, 20, 10])
         XCTAssertEqual(sidebarReorderedFilters(folders, from: 5, to: 6, rangeLocation: 5, offset: 1).map { $0.sidebarId }, [-1, 20, 10])
         XCTAssertEqual(sidebarReorderedFilters(folders, from: 1, to: 3, rangeLocation: 1, offset: 0).map { $0.sidebarId }, [10, 20, -1])
+    }
+
+    func testHidingFolderCountersChangesPresentationWithoutLosingRawCountsOrSelection() {
+        let state = SidebarState(tabs: [filter(20), filter(10)], selectedFilterId: 10)
+        let badges: (ChatListFilter) -> (count: Int, hasUnmutedUnread: Bool)? = { _ in (7, true) }
+        let visible = leftSidebarEntries(state, badgeForFilter: badges)
+        let hidden = leftSidebarEntries(state, badgeForFilter: badges, hideUnreadCounts: true)
+        XCTAssertEqual(visible.map(\.stableId), hidden.map(\.stableId))
+        XCTAssertNotEqual(visible, hidden)
+        guard case let .folder(_, selected, item, count, unmuted, hidesCount) = hidden[2] else { return XCTFail() }
+        XCTAssertTrue(selected)
+        XCTAssertEqual(item.sidebarId, 10)
+        XCTAssertEqual(count, 7)
+        XCTAssertTrue(unmuted)
+        XCTAssertTrue(hidesCount)
     }
 
     func testClassificationPrefersUnreadAndExplicitPeersUseGenericIcon() {

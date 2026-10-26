@@ -1,6 +1,25 @@
 import Cocoa
 
 struct ChatRowGeometry {
+    static let translationStackMinimumHeight: CGFloat = 70
+
+    static func quickTranslationFrame(shareFrame: CGRect, stacked: Bool, rowHeight: CGFloat) -> CGRect {
+        let size = CGSize(width: 30, height: 30)
+        let y = stacked ? shareFrame.minY - size.height - 4 : max(0, min(rowHeight - size.height, shareFrame.minY))
+        return CGRect(x: shareFrame.midX - size.width / 2, y: y, width: size.width, height: size.height)
+    }
+
+    struct SendFlightTarget: Equatable {
+        let rowFrame: NSRect
+        let bubbleFrame: NSRect
+        let contentFrame: NSRect
+        let timestampFrame: NSRect
+
+        func canContinue(with current: SendFlightTarget, sameItem: Bool) -> Bool {
+            sameItem && self == current
+        }
+    }
+
     struct Bubble {
         let rowWidth: CGFloat
         let layoutFrame: NSRect

@@ -6,6 +6,10 @@ import SwiftSignalKit
 import TGUIKit
 import BuildConfig
 import ApiCredentials
+import RegramCore
+#if !SHARE
+import RegramServices
+#endif
 
 #if SHARE
 import TelegramContextShare
@@ -468,6 +472,27 @@ class SharedAccountContext {
                     for id in removedIds {
                         hadUpdates = true
                         if let index = self.activeAccountsValue?.accounts.firstIndex(where: { $0.0 == id }) {
+                            if let removed = self.activeAccountsValue?.accounts[index].1 {
+                                let accountId = removed.peerId.toInt64()
+                                rgUnregisterLocalPremiumAccountPeerId(removed.peerId)
+                                RegramQuickTranslationTasks.shared.clear(accountId: accountId)
+                                RegramMessageMenuInventory.shared.clear(accountId: accountId)
+                                RegramChatListPolicy.clear(accountId: accountId)
+                                RegramTemporaryReveal.shared.clear(accountId: accountId)
+                                RGAutomaticInlineBotDismissals.shared.clear(accountId: accountId)
+                                RegramRecentChats.shared.clear(accountId: accountId)
+                                RGGroupRemarks.shared.clear(accountId: accountId)
+                                RGMessageBookmarks.shared.clear(accountId: accountId)
+                                let localGiftsAccount = RGLocalGiftsStore.accountKey(accountId: accountId, testingEnvironment: removed.testingEnvironment)
+                                RGLocalGiftsStore.shared.removeAccount(account: localGiftsAccount)
+                                RGLocalGiftAssets.removeAccount(account: localGiftsAccount)
+                                #if !SHARE
+                                RegramTranscriptionTasks.shared.cancelAccount(accountId)
+                                try? RegramFontStore.shared.removeAccount(accountId: accountId)
+                                try? RegramCredentials.shared.clear(accountId: accountId)
+                                #endif
+                                RegramPreferences.shared.removeAccount(accountId)
+                            }
                             self.activeAccountsValue?.accounts.remove(at: index)
                             self.managedAccountDisposables.set(nil, forKey: id)
                         }

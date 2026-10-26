@@ -94,8 +94,8 @@ public var appearanceSignal:Signal<Appearance, NoError> {
     
     let updateSignal = AppearanceDayContext.shared.day.get() |> map { _ in true }
     
-    return combineLatest(languageSignal, themeSignal, updateSignal |> deliverOnMainQueue) |> map {
-        return Appearance(language: $0.0, presentation: $0.1)
+    return combineLatest(languageSignal, themeSignal, updateSignal |> deliverOnMainQueue, InterfaceFontProvider.changes |> deliverOnMainQueue) |> map {
+        return Appearance(language: $0.0, presentation: $0.3 == 0 ? $0.1 : $0.1.new())
     }
 }
 

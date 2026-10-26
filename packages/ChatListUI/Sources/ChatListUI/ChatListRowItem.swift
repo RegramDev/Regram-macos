@@ -1,3 +1,5 @@
+import RegramCore
+import ChatHistoryModel
 import Cocoa
 import TGUIKit
 import Postbox
@@ -155,6 +157,7 @@ public class ChatListRowItem: TableRowItem {
     }
         
     private var messages:[Message]
+    private let latestMessage: Message?
     public var message: Message? {
         return messages.first(where: { !$0.text.isEmpty }) ?? messages.first
     }
@@ -320,6 +323,7 @@ public class ChatListRowItem: TableRowItem {
     }
     
     public var hasRevealState: Bool {
+        guard RegramChatListPolicy.swipeAction(settings: RegramPreferences.shared.settings(accountId: context.peerId.toInt64())).allowsQuickActions else { return false }
         return canArchive || (groupId != .root && !isCollapsed)
     }
     
@@ -364,7 +368,7 @@ public class ChatListRowItem: TableRowItem {
 
     
     public var isOutMessage:Bool {
-        if let message = message {
+        if let message = latestMessage ?? message {
             return !message.flags.contains(.Incoming) && message.id.peerId != context.peerId
         }
         return false
@@ -372,7 +376,7 @@ public class ChatListRowItem: TableRowItem {
     public var isRead:Bool {
         switch mode {
         case let .topic(_, data):
-            if let message = message {
+            if let message = latestMessage ?? message {
                 if data.maxOutgoingReadId >= message.id.id {
                     return true
                 }
@@ -391,7 +395,7 @@ public class ChatListRowItem: TableRowItem {
                     return true
                 }
             }
-            if isForum, let message = message {
+            if isForum, let message = latestMessage ?? message {
                 for topic in forumTopicItems.prefix(1) {
                     if topic.maxOutgoingReadMessageId <= message.id {
                         return true
@@ -400,7 +404,7 @@ public class ChatListRowItem: TableRowItem {
                 
             }
             if let readState = readState {
-                if let message = message {
+                if let message = latestMessage ?? message {
                     return readState.isOutgoingMessageIndexRead(MessageIndex(message))
                 }
             }
@@ -427,7 +431,7 @@ public class ChatListRowItem: TableRowItem {
     }
     
     public var isSending:Bool {
-        if let message = message {
+        if let message = latestMessage ?? message {
             return message.flags.contains(.Unsent)
         }
         return false
@@ -485,12 +489,17 @@ public class ChatListRowItem: TableRowItem {
 
 
     public let isArchiveItem: Bool
+    public let regramLayoutPreferences: RegramChatListLayoutPreferences
     
-    public init(_ initialSize:NSSize, context: any AccountContextProtocol, stableId: UIChatListEntryId, pinnedType: ChatListPinnedType, groupId: EngineChatList.Group, groupItems: [EngineChatList.GroupItem.Item], messages: [Message], unreadCount: Int, activities: [PeerListState.InputActivities.Activity] = [], animateGroup: Bool = false, hideStatus: ItemHideStatus = .normal, hasFailed: Bool = false, filter: ChatListFilter = .allChats, appearMode: PeerListState.AppearMode = .normal, hideContent: Bool = false, getHideProgress:(()->CGFloat?)? = nil, openStory: @escaping(StoryInitialIndex?, Bool, Bool)->Void = { _, _, _ in }, storyState: EngineStorySubscriptions? = nil, isContact: Bool = false) {
+    public init(_ initialSize:NSSize, context: any AccountContextProtocol, stableId: UIChatListEntryId, pinnedType: ChatListPinnedType, groupId: EngineChatList.Group, groupItems: [EngineChatList.GroupItem.Item], messages: [Message], unreadCount: Int, activities: [PeerListState.InputActivities.Activity] = [], animateGroup: Bool = false, hideStatus: ItemHideStatus = .normal, hasFailed: Bool = false, filter: ChatListFilter = .allChats, appearMode: PeerListState.AppearMode = .normal, hideContent: Bool = false, getHideProgress:(()->CGFloat?)? = nil, openStory: @escaping(StoryInitialIndex?, Bool, Bool)->Void = { _, _, _ in }, storyState: EngineStorySubscriptions? = nil, isContact: Bool = false, layoutPreferences: RegramChatListLayoutPreferences? = nil) {
         let relativeDateReferenceTimestamp = Date().timeIntervalSince1970
+        regramLayoutPreferences = layoutPreferences ?? RegramChatListLayoutPreferences(settings: RegramPreferences.shared.settings(accountId: context.peerId.toInt64()))
+        let storyState = RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["hideStories"].bool ? nil : storyState
+        self.latestMessage = messages.first
         self.groupId = groupId
         self.peer = nil
         self.mode = .chat
+        let messages = messages.filter { !regramShouldHideMessage($0, accountId: context.peerId.toInt64()) }
         self.messages = messages
         self.chatListIndex = nil
         self.activities = activities
@@ -732,10 +741,15 @@ public class ChatListRowItem: TableRowItem {
     public let monoforumMessagesSelected: TextViewLayout?
 
 
-    public init(_ initialSize:NSSize, context: any AccountContextProtocol, stableId: UIChatListEntryId, mode: Mode, messages: [Message], index: ChatListIndex? = nil, readState:EnginePeerReadCounters? = nil, draft:EngineChatList.Draft? = nil, pinnedType:ChatListPinnedType = .none, renderedPeer:EngineRenderedPeer, peerPresence: EnginePeer.Presence? = nil, forumTopicData: EngineChatList.ForumTopicData? = nil, forumTopicItems:[EngineChatList.ForumTopicData] = [], activities: [PeerListState.InputActivities.Activity] = [], highlightText: String? = nil, associatedGroupId: EngineChatList.Group = .root, isMuted:Bool = false, hasFailed: Bool = false, hasUnreadMentions: Bool = false, hasUnreadReactions: Bool = false, hasUnreadVotes: Bool = false, showBadge: Bool = true, filter: ChatListFilter = .allChats, hideStatus: ItemHideStatus? = nil, titleMode: TitleMode = .normal, appearMode: PeerListState.AppearMode = .normal, hideContent: Bool = false, getHideProgress:(()->CGFloat?)? = nil, selectedForum: PeerId? = nil, autoremoveTimeout: Int32? = nil, story: EngineChatList.StoryStats? = nil, openStory: @escaping(StoryInitialIndex?, Bool, Bool)->Void = { _, _, _ in }, storyState: EngineStorySubscriptions? = nil, isContact: Bool = false, displayAsTopics: Bool = false, folders: FilterData? = nil, communityCategories: [PeerId: ChatListFilterPeerCategories] = [:], canPreviewChat: Bool = false) {
+    public init(_ initialSize:NSSize, context: any AccountContextProtocol, stableId: UIChatListEntryId, mode: Mode, messages: [Message], index: ChatListIndex? = nil, readState:EnginePeerReadCounters? = nil, draft:EngineChatList.Draft? = nil, pinnedType:ChatListPinnedType = .none, renderedPeer:EngineRenderedPeer, peerPresence: EnginePeer.Presence? = nil, forumTopicData: EngineChatList.ForumTopicData? = nil, forumTopicItems:[EngineChatList.ForumTopicData] = [], activities: [PeerListState.InputActivities.Activity] = [], highlightText: String? = nil, associatedGroupId: EngineChatList.Group = .root, isMuted:Bool = false, hasFailed: Bool = false, hasUnreadMentions: Bool = false, hasUnreadReactions: Bool = false, hasUnreadVotes: Bool = false, showBadge: Bool = true, filter: ChatListFilter = .allChats, hideStatus: ItemHideStatus? = nil, titleMode: TitleMode = .normal, appearMode: PeerListState.AppearMode = .normal, hideContent: Bool = false, getHideProgress:(()->CGFloat?)? = nil, selectedForum: PeerId? = nil, autoremoveTimeout: Int32? = nil, story: EngineChatList.StoryStats? = nil, openStory: @escaping(StoryInitialIndex?, Bool, Bool)->Void = { _, _, _ in }, storyState: EngineStorySubscriptions? = nil, isContact: Bool = false, displayAsTopics: Bool = false, folders: FilterData? = nil, communityCategories: [PeerId: ChatListFilterPeerCategories] = [:], canPreviewChat: Bool = false, previewMessages: [Message]? = nil, layoutPreferences: RegramChatListLayoutPreferences? = nil) {
         let relativeDateReferenceTimestamp = Date().timeIntervalSince1970
+        regramLayoutPreferences = layoutPreferences ?? RegramChatListLayoutPreferences(settings: RegramPreferences.shared.settings(accountId: context.peerId.toInt64()))
         
         
+        let hideStories = RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["hideStories"].bool
+        let story = hideStories ? nil : story
+        let storyState = hideStories ? nil : storyState
+        self.latestMessage = messages.first
         if !forumTopicItems.isEmpty {
             var bp = 0
             bp += 1
@@ -779,8 +793,11 @@ public class ChatListRowItem: TableRowItem {
         self.context = context
         self.story = story
         self.openStory = openStory
+        let originalMessages = messages
+        let messages = (previewMessages ?? messages).filter { !regramShouldHideMessage($0, accountId: context.peerId.toInt64()) }
         self.messages = messages
-        self.activities = activities
+        let hideActivities = RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["features.hidePrivateChatActivities"].bool && renderedPeer.chatMainPeer?._asPeer() is TelegramUser
+        self.activities = hideActivities ? [] : activities
         self.pinnedType = pinnedType
         self.splitState = context.layout
         self.hideStatus = hideStatus
@@ -808,7 +825,7 @@ public class ChatListRowItem: TableRowItem {
         self.canPreviewChat = canPreviewChat
         
         
-        self.hasGramBadge = chatListHasUnreadIncomingGramTransfer(messages, readState: readState, accountPeerId: context.peerId)
+        self.hasGramBadge = chatListHasUnreadIncomingGramTransfer(originalMessages, readState: readState, accountPeerId: context.peerId)
 
         if let peer, let botInfo = peer.botInfo, botInfo.flags.contains(.hasWebApp), readState == nil || readState?.count == 0, !hasGramBadge, splitState != .minimisize {
             self.openMiniApp = .init(.initialize(string: strings().chatListOpenMiniApp, color: theme.colors.underSelectedColor, font: .medium(.text)), alignment: .center)
@@ -917,7 +934,7 @@ public class ChatListRowItem: TableRowItem {
                 if let peer = peer, peer.isMonoForum {
                     text = renderedPeer.chatOrMonoforumMainPeer?._asPeer().displayTitle
                 } else {
-                    text = peer?.displayTitle
+                    text = peer.flatMap { RGGroupRemarks.shared.name(accountId: context.peerId.toInt64(), peerId: $0.id.toInt64()) } ?? peer?.displayTitle
                 }
             }
             let _ = titleText.append(string: text, color: renderedPeer.peers[renderedPeer.peerId]?._asPeer() is TelegramSecretChat ? theme.chatList.secretChatTextColor : theme.chatList.textColor, font: .medium(.title))
@@ -952,7 +969,7 @@ public class ChatListRowItem: TableRowItem {
             
         } else if let message = messages.first {
             let date:NSMutableAttributedString = NSMutableAttributedString()
-            var time:TimeInterval = TimeInterval(message.timestamp)
+            var time:TimeInterval = TimeInterval(originalMessages.first?.timestamp ?? message.timestamp)
             time -= context.timeDifference
             let range = date.append(string: DateUtils.string(forMessageListDate: Int32(time)), color: theme.colors.grayText, font: .normal(.short))
             date.setSelected(color: theme.colors.underSelectedColor, range: range)
@@ -1055,6 +1072,14 @@ public class ChatListRowItem: TableRowItem {
             }
         }
         
+        if dateLayout == nil, let original = originalMessages.first {
+            let date = NSMutableAttributedString()
+            let timestamp = Int32(TimeInterval(original.timestamp) - context.timeDifference)
+            let range = date.append(string: DateUtils.string(forMessageListDate: timestamp), color: theme.colors.grayText, font: .normal(.short))
+            date.setSelected(color: theme.colors.underSelectedColor, range: range)
+            dateLayout = TextViewLayout(date, mayItems: false)
+            dateLayout?.measure(width: .greatestFiniteMagnitude)
+        }
         contentImageSpecs = Array(contentImageSpecs.prefix(3))
         
         for i in 0 ..< contentImageSpecs.count {
@@ -1162,13 +1187,17 @@ public class ChatListRowItem: TableRowItem {
                 }
             }
             if let messageText = messageText?.trimmed, !messageText.string.isEmpty {
-                self.messageLayout = .init(messageText, maximumNumberOfLines: chatNameLayout != nil || tags != nil ? 1 : 2, cutout: textCutout)
+                self.messageLayout = .init(messageText, maximumNumberOfLines: Int32(regramLayoutPreferences.messageLines), cutout: textCutout)
                 
-                self.messageSelectedMaxLines = chatNameLayout != nil || tags != nil ? 1 : 2
+                self.messageSelectedMaxLines = Int32(regramLayoutPreferences.messageLines)
                 self.messageSelectedCutout = textCutout
             }
         }
         
+        if messages.isEmpty, !originalMessages.isEmpty, previewMessages != nil {
+            let text = regramLocalizedString("filters.hiddenPreview", languageCode: appCurrentLanguage.primaryLanguage.languageCode)
+            messageLayout = TextViewLayout(.initialize(string: text, color: theme.colors.grayText, font: .normal(.text)), maximumNumberOfLines: 1)
+        }
         _ = makeSize(initialSize.width, oldWidth: 0)
         
         
@@ -1187,7 +1216,7 @@ public class ChatListRowItem: TableRowItem {
         }
     }
     
-    public let margin:CGFloat = 9
+    public var margin: CGFloat { regramCompact ? CGFloat(regramLayoutPreferences.inset) : 9 }
     
     
     public var isPinned: Bool {
@@ -1380,7 +1409,7 @@ public class ChatListRowItem: TableRowItem {
     public var leftInset:CGFloat {
         switch mode {
         case .chat, .savedMessages:
-            return 50 + (10 * 2.0)
+            return (regramCompact ? CGFloat(regramLayoutPreferences.avatarSize) : 50) + 20
         case .topic:
             if titleMode == .forumInfo {
                 return 50 + (10 * 2.0)
@@ -2619,6 +2648,14 @@ public class ChatListRowItem: TableRowItem {
         return ChatListRowView.self
     }
   
+    public var regramCompact: Bool {
+        regramLayoutPreferences.compact && !shouldHideContent && !isGroup && !isTopic
+    }
+
+    public var regramHideSeparator: Bool {
+        regramLayoutPreferences.hideSeparators
+    }
+
     public override var height: CGFloat {
         if let hideStatus = hideStatus {
             switch hideStatus {
@@ -2634,7 +2671,11 @@ public class ChatListRowItem: TableRowItem {
         
         switch mode {
         case .chat, .savedMessages:
-            return 70
+            if isGroup { return 70 }
+            let authorHeight = tags == nil ? chatNameLayout?.layoutSize.height ?? 0 : 0
+            let bodyHeight = max(messageLayout?.layoutSize.height ?? 0, max(topicsLayout?.size.height ?? 0, tags == nil ? 0 : chatNameLayout?.layoutSize.height ?? 0))
+            let tagsHeight = tags?.tags.first?.size.height ?? 0
+            return CGFloat(regramLayoutPreferences.rowHeight(titleHeight: Double(displayLayout?.layoutSize.height ?? 17), authorHeight: Double(authorHeight), bodyHeight: Double(bodyHeight), tagsHeight: Double(tagsHeight)))
         case .topic:
             return 53 + (displayLayout?.layoutSize.height ?? 17)
         }

@@ -35,6 +35,8 @@ import TelegramUtils
 import WebAppUI
 import ChatModeTypes
 import InlineStickerLayer
+import RegramCore
+import PhoneNumberUtils
 
 struct UserInfoEditingState: Equatable {
     let editingFirstName: String?
@@ -2481,7 +2483,8 @@ enum UserInfoEntry<Context: AccountContextProtocol>: PeerInfoEntry {
                     LinkHooks.shared.openExternalLink("https://fragment.com", false)
                 }, itemImage: MenuAnimation.menu_show_info.value, removeTail: false, overrideWidth: 200))
             }
-            return TextAndLabelItem(initialSize, stableId: stableId.hashValue, label:value.label, copyMenuText: strings().textCopyLabelPhoneNumber, text: PeerInfoUIHooks.shared.formatPhoneNumber(arguments.context, value.number), context: arguments.context, viewType: viewType, canCopy: canCopy, _copyToClipboard: {
+            let displayedPhone = value.number.hasPrefix("888") ? "+" + formatPhoneNumberToMask(value.number, mask: "XXX XXXX XXXX") : PeerInfoUIHooks.shared.formatPhoneNumber(arguments.context, value.number)
+            return TextAndLabelItem(initialSize, stableId: stableId.hashValue, label:value.label, copyMenuText: strings().textCopyLabelPhoneNumber, text: displayedPhone, context: arguments.context, viewType: viewType, canCopy: canCopy, _copyToClipboard: {
                 
                 if value.number.hasPrefix("888") {
                     arguments.openFragment(.phoneNumber(value.number))
@@ -2796,7 +2799,7 @@ func userInfoEntries<Context: AccountContextProtocol>(view: PeerView, arguments:
                 } else if user.isFake {
                     infoBlock.append(UserInfoEntry<Context>.scam(sectionId: sectionId, title: strings().peerInfoFake, text: strings().peerInfoFakeWarning, viewType: .singleItem))
                 }
-                if let phoneNumber = user.phone, !phoneNumber.isEmpty {
+                if let phoneNumber = regramLocalDisplayedPhone(accountId: arguments.context.peerId.toInt64(), peerId: user.id.toInt64(), testingEnvironment: arguments.context.account.testingEnvironment, phone: user.phone), !phoneNumber.isEmpty {
                     infoBlock.append(.phoneNumber(sectionId: sectionId, index: 0, value: PhoneNumberWithLabel(label: phoneNumber.hasPrefix("888") ? strings().peerInfoAnonymousPhone : strings().peerInfoPhone, number: phoneNumber), canCopy: true, viewType: .singleItem))
                 } else if view.peerIsContact {
                     infoBlock.append(.phoneNumber(sectionId: sectionId, index: 0, value: PhoneNumberWithLabel(label: strings().peerInfoPhone, number: strings().newContactPhoneHidden), canCopy: false, viewType: .singleItem))

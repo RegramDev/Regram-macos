@@ -13,7 +13,7 @@ let deps: [(String, String)] = [
     ("ChatModeTypes", "../ChatModeTypes"),
     ("MessageUtils", "../MessageUtils"),
     ("RangeSet", "../../submodules/telegram-ios/submodules/Utils/RangeSet"),
-    ("TelegramMediaResources", "../../submodules/telegram-ios/submodules/TelegramMediaResources"),
+    ("TelegramMediaResources", "../TelegramMediaResources"),
 ]
 
 let package = Package(

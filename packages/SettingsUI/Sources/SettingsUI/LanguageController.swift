@@ -123,7 +123,7 @@ private func entries(_ state: State, arguments: Arguments) -> [InputDataEntry] {
     }), viewType: .firstItem)))
     index += 1
     
-    entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_translate_channels, data: .init(name: strings().languageTranslateMessagesChannel, color: theme.colors.text, type: .switchable(state.settings.translateChats), viewType: .lastItem, enabled: state.isPremium, action: arguments.toggleTranslateChannels, disabledAction: arguments.premiumAlert)))
+    entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: _id_translate_channels, data: .init(name: strings().languageTranslateMessagesChannel, color: theme.colors.text, type: .switchable(state.settings.translateChats), viewType: .lastItem, action: arguments.toggleTranslateChannels)))
     index += 1
     
     entries.append(.desc(sectionId: sectionId, index: index, text: .markdown(strings().languageTranslateMessagesChannelInfo, linkHandler: { _ in

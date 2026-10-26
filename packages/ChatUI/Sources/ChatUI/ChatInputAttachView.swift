@@ -1,5 +1,7 @@
+import RegramCore
 import Cocoa
 import InputView
+import InputDataUI
 import TGUIKit
 import SwiftSignalKit
 import TelegramCore
@@ -265,6 +267,20 @@ public final class ChatInputAttachButton: View, MorphHoldObserving {
                     items.append(ContextMenuItem(strings().inputAttachPopoverPhotoOrVideo, handler: { [weak self] in
                         self?.chatInteraction.attachPhotoOrVideo(nil)
                     }, itemImage: MenuAnimation.menu_shared_media.value))
+                }
+
+                let regramSettings = RegramPreferences.shared.settings(accountId: context.peerId.toInt64())
+                if !regramSettings["disableGalleryCamera"].bool, let capture = FeatureNavigationHooks.shared.captureRegramMedia {
+                    let permitsCapture = (peer as? TelegramChannel).map { $0.hasPermission(.sendPhoto) || $0.hasPermission(.sendVideo) } ?? true
+                    if permitsCapture {
+                        items.append(ContextMenuItem(regramLocalizedString("ios.Native.Camera", languageCode: appCurrentLanguage.primaryLanguage.languageCode), handler: {
+                            let action = chatInteraction.captureDeferredSendAction()
+                            capture(context, true) { url in
+                                guard action.takeIfCurrent() else { return }
+                                chatInteraction.showPreviewSender([url], true, nil)
+                            }
+                        }, itemImage: MenuAnimation.menu_shared_media.value))
+                    }
                 }
 
                 if let shortcuts = chatInteraction.presentation.shortcuts, let peer = chatInteraction.peer, chatInteraction.presentation.chatMode == .history {

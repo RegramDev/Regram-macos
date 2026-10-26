@@ -1,3 +1,4 @@
+import RegramCore
 import Cocoa
 
 import TelegramCore
@@ -25,8 +26,44 @@ import ColorPalette
 import InAppSettings
 import FoundationUtils
 import ObjcUtils
+import FetchManager
 
 public class MGalleryVideoItem: MGalleryItem {
+    private var appliedRegramQuality = false
+    private let regramQualityDisposable = MetaDisposable()
+    private let regramStreamingObservation = RegramGalleryVideoStreamingObservation()
+
+    private func applyRegramQuality() {
+        guard !appliedRegramQuality else { return }
+        let preference = RGVideoQualityPreference(rawValue: RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["defaultVideoQuality"].string) ?? .automatic
+        guard preference != .automatic else { appliedRegramQuality = true; regramQualityDisposable.set(nil); return }
+        guard let state = controller.mediaPlayer.videoQualityState() else {
+            if !(controller.mediaPlayer is HLSVideoJSNativeContentView) { appliedRegramQuality = true; regramQualityDisposable.set(nil) }
+            return
+        }
+        guard case .auto = state.preferred else { appliedRegramQuality = true; regramQualityDisposable.set(nil); return }
+        guard let quality = preference.selectedQuality(available: state.available) else { return }
+        appliedRegramQuality = true
+        controller.mediaPlayer.setVideoQuality(.quality(quality))
+        regramQualityDisposable.set(nil)
+    }
+
+    private func observeRegramStreaming() {
+        regramStreamingObservation.start(playerIsLoaded: controller.isLoaded(), isStreamable: media.isStreamable, observe: { [controller] update in
+            let disposable = (controller.status |> deliverOnMainQueue).start(next: { status in
+                switch status.status {
+                case .playing: update(true)
+                case let .buffering(_, whilePlaying): update(whilePlaying)
+                case .paused: update(false)
+                }
+            })
+            return { disposable.dispose() }
+        }, acquirePriority: { [context, resourceId = media.resource.id.stringRepresentation] in
+            let disposable = context.fetchManager.acquireRegramStreamingPriority(resourceId: resourceId)
+            return { disposable.dispose() }
+        })
+    }
+
     public var startTime: TimeInterval = 0
     private var playAfter:Bool = false
     private let controller: SVideoController
@@ -56,7 +93,7 @@ public class MGalleryVideoItem: MGalleryItem {
     public override init(_ context: any AccountContextProtocol, _ entry: GalleryEntry, _ pagerSize: NSSize) {
         controller = SVideoController(context: context, reference: entry.fileReference(entry.file!), message: entry.message, isProtected: entry.isProtected, isControlsLimited: entry.message?.adAttribute != nil)
         super.init(context, entry, pagerSize)
-        
+
         rotateDisposable.set((rotate.get() |> deliverOnMainQueue).start(next: { [weak self] orientation in
             guard let self else {
                 return
@@ -89,6 +126,7 @@ public class MGalleryVideoItem: MGalleryItem {
     deinit {
         updateMagnifyDisposable.dispose()
         rotateDisposable.dispose()
+        regramQualityDisposable.dispose()
     }
         
     public override func singleView() -> NSView {
@@ -108,6 +146,9 @@ public class MGalleryVideoItem: MGalleryItem {
 
         controller.play(startTime)
         controller.viewDidAppear(false)
+        observeRegramStreaming()
+        applyRegramQuality()
+        if !appliedRegramQuality { regramQualityDisposable.set((controller.mediaPlayer.status |> deliverOnMainQueue).start(next: { [weak self] _ in self?.applyRegramQuality() })) }
         self.startTime = 0
         
         
@@ -126,6 +167,7 @@ public class MGalleryVideoItem: MGalleryItem {
     
     public override func disappear(for view: NSView?) {
         super.disappear(for: view)
+        regramQualityDisposable.set(nil)
         if isPausedGlobalPlayer {
             GalleryHooks.shared.resumeGlobalAudio(context)
         }

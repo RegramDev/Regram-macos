@@ -6,6 +6,7 @@ import TGUIKit
 
 public extension Peer {
     var namePeerColor: PeerNameColor? {
+        guard PeerNameColorProvider.isEnabled else { return nil }
         if let nameColor {
             switch nameColor {
             case .preset(let peerNameColor):

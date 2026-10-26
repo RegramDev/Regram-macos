@@ -6,8 +6,8 @@
 	<false/>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>6N38VWS5BX.ru.keepcoder.Telegram</string>
-		<string>6N38VWS5BX.ru.keepcoder.Telegram.TelegramShare</string>
+		<string>$(AppIdentifierPrefix)app.regram.macos</string>
+		<string>$(AppIdentifierPrefix)app.regram.macos.share</string>
 	</array>
 	<key>com.apple.security.device.audio-input</key>
 	<true/>

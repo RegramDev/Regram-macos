@@ -46,6 +46,7 @@ func performInviteJoin(context: any AccountContextProtocol, hash: String, window
         case let .joined(peer):
             if let peer {
                 interaction(peer._asPeer())
+                FeatureNavigationHooks.shared.presentRegramFolderAfterJoining?(context, peer.id)
             }
             close()
         case let .webView(webView):

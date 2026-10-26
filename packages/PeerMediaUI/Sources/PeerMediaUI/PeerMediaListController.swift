@@ -535,7 +535,8 @@ open class PeerMediaListController<Context: AccountContextProtocol>: TableViewCo
         })
         
         
-        let historyViewTransition = combineLatest(queue: prepareQueue,historyPromise.get(), appearanceSignal) |> map { update, appearance -> (transition: TableUpdateTransition, previousUpdate: PeerMediaUpdate?, currentUpdate: PeerMediaUpdate) in
+        let historyViewTransition = combineLatest(queue: prepareQueue,historyPromise.get(), appearanceSignal, regramMessageFilterChanges(accountId: context.peerId.toInt64())) |> map { update, appearance, _ -> (transition: TableUpdateTransition, previousUpdate: PeerMediaUpdate?, currentUpdate: PeerMediaUpdate) in
+            let update = PeerMediaUpdate(messages: regramVisibleMessages(update.messages, accountId: context.peerId.toInt64()), updateType: update.updateType, laterId: update.laterId, earlierId: update.earlierId, automaticDownload: update.automaticDownload, searchState: update.searchState, contentSettings: update.contentSettings)
             let animated = animated.swap(true)
             var scroll:TableScrollState = animated ? .none(nil) : .saveVisible(.upper, false)
             

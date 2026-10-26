@@ -10,6 +10,7 @@ import ThemeSettings
 import TelegramTheme
 import TelegramContext
 import AlertsUI
+import InputDataUI
 
 
 public func joinChannel(context: any AccountContextProtocol, peerId: PeerId) {
@@ -18,6 +19,7 @@ public func joinChannel(context: any AccountContextProtocol, peerId: PeerId) {
         switch outcome {
         case .joined:
             _ = (showModalSuccess(for: context.window, icon: theme.icons.successModalProgress, delay: 1.5)).start()
+            FeatureNavigationHooks.shared.presentRegramFolderAfterJoining?(context, peerId)
         case let .webView(webView):
             ChatNavigationHooks.shared.openJoinChatBotWebViewObserved(context, webView.botPeer.id, webView.url, webView.queryId, peerId)
         }

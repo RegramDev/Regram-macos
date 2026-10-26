@@ -3,6 +3,8 @@
 import PackageDescription
 
 let deps: [(String, String)] = [
+    ("RegramServices", "../RegramServices"),
+    ("FetchManager", "../FetchManager"),
     ("SecureIdUtils", "../SecureIdUtils"),
     ("TGUIKit", "../TGUIKit"),
     ("InstantPageUI", "../InstantPageUI"),
@@ -47,6 +49,7 @@ let package = Package(
         .library(name: "GalleryUI", targets: ["GalleryUI"]),
     ],
     dependencies: [
+        .package(name: "RegramCore", path: "../RegramCore"),
         .package(name: "SSignalKit", path: "../../submodules/telegram-ios/submodules/SSignalKit"),
         .package(name: "TelegramCore", path: "../../submodules/telegram-ios/submodules/TelegramCore"),
         .package(name: "Postbox", path: "../../submodules/telegram-ios/submodules/Postbox"),
@@ -55,10 +58,12 @@ let package = Package(
         .target(
             name: "GalleryUI",
             dependencies: [
+                .product(name: "RegramCore", package: "RegramCore"),
                 .product(name: "SwiftSignalKit", package: "SSignalKit", condition: nil),
                 .product(name: "TelegramCore", package: "TelegramCore", condition: nil),
                 .product(name: "Postbox", package: "Postbox", condition: nil),
             ] + deps.map { .product(name: $0.0, package: $0.0, condition: nil) },
             path: "Sources/GalleryUI"),
+        .testTarget(name: "GalleryUITests", dependencies: ["GalleryUI"]),
     ]
 )

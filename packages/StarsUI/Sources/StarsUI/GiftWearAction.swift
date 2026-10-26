@@ -1,3 +1,5 @@
+import ChatHistoryModel
+import RegramCore
 import Foundation
 import SwiftSignalKit
 import TelegramCore
@@ -37,6 +39,11 @@ final class GiftWearAction {
 
     func perform(context: any AccountContextProtocol, peer: EnginePeer, gift: StarGift.UniqueGift, window: Window, canPresent: @escaping () -> Bool, completion: @escaping (Outcome) -> Void) {
         guard self.isActive, self.operationId == nil, canPresent(), self.isActive, self.operationId == nil else { return }
+        if regramIsLocalGift(.unique(gift)) {
+            guard peer.id == context.peerId else { completion(.failed); return }
+            completion(regramWearLocalGift(context: context, gift: gift, wear: true) ? .applied : .failed)
+            return
+        }
         let operationId = UUID()
         self.operationId = operationId
         let pending = MetaDisposable()

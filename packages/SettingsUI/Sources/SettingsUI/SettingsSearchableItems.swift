@@ -1,3 +1,5 @@
+import RegramCore
+import InputDataUI
 import Cocoa
 import Postbox
 import TGUIKit
@@ -13,6 +15,7 @@ import WallpaperUI
 
 enum SettingsSearchableItemIcon {
     case profile
+    case regram
     case proxy
     case savedMessages
     case calls
@@ -34,6 +37,8 @@ extension SettingsSearchableItemIcon {
         switch self {
         case .profile:
             return theme.icons.settingsProfile
+        case .regram:
+            return FeatureNavigationHooks.shared.regramSettingsIcon() ?? theme.icons.settingsGeneral
         case .proxy:
             return theme.icons.settingsProxy
         case .stickers:
@@ -84,6 +89,7 @@ struct SettingsSearchableItem<Context: AccountContextProtocol> {
 
 func searchSettingsItems<Context: AccountContextProtocol>(items: [SettingsSearchableItem<Context>], query: String) -> [SettingsSearchableItem<Context>] {
     let queryTokens = stringTokens(query.lowercased())
+    let regramQuery = RegramSettingsSearchQuery(query, language: appCurrentLanguage.primaryLanguage.languageCode)
     
     var result: [SettingsSearchableItem<Context>] = []
     for item in items {
@@ -101,7 +107,7 @@ func searchSettingsItems<Context: AccountContextProtocol>(items: [SettingsSearch
         }
         
         let tokens = stringTokens(string)
-        if matchStringTokens(tokens, with: queryTokens) {
+        if matchStringTokens(tokens, with: queryTokens) || (item.id.isRegramSearchItem && regramQuery.matches(string)) {
             result.append(item)
         }
     }
@@ -535,6 +541,9 @@ private func appearanceSearchableItems<Context: AccountContextProtocol>(context:
         SettingsSearchableItem(id: .appearance(6), title: strings().appearanceSettingsChatViewHeader, alternate: synonyms(strings().settingsSearchSynonymsAppearanceChatMode), icon: icon, breadcrumbs: [strings().accountSettingsTheme], present: { context, _, present in
             presentAppearanceSettings(context, present, .chatMode)
         }),
+        SettingsSearchableItem(id: .appearance(7), title: strings().appearanceSettingsDockIcon, alternate: [], icon: icon, breadcrumbs: [strings().accountSettingsTheme], present: { context, _, present in
+            presentAppearanceSettings(context, present, .dockIcon)
+        }),
     ]
 }
 
@@ -638,6 +647,7 @@ func settingsSearchableItems<Context: AccountContextProtocol>(context: Context, 
         |> map { canAddAccount, localizations, notificationSettings, archivedStickerPacks, proxyServers, privacySettings in
             
             var allItems: [SettingsSearchableItem<Context>] = []
+            allItems.append(contentsOf: regramSearchableItems(context: context))
             
             let profileItems = profileSearchableItems(context: context, canAddAccount: canAddAccount)
             allItems.append(contentsOf: profileItems)
@@ -697,3 +707,21 @@ func settingsSearchableItems<Context: AccountContextProtocol>(context: Context, 
 
 
 
+
+private extension SettingsSearchableItemId {
+    var isRegramSearchItem: Bool {
+        if case let .appearance(id) = self { return id >= 0x40000000 }
+        return false
+    }
+}
+
+private func regramSearchableItems<Context: AccountContextProtocol>(context: Context) -> [SettingsSearchableItem<Context>] {
+    let language = appCurrentLanguage.primaryLanguage.languageCode
+    return RegramSettingsCatalog.entries.map { entry in
+        SettingsSearchableItem(id: .appearance(entry.stableId), title: entry.title(language: language), alternate: entry.alternate(language: language), icon: .regram, breadcrumbs: ["Regram Pro", regramLocalizedString(entry.pageTitleKey, languageCode: language)], present: { context, _, present in
+            if let controller = FeatureNavigationHooks.shared.makeRegramController(context, entry.destination) {
+                present(.push, controller)
+            }
+        })
+    }
+}

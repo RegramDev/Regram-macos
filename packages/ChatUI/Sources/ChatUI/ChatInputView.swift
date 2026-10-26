@@ -23,6 +23,8 @@ import FoundationUtils
 import ChatHistoryModel
 import AlertsUI
 import GeneralRows
+import RegramCore
+import RegramSignals
 import InputTextView
 import PremiumUI
 import InlineStickerLayer
@@ -682,6 +684,45 @@ public class ChatInputView: View, Notifable {
     private let slowModeUntilDisposable = MetaDisposable()
     private let accessoryDisposable:MetaDisposable = MetaDisposable()
     private let richDraftDisposable = MetaDisposable()
+    private let regramInputPreferences = MetaDisposable()
+    private var regramNicknameResolver: RegramNicknameMentionInputResolver?
+    public var regramHidesChannelBottomButton: Bool {
+        let presentation = chatInteraction.presentation
+        guard RegramPreferences.shared.settings(accountId: chatInteraction.context.peerId.toInt64())["hideChannelBottomButton"].bool,
+              let channel = presentation.peer as? TelegramChannel, case .broadcast = channel.info, case .member = channel.participationStatus,
+              !channel.hasPermission(.sendSomething), presentation.interfaceState.editState == nil, presentation.selectionState == nil, !presentation.searchMode.inSearch else { return false }
+        switch presentation.state {
+        case .action, .channelWithDiscussion: return true
+        default: return false
+        }
+    }
+
+    private func updateRegramInputPreferences() {
+        let settings = RegramPreferences.shared.settings(accountId: chatInteraction.context.peerId.toInt64())
+        updateAttachments(chatInteraction.presentation, false)
+        var state = ChatInputView.sendButtonState(from: chatInteraction.presentation)
+        if state.kind == .voice && settings["hideRecordingButton"].bool { state.kind = .send; state.isSendEnabled = false }
+        updateSendButton(state, animated: false)
+        updateLayout(size: frame.size, transition: .immediate)
+        inputDidUpdateLayout(animated: false)
+        superview?.needsLayout = true
+        updateRegramNicknameMentionInput()
+    }
+
+    private func updateRegramNicknameMentionInput() {
+        guard chatInteraction.richTextDraft == nil, let rawInput = textView.inputView as? NSTextView, !rawInput.hasMarkedText() else { regramNicknameResolver?.cancel(); return }
+        if regramNicknameResolver == nil { regramNicknameResolver = RegramNicknameMentionInputResolver(context: chatInteraction.interactionContext) }
+        let interaction = chatInteraction
+        let input = interaction.presentation.effectiveInput
+        let session = interaction.captureDeferredSendAction()
+        regramNicknameResolver?.update(input: input, canApply: { [weak self, weak interaction] in
+            guard let self, let interaction, self.chatInteraction === interaction, self.window != nil, interaction.richTextDraft == nil,
+                  session.isAvailable, interaction.presentation.effectiveInput == input,
+                  let rawInput = self.textView.inputView as? NSTextView, !rawInput.hasMarkedText() else { return false }
+            return true
+        }, apply: { [weak interaction] updated in interaction?.update { $0.withUpdatedEffectiveInputState(updated) } })
+    }
+
     private let incomingTypingDraftDisposable = MetaDisposable()
     private var incomingTypingDraftKey: PeerAndThreadId?
     private var canStopIncomingStreamingMessage = false
@@ -735,6 +776,7 @@ public class ChatInputView: View, Notifable {
         updateLocalizationAndTheme(theme: theme)
 
         self.textView.installClickToFocus()
+        regramInputPreferences.set((regramPreferenceChanges(accountId: chatInteraction.context.peerId.toInt64()) |> deliverOnMainQueue).start(next: { [weak self] _ in self?.updateRegramInputPreferences() }))
         
         
         textInteractions.inputDidUpdate = { [weak self] state in
@@ -863,6 +905,8 @@ public class ChatInputView: View, Notifable {
     }
 
     private func updateSendButton(_ state: ChatInputSendButton.State, animated: Bool) {
+        var state = state
+        if state.kind == .voice && RegramPreferences.shared.settings(accountId: chatInteraction.context.peerId.toInt64())["hideRecordingButton"].bool { state.kind = .send; state.isSendEnabled = false }
         let wasInField = sendButton.isInField
         let hadState = sendButton.hasAppliedState
         let desiredChanged = sendButton.update(state: state, animated: animated)
@@ -885,9 +929,17 @@ public class ChatInputView: View, Notifable {
     private func updateRichDraftKeyHandlers() {
         let window = chatInteraction.interactionContext.window
         window.remove(object: self, for: .Return)
+        window.remove(object: self, for: .KeypadEnter)
         window.remove(object: self, for: .Delete)
         window.remove(object: self, for: .Z, modifierFlags: [.command], forceCheckFlags: true)
         window.remove(object: self, for: .Z, modifierFlags: [.command, .shift], forceCheckFlags: true)
+
+        let commandReturn: (NSEvent) -> KeyHandlerResult = { [weak self] event in
+            guard let self else { return .rejected }
+            return RegramInputReturnPolicy.handleCommandReturn(event, responder: self.chatInteraction.interactionContext.window.firstResponder, inputRoot: self) ? .invoked : .rejected
+        }
+        window.set(handler: commandReturn, with: self, for: .Return, priority: .supreme, modifierFlags: [.command])
+        window.set(handler: commandReturn, with: self, for: .KeypadEnter, priority: .supreme, modifierFlags: [.command])
 
         // Whether the draft is shown in the LIVE inline editor (vs the read-only media preview). Matches the
         // preview's block-based decision (NOT `media.isEmpty`, which can be non-empty for a text-only draft):
@@ -906,13 +958,11 @@ public class ChatInputView: View, Notifable {
         }()
 
         if isInlineEditable {
-            // Return follows the plain-input send preference even with the caret inside the editor: the
-            // configured send combo (Enter, or ⌘/⇧-Enter) sends; any other Return combo is rejected so the
-            // editor inserts a newline. A window handler (not just the editor's own Return) is needed so
-            // ⌘-Enter — which the editor never receives as `insertNewline` — still sends.
             window.set(handler: { [weak self] event -> KeyHandlerResult in
                 guard let self = self, self.chatInteraction.richTextDraft != nil else { return .rejected }
-                if FastSettings.checkSendingAbility(for: event) {
+                let settings = RegramPreferences.shared.settings(accountId: self.chatInteraction.interactionContext.peerId.toInt64())
+                let marked = (self.chatInteraction.interactionContext.window.firstResponder as? NSTextInputClient)?.hasMarkedText() == true
+                if RegramInputReturnPolicy.shouldSend(sendWithReturn: settings["sendWithReturnKey"].bool, modifiers: event.modifierFlags, hasMarkedText: marked) {
                     self.chatInteraction.sendMessage(false, nil, self.chatInteraction.presentation.messageEffect)
                     return .invoked
                 }
@@ -928,10 +978,11 @@ public class ChatInputView: View, Notifable {
                 return .invoked
             }, with: self, for: .Z, priority: .high, modifierFlags: [.command, .shift])
         } else if chatInteraction.richTextDraft != nil {
-            // Enter sends (honoring the Enter / ⌘-Enter send preference).
             window.set(handler: { [weak self] event -> KeyHandlerResult in
                 guard let self = self, self.chatInteraction.richTextDraft != nil else { return .rejected }
-                if FastSettings.checkSendingAbility(for: event) {
+                let settings = RegramPreferences.shared.settings(accountId: self.chatInteraction.interactionContext.peerId.toInt64())
+                let marked = (self.chatInteraction.interactionContext.window.firstResponder as? NSTextInputClient)?.hasMarkedText() == true
+                if RegramInputReturnPolicy.shouldSend(sendWithReturn: settings["sendWithReturnKey"].bool, modifiers: event.modifierFlags, hasMarkedText: marked) {
                     self.chatInteraction.sendMessage(false, nil, self.chatInteraction.presentation.messageEffect)
                     return .invoked
                 }
@@ -971,7 +1022,8 @@ public class ChatInputView: View, Notifable {
         let interaction = self.chatInteraction
         let context = interaction.interactionContext
         
-        if FastSettings.checkSendingAbility(for: event) {
+        let sendWithReturn = RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["sendWithReturnKey"].bool
+        if RegramInputReturnPolicy.shouldSend(sendWithReturn: sendWithReturn, modifiers: event.modifierFlags, hasMarkedText: textView.inputView.hasMarkedText()) {
             let text = textView.string().trimmed
             if text.length > interaction.maxInputCharacters {
                 if context.isPremium || context.premiumIsBlocked {
@@ -1006,6 +1058,7 @@ public class ChatInputView: View, Notifable {
     public static let inputBottomInset: CGFloat = 12
 
     public func height(for width: CGFloat) -> CGFloat {
+        if regramHidesChannelBottomButton { return 0 }
         let contentHeight:CGFloat = contentHeight(for: width)
         var sumHeight:CGFloat = contentHeight + ChatInputView.inputBottomInset
         if let markup = replyMarkupModel  {
@@ -1025,6 +1078,13 @@ public class ChatInputView: View, Notifable {
     
     
     
+    public override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if let window, window.isKeyWindow, RegramInputReturnPolicy.handleCommandReturn(event, responder: window.firstResponder, inputRoot: self) {
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+
     public override var responder:NSResponder? {
         // While a text-only rich draft is shown inline, the composer's focus target is the live editor (the
         // plain text field is hidden) — so typing / deleting edits the draft in place.
@@ -1035,7 +1095,9 @@ public class ChatInputView: View, Notifable {
     }
     
     public func updateInterface(with interaction:ChatInteraction) -> Void {
+        if chatInteraction !== interaction { regramNicknameResolver?.cancel(); regramNicknameResolver = nil }
         self.chatInteraction = interaction
+        RegramLinkMetadata.shared.refreshIfNeeded(engine: interaction.context.engine)
         sendButton.prepare(with: chatInteraction)
         needUpdateChatState(with: chatState, false)
         needUpdateReplyMarkup(with: interaction.presentation, false)
@@ -1796,6 +1858,7 @@ public class ChatInputView: View, Notifable {
         }
 
         if state.effectiveInput != prevState.effectiveInput {
+            updateRegramNicknameMentionInput()
             if state.effectiveInput.inputText.count != prevState.effectiveInput.inputText.count {
                 self.textView.scrollToCursor()
             }
@@ -1875,7 +1938,7 @@ public class ChatInputView: View, Notifable {
         var anim = animated
         var appearingSendAs: ChatInputSendAsView?
         let hasSendAs = inputState.sendAsPeers?.isEmpty == false
-        if let sendAsPeers = inputState.sendAsPeers, !sendAsPeers.isEmpty && inputState.state == .normal {
+        if let sendAsPeers = inputState.sendAsPeers, !sendAsPeers.isEmpty && inputState.state == .normal, !RegramPreferences.shared.settings(accountId: chatInteraction.context.peerId.toInt64())["disableSendAsButton"].bool {
             let current: ChatInputSendAsView
             if let view = self.sendAsView {
                 current = view
@@ -1925,6 +1988,7 @@ public class ChatInputView: View, Notifable {
         }
 
         if let view = stateView {
+            view.isHidden = regramHidesChannelBottomButton
             transition.updateFrame(view: view, frame: size.bounds)
             view.updateLayout(size: size, transition: .immediate)
         }
@@ -1934,7 +1998,7 @@ public class ChatInputView: View, Notifable {
         // its frame and hit-tests by default. Its internal layout uses the
         // stored `bottomHeight` to shift the input row UP above the keyboard
         // markup area when shown.
-        transition.updateFrame(view: container, frame: size.bounds)
+        transition.updateFrame(view: container, frame: NSRect(x: 0, y: 0, width: size.width, height: max(0, size.height)))
         container.bottomHeight = bottomHeight
         container.updateLayout(transition: transition)
 
@@ -2133,8 +2197,11 @@ public class ChatInputView: View, Notifable {
         self.rtfAttachmentsDisposable.dispose()
         self.slowModeUntilDisposable.dispose()
         self.richDraftDisposable.dispose()
+        self.regramInputPreferences.dispose()
+        self.regramNicknameResolver?.cancel()
         self.incomingTypingDraftDisposable.dispose()
         self.chatInteraction.interactionContext.window.remove(object: self, for: .Return)
+        self.chatInteraction.interactionContext.window.remove(object: self, for: .KeypadEnter)
         self.chatInteraction.interactionContext.window.remove(object: self, for: .Delete)
         self.chatInteraction.interactionContext.window.remove(object: self, for: .Z, modifierFlags: [.command], forceCheckFlags: true)
         self.chatInteraction.interactionContext.window.remove(object: self, for: .Z, modifierFlags: [.command, .shift], forceCheckFlags: true)

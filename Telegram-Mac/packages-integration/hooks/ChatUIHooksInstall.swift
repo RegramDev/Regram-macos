@@ -153,6 +153,9 @@ func installChatUIHooks() {
         let object = ForwardMessagesObject(context.concrete, messages: messages, getMessages: getMessages)
         return ShareModalController(object)
     }
+    hooks.makeForwardMessagesWithoutQuoteShareModal = { context, messages, getMessages in
+        ShareModalController(ForwardMessagesObject(context.concrete, messages: messages, hideNames: true, getMessages: getMessages))
+    }
     hooks.navigateToChatWithContext = { navigation, context, location, focus, action, additional in
         navigateToChat(navigation: navigation, context: context.concrete, chatLocation: location, focusTarget: focus, initialAction: action, additional: additional)
     }

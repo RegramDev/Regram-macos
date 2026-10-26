@@ -99,6 +99,15 @@ public enum FeatureModalKind {
 }
 
 public struct FeatureNavigationHooks {
+    public var regramSettingsIcon: () -> CGImage? = { nil }
+    public var makeRegramController: (any AccountContextProtocol, String?) -> ViewController? = { _, _ in nil }
+    public var captureRegramMedia: ((any AccountContextProtocol, Bool, @escaping (URL) -> Void) -> Void)?
+    public var presentRegramFolderAfterJoining: ((any AccountContextProtocol, PeerId) -> Void)?
+    public var makeRegramMessageController: (any AccountContextProtocol, Message) -> ViewController? = { _, _ in nil }
+    public var makeRegramFilterImportController: ((any AccountContextProtocol, Data) -> ViewController?)? = nil
+    public var makeRegramSummaryController: (any AccountContextProtocol, [Message], Bool) -> ViewController? = { _, _, _ in nil }
+    public var makeRegramSummaryRangeController: (any AccountContextProtocol, PeerId, Int64?, [Message]) -> ViewController? = { _, _, _, _ in nil }
+    public var makeRegramWebTranslationController: (any AccountContextProtocol, URL) -> ViewController? = { _, _ in nil }
     public var showPremiumBoarding: (any AccountContextProtocol, Window, PremiumBoardingSource?, Bool, TelegramPresentationTheme?) -> Void = { _, _, _, _, _ in }
     public var showPremiumBoardingWithContext: ((any AccountContextProtocol, Window, PremiumBoardingSource?, Bool, TelegramPresentationTheme?) -> Void)?
 

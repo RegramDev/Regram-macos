@@ -16,6 +16,7 @@ import ColorPalette
 import MessageUtils
 import FoundationUtils
 import InlineMediaGrid
+import FetchManager
 
 
 public class ChatMediaContentView: Control, NSDraggingSource, NSPasteboardItemDataProvider, PinchableView {
@@ -125,6 +126,9 @@ public class ChatMediaContentView: Control, NSDraggingSource, NSPasteboardItemDa
     
     public func cancelFetching() {
         if let context = context, let media = media {
+            if let parent, let image = media as? TelegramMediaImage, let representation = image.representationForDisplayAtSize(.init(width: 1280, height: 1280)) {
+                context.fetchManager.cancelInteractiveFetches(category: .image, location: .chat(parent.id.peerId), locationKey: .messageId(parent.id), resource: representation.resource)
+            }
             if let parent = parent, let parameters = parameters {
                 parameters.cancelOperation(parent, media)
             } else {

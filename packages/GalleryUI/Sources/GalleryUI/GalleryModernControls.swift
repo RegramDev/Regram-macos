@@ -263,7 +263,7 @@ public class GalleryModernControlsView: View {
         }
     }
     
-    public func updateControlsVisible(_ entry: GalleryEntry) {
+    public func updateControlsVisible(_ entry: GalleryEntry, accountId: Int64, cachedData: CachedPeerData? = nil) {
         switch entry {
        
         case let .instantMedia(media, _):
@@ -281,7 +281,7 @@ public class GalleryModernControlsView: View {
                 }
             }
         case let .message(message):
-            let cantSave = message.message?.containsSecretMedia == true || message.message?.isCopyProtected() == true
+            let cantSave = !entry.regramCanExport(accountId: accountId, cachedData: cachedData)
             
             if message.message?.adAttribute != nil {
                 zoomInControl.isHidden = true
@@ -456,10 +456,10 @@ public class GalleryModernControls: GenericViewController<GalleryModernControlsV
     }
     
     
-    public func update(_ item: MGalleryItem?) {
+    public func update(_ item: MGalleryItem?, cachedData: CachedPeerData? = nil) {
         if let item = item {
             if let interfaceState = item.entry.interfaceState {
-                self.genericView.updateControlsVisible(item.entry)
+                self.genericView.updateControlsVisible(item.entry, accountId: context.peerId.toInt64(), cachedData: cachedData)
                 peerDisposable.set((context.account.postbox.loadedPeerWithId(interfaceState.0) |> deliverOnMainQueue).start(next: { [weak self, weak item] peer in
                     guard let `self` = self, let item = item else {return}
                     self.genericView.updatePeer(peer, timestamp: interfaceState.1 == 0 ? 0 : interfaceState.1 - self.context.timeDifference, account: self.context.account, canShare: item.entry.canShare && self.interactions.canShare())

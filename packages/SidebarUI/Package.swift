@@ -7,6 +7,7 @@ let package = Package(
     platforms: [.macOS(.v10_13)],
     products: [.library(name: "SidebarUI", targets: ["SidebarUI"])],
     dependencies: [
+        .package(name: "RegramCore", path: "../RegramCore"),
         .package(name: "InputDataUI", path: "../InputDataUI"),
         .package(name: "GeneralRows", path: "../GeneralRows"),
         .package(name: "TelegramContext", path: "../TelegramContext"),
@@ -23,6 +24,8 @@ let package = Package(
     ],
     targets: [
         .target(name: "SidebarUI", dependencies: [
+            .product(name: "RegramCore", package: "RegramCore"),
+            .product(name: "RegramSignals", package: "RegramCore"),
             .product(name: "InputDataUI", package: "InputDataUI"),
             .product(name: "GeneralRows", package: "GeneralRows"),
             .product(name: "TelegramContext", package: "TelegramContext"),

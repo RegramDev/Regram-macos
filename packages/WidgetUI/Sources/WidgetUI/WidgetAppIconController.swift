@@ -9,7 +9,7 @@ import TelegramTheme
 import TelegramIconsTheme
 import TelegramContext
 import TelegramUtils
-import PremiumUI
+import RegramServices
 import SettingsUI
 
 final class WidgetAppIconContainer : View {
@@ -17,7 +17,7 @@ final class WidgetAppIconContainer : View {
     private var item: DockIconRowItem?
     private let itemView: DockIconRowView = .init(frame: .zero)
     
-    var selectIcon:((TelegramApplicationIcons.Icon)->Void)?
+    var selectIcon:((String)->Void)?
     
     required init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -33,8 +33,8 @@ final class WidgetAppIconContainer : View {
         fatalError("init(coder:) has not been implemented")
     }
     
-    func update(dockItems: [TelegramApplicationIcons.Icon], settings: DockSettings, animated: Bool, context: any AccountContextProtocol) {
-        let item = DockIconRowItem(frame.size, stableId: 0, viewType: .modern(position: .single, insets: .init()), context: context, dockIcons: dockItems, selected: settings.iconSelected, action: { [weak self] icon in
+    func update(dockItems: [String], selectedIcon: String, animated: Bool) {
+        let item = DockIconRowItem(frame.size, stableId: 0, viewType: .modern(position: .single, insets: .init()), dockIcons: dockItems, selected: selectedIcon, action: { [weak self] icon in
             self?.selectIcon?(icon)
         }, insets: .init(left: 10))
         self.item = item
@@ -48,9 +48,11 @@ final class WidgetAppIconContainer : View {
 
 
 private struct State : Equatable {
-    var dockItems: [TelegramApplicationIcons.Icon] = []
-    var shuffled: [TelegramApplicationIcons.Icon] = []
-    var settings: DockSettings = .defaultSettings
+    var dockItems: [String] = RegramBranding.icons
+    var shuffled: [String] = []
+    var selectedIcon: String = RegramBranding.selectedIcon
+    var dark = false
+    var language = ""
     
     mutating func shuffle() {
         if !dockItems.isEmpty {
@@ -79,17 +81,11 @@ final class WidgetAppIconController<Context: AccountContextProtocol> : TelegramG
         let context = self.context
         
         self.genericView.dataView?.selectIcon = { icon in
-            if icon.isPremium, !context.isPremium {
-                prem(with: PremiumBoardingController(context: context, source: .settings), for: context.window)
-                return
-            }
-            _ = updateDockSettings(accountManager: context.sharedContext.accountManager, { settings in
-                return settings.withUpdatedIcon(icon.file.fileName)
-            }).startStandalone()
-            
+            RegramBranding.selectIcon(icon, dark: theme.colors.isDark)
         }
         
-        let initialState = State()
+        var initialState = State()
+        initialState.shuffle()
         
         let statePromise = ValuePromise<State>(ignoreRepeated: true)
         let stateValue = Atomic(value: initialState)
@@ -97,20 +93,18 @@ final class WidgetAppIconController<Context: AccountContextProtocol> : TelegramG
             statePromise.set(stateValue.modify (f))
         }
         
-        disposable.add(combineLatest(queue: .mainQueue(), context.engine.resources.applicationIcons(), dockSettings(accountManager: context.sharedContext.accountManager)).startStrict(next: { dockIcons, settings in
+        disposable.add((combineLatest(RegramBranding.selection, appearanceSignal) |> deliverOnMainQueue).startStrict(next: { icon, appearance in
             updateState { current in
                 var current = current
-                current.dockItems = dockIcons.icons
-                current.settings = settings
-                if current.shuffled.isEmpty {
-                    current.shuffle()
-                }
+                current.selectedIcon = icon
+                current.dark = appearance.presentation.colors.isDark
+                current.language = appCurrentLanguage.primaryLanguage.languageCode
                 return current
             }
         }))
         
         disposable.add((statePromise.get() |> deliverOnMainQueue).startStrict(next: { [weak self] state in
-            self?.genericView.dataView?.update(dockItems: state.shuffled, settings: state.settings, animated: true, context: context)
+            self?.genericView.dataView?.update(dockItems: state.shuffled, selectedIcon: state.selectedIcon, animated: true)
             
             self?.genericView.update(.init(title: { strings().emptyChatAppIcon }, desc: { strings().emptyChatAppIconDesc }, descClick: {
                 context.bindings.rootNavigation().push(AppAppearanceViewController(context: context))

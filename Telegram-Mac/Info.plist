@@ -11,13 +11,13 @@
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIconName</key>
-	<string>AppIcon</string>
+	<string>Regram</string>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>$(PRODUCT_NAME)</string>
+	<string>Regram</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -29,8 +29,7 @@
 			<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>tg</string>
-				<string>telegram</string>
+				<string>regram</string>
 			</array>
 		</dict>
 		<dict>
@@ -51,7 +50,7 @@
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>283357</string>
+	<string>283367</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSApplicationCategoryType</key>
@@ -90,12 +89,30 @@
 	<key>SOURCE</key>
 	<string>${SOURCE}</string>
 	<key>SUFeedURL</key>
-	<string>${SFEED_URL}</string>
+	<string></string>
 	<key>SUPublicDSAKeyFile</key>
 	<string>${DSA_PEM_FILE}</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>SFCompactRounded-Semibold.otf</string>
 	</array>
+	<key>RegramRootBundleIdentifier</key>
+	<string>app.regram.macos</string>
+	<key>RegramApiId</key>
+	<string>$(REGRAM_API_ID)</string>
+	<key>RegramApiHash</key>
+	<string>$(REGRAM_API_HASH)</string>
+	<key>RegramApplicationGroup</key>
+	<string>$(AppIdentifierPrefix)app.regram.macos</string>
+	<key>RegramTeamIdentifier</key>
+	<string>$(DEVELOPMENT_TEAM)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Regram</string>
+	<key>RegramUpdatesDisabled</key>
+	<true/>
+	<key>SUEnableAutomaticChecks</key>
+	<false/>
+	<key>SUAutomaticallyUpdate</key>
+	<false/>
 </dict>
 </plist>

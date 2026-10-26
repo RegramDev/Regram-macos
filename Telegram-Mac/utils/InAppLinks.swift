@@ -752,7 +752,10 @@ private func executeInviteLink(hash: String, context: AccountContext, window: Wi
                     _ = (showModalProgress(signal: signal, for: window)).start(next: { outcome in
                         switch outcome {
                         case let .joined(peer):
-                            if let peer { openPeer(peer._asPeer(), nil) }
+                            if let peer {
+                                openPeer(peer._asPeer(), nil)
+                                FeatureNavigationHooks.shared.presentRegramFolderAfterJoining?(context, peer.id)
+                            }
                         case let .webView(webView):
                             openJoinChatBotWebView(context: context, botId: webView.botPeer.id, url: webView.url, queryId: webView.queryId, joinedPeerId: webView.peerId)
                         }

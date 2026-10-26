@@ -2,6 +2,7 @@ import Foundation
 import Postbox
 import TelegramCore
 import SwiftSignalKit
+import RegramCore
 import Postbox
 
 public struct FetchManagerLocationEntryId: Hashable {
@@ -73,7 +74,8 @@ private final class FetchManagerLocationEntry {
 }
 
 private final class FetchManagerActiveContext {
-    let userInitiated: Bool
+    var userInitiated: Bool
+    var regramGeneration: UInt64 = 0
     var ranges = IndexSet()
     var disposable: Disposable?
     
@@ -116,9 +118,13 @@ private final class FetchManagerStatusContext {
 }
 
 private final class FetchManagerCategoryContext {
+    private var regramMediaPriorityEnabled = false
+    private var regramVisibleResourceIds: [String] = []
+    private var regramPreloadResourceIds: [String] = []
+    private var regramStreamingResourceIds = Set<String>()
     private let postbox: Postbox
     private let storeManager: DownloadedMediaStoreManager?
-    private let entryCompleted: (FetchManagerLocationEntryId) -> Void
+    private let entryCompleted: (FetchManagerLocationEntryId, Bool, @escaping () -> Bool) -> Void
     private let activeEntriesUpdated: () -> Void
     
     private var topEntryIdAndPriority: (FetchManagerLocationEntryId, FetchManagerPriorityKey)?
@@ -136,17 +142,71 @@ private final class FetchManagerCategoryContext {
         return false
     }
     
-    init(postbox: Postbox, storeManager: DownloadedMediaStoreManager?, entryCompleted: @escaping (FetchManagerLocationEntryId) -> Void, activeEntriesUpdated: @escaping () -> Void) {
+    init(postbox: Postbox, storeManager: DownloadedMediaStoreManager?, entryCompleted: @escaping (FetchManagerLocationEntryId, Bool, @escaping () -> Bool) -> Void, activeEntriesUpdated: @escaping () -> Void) {
         self.postbox = postbox
         self.storeManager = storeManager
         self.entryCompleted = entryCompleted
         self.activeEntriesUpdated = activeEntriesUpdated
+    }
+
+    deinit {
+        for context in activeContexts.values { context.disposable?.dispose() }
+        for context in statusContexts.values { context.disposable?.dispose() }
     }
     
     func getActiveEntries() -> [FetchManagerLocationEntry] {
         return Array(self.entries.values)
     }
     
+    private func regramCompletion(id: FetchManagerLocationEntryId, context: FetchManagerActiveContext) -> (Bool) -> Void {
+        context.regramGeneration &+= 1
+        let generation = context.regramGeneration
+        return { [weak self, weak context] completed in
+            guard let self, let context, self.activeContexts[id] === context, context.regramGeneration == generation else { return }
+            self.entryCompleted(id, completed, { [weak self, weak context] in
+                guard let self, let context else { return false }
+                return self.activeContexts[id] === context && context.regramGeneration == generation
+            })
+        }
+    }
+
+    func regramUpdateMediaPriority(enabled: Bool, visible: [String], preload: [String], streaming: Set<String>) {
+        guard regramMediaPriorityEnabled != enabled || regramVisibleResourceIds != visible || regramPreloadResourceIds != preload || regramStreamingResourceIds != streaming else { return }
+        regramMediaPriorityEnabled = enabled
+        regramVisibleResourceIds = visible
+        regramPreloadResourceIds = preload
+        regramStreamingResourceIds = streaming
+        topEntryIdAndPriority = nil
+        _ = maybeFindAndActivateNewTopEntry()
+        activeEntriesUpdated()
+    }
+
+    private func regramReconcileActiveEntries() -> Bool {
+        let candidates = entries.values.filter { !$0.isPaused && $0.priorityKey != nil && !$0.combinedRanges.isEmpty }.sorted { lhs, rhs in
+            let l = lhs.priorityKey!
+            let r = rhs.priorityKey!
+            return l == r ? lhs.episode < rhs.episode : l < r
+        }
+        let selected = RegramMediaLoadingPolicy.selectedResources(candidates: candidates.map { entry in
+            RegramMediaFetchCandidate(resourceId: entry.id.resourceId.stringRepresentation, isUserInitiated: entry.userInitiated, isForegroundPrefetch: entry.references.copyItems().contains {
+                if case .foregroundPrefetch = $0 { return true }
+                return false
+            })
+        }, visible: regramVisibleResourceIds, preload: regramPreloadResourceIds, streaming: regramStreamingResourceIds)
+        let selectedIds = Set(candidates.filter { selected.contains($0.id.resourceId.stringRepresentation) }.map { $0.id })
+        var changed = false
+        for id in Array(activeContexts.keys) where !selectedIds.contains(id) {
+            activeContexts.removeValue(forKey: id)?.disposable?.dispose()
+            changed = true
+        }
+        for entry in candidates where selectedIds.contains(entry.id) {
+            topEntryIdAndPriority = (entry.id, entry.priorityKey!)
+            changed = activateTopEntry() || changed
+        }
+        topEntryIdAndPriority = nil
+        return changed
+    }
+
     func withEntry(id: FetchManagerLocationEntryId, takeNew: (() -> (AnyMediaReference?, MediaResourceReference, MediaResourceStatsCategory, Int32))?, _ f: (FetchManagerLocationEntry) -> Void) {
         let entry: FetchManagerLocationEntry
         let previousPriorityKey: FetchManagerPriorityKey?
@@ -215,7 +275,7 @@ private final class FetchManagerCategoryContext {
             if activeContext.disposable == nil || activeContext.ranges != ranges {
                 if let entry = self.entries[id] {
                     activeContext.ranges = ranges
-                    let entryCompleted = self.entryCompleted
+                    let entryCompleted = self.regramCompletion(id: id, context: activeContext)
                     let storeManager = self.storeManager
                     let parsedRanges: [(Range<Int64>, MediaBoxFetchPriority)]?
                     if ranges.count == 1 && ranges.min() == 0 && ranges.max() == Int(Int32.max) {
@@ -267,8 +327,8 @@ private final class FetchManagerCategoryContext {
                         return .single(type)
                     }
                     |> deliverOnMainQueue).start(next: { _ in
-                        entryCompleted(id)
-                    })
+                        entryCompleted(true)
+                    }, error: { _ in entryCompleted(false) })
                 } else {
                     assertionFailure()
                 }
@@ -295,6 +355,7 @@ private final class FetchManagerCategoryContext {
     }
     
     func maybeFindAndActivateNewTopEntry() -> Bool {
+        if regramMediaPriorityEnabled { return regramReconcileActiveEntries() }
         if self.topEntryIdAndPriority == nil && !self.entries.isEmpty {
             var topEntryIdAndPriority: (FetchManagerLocationEntryId, FetchManagerPriorityKey)?
             for (id, entry) in self.entries {
@@ -317,6 +378,10 @@ private final class FetchManagerCategoryContext {
             self.topEntryIdAndPriority = topEntryIdAndPriority
         }
         
+        return activateTopEntry()
+    }
+
+    private func activateTopEntry() -> Bool {
         if let topEntryId = self.topEntryIdAndPriority?.0 {
             if let entry = self.entries[topEntryId] {
                 let ranges = entry.combinedRanges
@@ -358,6 +423,7 @@ private final class FetchManagerCategoryContext {
                     restart = true
                 }
                 
+                activeContext.userInitiated = entry.userInitiated
                 if restart {
                     activeContext.ranges = ranges
                     
@@ -381,7 +447,7 @@ private final class FetchManagerCategoryContext {
                     }
 
                     
-                    let entryCompleted = self.entryCompleted
+                    let entryCompleted = self.regramCompletion(id: topEntryId, context: activeContext)
                     let storeManager = self.storeManager
                     activeContext.disposable?.dispose()
                     if isVideoPreload {
@@ -392,10 +458,10 @@ private final class FetchManagerCategoryContext {
                             |> map { _ -> FetchResourceSourceType in }
                             |> then(.single(.local))
                             |> deliverOnMainQueue).start(next: { _ in
-                                entryCompleted(topEntryId)
-                            })
+                                entryCompleted(true)
+                            }, error: { _ in entryCompleted(false) })
                         } else {
-                            entryCompleted(topEntryId)
+                            entryCompleted(true)
                         }
                     } else if ranges.isEmpty {
                     } else {
@@ -416,8 +482,8 @@ private final class FetchManagerCategoryContext {
                             return .single(type)
                         }
                         |> deliverOnMainQueue).start(next: { _ in
-                            entryCompleted(topEntryId)
-                        })
+                            entryCompleted(true)
+                        }, error: { _ in entryCompleted(false) })
                     }
                     return true
                 } else {
@@ -666,6 +732,9 @@ public final class FetchManagerImpl: FetchManager {
     public static var preloadVideoResource:((Postbox, MediaResourceUserLocation, MediaResourceUserContentType, MediaResourceReference, Double)->Signal<Never, NoError>)? = nil
     
     private var categoryContexts: [FetchManagerCategory: FetchManagerCategoryContext] = [:]
+    private var regramPriorityState = RegramMediaPriorityState()
+    private var regramSettingsObserver: NSObjectProtocol?
+
     
     private let hasUserInitiatedEntriesValue = ValuePromise<Bool>(false, ignoreRepeated: true)
     public var hasUserInitiatedEntries: Signal<Bool, NoError> {
@@ -680,8 +749,45 @@ public final class FetchManagerImpl: FetchManager {
     public init(postbox: Postbox, storeManager: DownloadedMediaStoreManager?) {
         self.postbox = postbox
         self.storeManager = storeManager
+        regramSettingsObserver = NotificationCenter.default.addObserver(forName: RegramPreferences.didChange, object: nil, queue: .main) { [weak self] notification in
+            guard let self, let accountId = RegramAccountScope.shared.accountId(for: self.postbox), notification.object as? Int64 == accountId else { return }
+            self.queue.async { [weak self] in self?.regramRefreshMediaPriorities() }
+        }
     }
-    
+
+    deinit {
+        if let observer = regramSettingsObserver { NotificationCenter.default.removeObserver(observer) }
+    }
+
+    public func setRegramChatMediaPriority(owner: Int64, visibleResourceIds: [String], preloadResourceIds: [String]) {
+        queue.async { [weak self] in
+            guard let self, self.regramPriorityState.updateScreen(owner: owner, visible: visibleResourceIds, preload: preloadResourceIds) else { return }
+            self.regramRefreshMediaPriorities()
+        }
+    }
+
+    public func acquireRegramStreamingPriority(resourceId: String) -> Disposable {
+        queue.async { [weak self] in
+            guard let self else { return }
+            self.regramPriorityState.acquireStreaming(resourceId)
+            self.regramRefreshMediaPriorities()
+        }
+        return ActionDisposable { [weak self] in
+            self?.queue.async { [weak self] in
+                guard let self else { return }
+                self.regramPriorityState.releaseStreaming(resourceId)
+                self.regramRefreshMediaPriorities()
+            }
+        }
+    }
+
+    private func regramRefreshMediaPriorities() {
+        let enabled = RegramAccountScope.shared.settings(for: postbox)["mediaLoadingExperiment"].bool
+        for context in Array(categoryContexts.values) {
+            context.regramUpdateMediaPriority(enabled: enabled, visible: enabled ? regramPriorityState.visible : [], preload: enabled ? regramPriorityState.preload : [], streaming: enabled ? regramPriorityState.streaming : [])
+        }
+    }
+
     private func takeNextEpisodeId() -> Int32 {
         let value = self.nextEpisodeId
         self.nextEpisodeId += 1
@@ -701,13 +807,13 @@ public final class FetchManagerImpl: FetchManager {
             context = current
         } else {
             let queue = self.queue
-            context = FetchManagerCategoryContext(postbox: self.postbox, storeManager: self.storeManager, entryCompleted: { [weak self] id in
+            context = FetchManagerCategoryContext(postbox: self.postbox, storeManager: self.storeManager, entryCompleted: { [weak self] id, completed, isCurrent in
                 queue.async {
-                    guard let strongSelf = self else {
+                    guard let strongSelf = self, isCurrent() else {
                         return
                     }
                     strongSelf.withCategoryContext(key, { context in
-                        context.cancelEntry(id, isCompleted: true)
+                        context.cancelEntry(id, isCompleted: completed)
                     })
                 }
             }, activeEntriesUpdated: { [weak self] in
@@ -735,6 +841,7 @@ public final class FetchManagerImpl: FetchManager {
                 }
             })
             self.categoryContexts[key] = context
+            context.regramUpdateMediaPriority(enabled: RegramAccountScope.shared.settings(for: postbox)["mediaLoadingExperiment"].bool, visible: regramPriorityState.visible, preload: regramPriorityState.preload, streaming: regramPriorityState.streaming)
         }
         
         f(context)

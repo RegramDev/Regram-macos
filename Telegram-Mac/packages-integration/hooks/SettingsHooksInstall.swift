@@ -370,6 +370,7 @@ func installSettingsUIHooks() {
         #endif
         return text
     }, appUpdateState: {
+        if Bundle.main.object(forInfoDictionaryKey: "RegramUpdatesDisabled") as? Bool == true { return .single(nil) }
         let appUpdateState: Signal<Any?, NoError>
         #if APP_STORE
             appUpdateState = .single(nil)

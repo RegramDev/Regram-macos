@@ -4,6 +4,8 @@ import ColorPalette
 
 
 public class SearchTextField: BaseTextView {
+    private var inputGeometryObservers: [NSObjectProtocol] = []
+    private var inputGeometryRefreshScheduled = false
 
     
     public init() {
@@ -26,7 +28,9 @@ public class SearchTextField: BaseTextView {
     
     override public func resignFirstResponder() -> Bool {
         self.delegate?.textDidEndEditing?(Notification(name: NSControl.textDidChangeNotification))
-        return super.resignFirstResponder()
+        let accepted = super.resignFirstResponder()
+        if accepted { removeInputGeometryObservers() }
+        return accepted
     }
 
     public override func accessibilityRole() -> NSAccessibility.Role? {
@@ -39,7 +43,77 @@ public class SearchTextField: BaseTextView {
     
     override public func becomeFirstResponder() -> Bool {
         self.delegate?.textDidBeginEditing?(Notification(name: NSControl.textDidChangeNotification))
-        return super.becomeFirstResponder()
+        let accepted = super.becomeFirstResponder()
+        if accepted {
+            observeInputGeometry()
+            refreshInputCharacterCoordinates()
+        }
+        return accepted
+    }
+
+    public override func firstRect(forCharacterRange range: NSRange, actualRange: NSRangePointer?) -> NSRect {
+        let previousSize = frame.size
+        (enclosingScrollView?.superview as? SearchView)?.layoutSubtreeIfNeeded()
+        if frame.size != previousSize && hasMarkedText() { scrollRangeToVisible(selectedRange()) }
+        enclosingScrollView?.layoutSubtreeIfNeeded()
+        layoutSubtreeIfNeeded()
+        let length = (string as NSString).length
+        let selection = selectedRange()
+        let requestedLocation = range.location == NSNotFound ? selection.location : range.location
+        let location = requestedLocation == NSNotFound ? length : min(max(0, requestedLocation), length)
+        let requestedLength = range.location == NSNotFound ? 0 : range.length
+        let resolvedRange = NSRange(location: location, length: min(max(0, requestedLength), length - location))
+        return super.firstRect(forCharacterRange: resolvedRange, actualRange: actualRange)
+    }
+
+    public override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        observeInputGeometry()
+        refreshInputCharacterCoordinates()
+    }
+
+    public override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        observeInputGeometry()
+        refreshInputCharacterCoordinates()
+    }
+
+    fileprivate func refreshInputCharacterCoordinates() {
+        guard !inputGeometryRefreshScheduled else { return }
+        inputGeometryRefreshScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.inputGeometryRefreshScheduled = false
+            guard self.window?.firstResponder === self else { return }
+            self.inputContext?.invalidateCharacterCoordinates()
+        }
+    }
+
+    private func removeInputGeometryObservers() {
+        for observer in inputGeometryObservers { NotificationCenter.default.removeObserver(observer) }
+        inputGeometryObservers.removeAll()
+    }
+
+    private func observeInputGeometry() {
+        removeInputGeometryObservers()
+        guard let window, window.firstResponder === self else { return }
+        let center = NotificationCenter.default
+        let refresh: (Notification) -> Void = { [weak self] _ in self?.refreshInputCharacterCoordinates() }
+        var ancestor: NSView? = self
+        while let view = ancestor {
+            view.postsFrameChangedNotifications = true
+            view.postsBoundsChangedNotifications = true
+            inputGeometryObservers.append(center.addObserver(forName: NSView.frameDidChangeNotification, object: view, queue: nil, using: refresh))
+            inputGeometryObservers.append(center.addObserver(forName: NSView.boundsDidChangeNotification, object: view, queue: nil, using: refresh))
+            ancestor = view.superview
+        }
+        for name in [NSWindow.didMoveNotification, NSWindow.didResizeNotification, NSWindow.didChangeScreenNotification, NSWindow.didChangeBackingPropertiesNotification] {
+            inputGeometryObservers.append(center.addObserver(forName: name, object: window, queue: nil, using: refresh))
+        }
+    }
+
+    deinit {
+        removeInputGeometryObservers()
     }
     
     override public func paste(_ sender: Any?) {
@@ -617,7 +691,6 @@ open class SearchView: OverlayControl, NSTextViewDelegate {
                 
                 self.input.isHidden = false
                 self.inputContainer.isHidden = false
-                self.window?.makeFirstResponder(self.input)
                 self.lock = false
                
 
@@ -636,7 +709,7 @@ open class SearchView: OverlayControl, NSTextViewDelegate {
                
                 self.input.isHidden = true
                 inputContainer.isHidden = true
-                self.input.string = ""
+                self.updateInputText("")
                 self.window?.makeFirstResponder(nil)
                 self.placeholder.isHidden = false
                 
@@ -651,6 +724,7 @@ open class SearchView: OverlayControl, NSTextViewDelegate {
             updateLoading()
             
             self.updateLayout(size: frame.size, transition: animated ? .animated(duration: 0.2, curve: .easeOut) : .immediate)
+            if state == .Focus { self.window?.makeFirstResponder(self.input) }
         }
   
     }
@@ -768,6 +842,7 @@ open class SearchView: OverlayControl, NSTextViewDelegate {
         transition.updateFrame(view: inputContainer, frame: inputRect)
         transition.updateFrame(view: input, frame: CGRect(origin: inputPoint, size: inputSize))
         transition.updateFrame(view: search, frame: search.centerFrameY(addition: -1))
+        (input as? SearchTextField)?.refreshInputCharacterCoordinates()
         
         
     }
@@ -816,8 +891,16 @@ open class SearchView: OverlayControl, NSTextViewDelegate {
     }
     
 
+    private func updateInputText(_ string: String) {
+        if input.hasMarkedText() {
+            input.unmarkText()
+            input.inputContext?.discardMarkedText()
+        }
+        input.string = string
+    }
+
     public func setString(_ string:String) {
-        self.input.string = string
+        self.updateInputText(string)
         textDidChange(Notification(name: NSText.didChangeNotification))
         needsLayout = true
     }

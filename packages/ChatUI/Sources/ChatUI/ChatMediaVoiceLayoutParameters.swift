@@ -1,4 +1,5 @@
 import Cocoa
+import RegramCore
 import TGUIKit
 import TelegramCore
 import InAppSettings
@@ -23,6 +24,9 @@ public func canTranscribeMessage(_ message: Message, context: any AccountContext
         return false
     }
     let file = message.media.first! as! TelegramMediaFile
+    if regramCanTranscribe(message, settings: RegramPreferences.shared.settings(accountId: context.peerId.toInt64())) {
+        return true
+    }
     if context.isPremium {
         return true
     } else {

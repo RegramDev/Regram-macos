@@ -31,6 +31,8 @@ let package = Package(
         .library(name: "TranslateUI", targets: ["TranslateUI"]),
     ],
     dependencies: [
+        .package(name: "RegramCore", path: "../RegramCore"),
+        .package(name: "RegramServices", path: "../RegramServices"),
         .package(name: "SSignalKit", path: "../../submodules/telegram-ios/submodules/SSignalKit"),
         .package(name: "TelegramCore", path: "../../submodules/telegram-ios/submodules/TelegramCore"),
         .package(name: "Postbox", path: "../../submodules/telegram-ios/submodules/Postbox"),
@@ -40,6 +42,8 @@ let package = Package(
         .target(
             name: "TranslateUI",
             dependencies: [
+                .product(name: "RegramCore", package: "RegramCore"),
+                .product(name: "RegramServices", package: "RegramServices"),
                 .product(name: "SwiftSignalKit", package: "SSignalKit", condition: nil),
                 .product(name: "TelegramCore", package: "TelegramCore", condition: nil),
                 .product(name: "Postbox", package: "Postbox", condition: nil),

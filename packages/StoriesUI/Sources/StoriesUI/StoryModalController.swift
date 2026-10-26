@@ -1,3 +1,4 @@
+import RegramCore
 import Cocoa
 import TGUIKit
 import Postbox
@@ -2983,7 +2984,7 @@ public final class StoryModalController<Context: AccountContextProtocol> : Modal
                         }, itemImage: MenuAnimation.menu_hd_lock.value))
                     }
                 }
-                if !story.storyItem.isForwardingDisabled, presentaion.mediaCall == nil {
+                if !story.storyItem.isForwardingDisabled || RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["allowDownloadingStories"].bool, presentaion.mediaCall == nil {
                     let resource: TelegramMediaFile?
                     if let media = story.storyItem.media._asMedia() as? TelegramMediaImage {
                         if let res = media.representations.last?.resource {
@@ -3000,9 +3001,13 @@ public final class StoryModalController<Context: AccountContextProtocol> : Modal
                     
                     
                     if let resource = resource {
-                        menu.addItem(ContextMenuItem(strings().storyMyInputSaveMedia, handler: {
-                            if context.isPremium {
-                                saveAs(resource, account: context.account)
+                        menu.addItem(ContextMenuItem(strings().storyMyInputSaveMedia, handler: { [weak self] in
+                            if context.isPremium || RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["allowDownloadingStories"].bool {
+                                guard let self else { return }
+                                self.actionsDisposable.add(regramSaveStoryMedia(context: context, file: resource, peerId: peer.id, original: story.storyItem, isCurrent: { [weak self] in
+                                    guard let self, !self.closed, let current = self.genericView.storyContext?.stateValue?.slice else { return false }
+                                    return current.peer.id == peer.id && current.item.storyItem.id == story.storyItem.id && current.item.storyItem.media._asMedia().isEqual(to: story.storyItem.media._asMedia())
+                                }))
                             } else {
                                 saveGalleryPremium()
                             }
@@ -3083,8 +3088,12 @@ public final class StoryModalController<Context: AccountContextProtocol> : Modal
                 }
                 
                 if let resource = resource {
-                    menu.addItem(ContextMenuItem(strings().storyMyInputSaveMedia, handler: {
-                        saveAs(resource, account: context.account)
+                    menu.addItem(ContextMenuItem(strings().storyMyInputSaveMedia, handler: { [weak self] in
+                        guard let self else { return }
+                        self.actionsDisposable.add(regramSaveStoryMedia(context: context, file: resource, peerId: peer.id, original: story.storyItem, isCurrent: { [weak self] in
+                            guard let self, !self.closed, let current = self.genericView.storyContext?.stateValue?.slice else { return false }
+                            return current.peer.id == peer.id && current.item.storyItem.id == story.storyItem.id && current.item.storyItem.media._asMedia().isEqual(to: story.storyItem.media._asMedia())
+                        }))
                     }, itemImage: MenuAnimation.menu_save_as.value))
                 }
                 
@@ -4059,7 +4068,19 @@ public final class StoryModalController<Context: AccountContextProtocol> : Modal
         return true
     }
     
+    private static func confirmStoryOpening(context: Context, open: @escaping () -> Void) {
+        guard RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["warnOnStoriesOpen"].bool else { open(); return }
+        let language = appCurrentLanguage.primaryLanguage.languageCode
+        verifyAlert_button(for: context.window, information: regramLocalizedString("story.confirmOpen", languageCode: language), successHandler: { _ in open() })
+    }
+
     public static func ShowStories(context: Context, isHidden: Bool, initialId: StoryInitialIndex?, singlePeer: Bool = false) {
+        confirmStoryOpening(context: context) {
+            ShowStoriesConfirmed(context: context, isHidden: isHidden, initialId: initialId, singlePeer: singlePeer)
+        }
+    }
+
+    private static func ShowStoriesConfirmed(context: Context, isHidden: Bool, initialId: StoryInitialIndex?, singlePeer: Bool = false) {
         let storyContent = StoryContentContextImpl(context: context, isHidden: isHidden, focusedPeerId: initialId?.peerId, singlePeer: singlePeer)
         
         let signal = ((storyContent.state
@@ -4095,6 +4116,12 @@ public final class StoryModalController<Context: AccountContextProtocol> : Modal
 
     }
     public static func ShowSingleStory(context: Context, storyId: StoryId, initialId: StoryInitialIndex?, readGlobally: Bool = true, emptyCallback:(()->Void)? = nil) {
+        confirmStoryOpening(context: context) {
+            ShowSingleStoryConfirmed(context: context, storyId: storyId, initialId: initialId, readGlobally: readGlobally, emptyCallback: emptyCallback)
+        }
+    }
+
+    private static func ShowSingleStoryConfirmed(context: Context, storyId: StoryId, initialId: StoryInitialIndex?, readGlobally: Bool = true, emptyCallback:(()->Void)? = nil) {
         
         var initialSignal: Signal<StoryId?, NoError> = context.account.postbox.transaction { transaction -> StoryId? in
             if let _ = transaction.getStory(id: storyId)?.get(Stories.StoredItem.self) {
@@ -4147,6 +4174,12 @@ public final class StoryModalController<Context: AccountContextProtocol> : Modal
         
     }
     public static func ShowListStory(context: Context, listContext: StoryListContext, peerId: PeerId, initialId: StoryInitialIndex?) {
+        confirmStoryOpening(context: context) {
+            ShowListStoryConfirmed(context: context, listContext: listContext, peerId: peerId, initialId: initialId)
+        }
+    }
+
+    private static func ShowListStoryConfirmed(context: Context, listContext: StoryListContext, peerId: PeerId, initialId: StoryInitialIndex?) {
         let storyContent = PeerStoryListContentContextImpl(context: context, peerId: peerId, listContext: listContext, initialId: initialId?.id)
         let _ = (storyContent.state
         |> filter { $0.slice != nil }

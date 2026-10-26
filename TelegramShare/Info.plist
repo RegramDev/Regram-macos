@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Telegram</string>
+	<string>Regram</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -21,7 +21,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>283357</string>
+	<string>283367</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSMinimumSystemVersion</key>
@@ -57,5 +57,15 @@
 	<string>Copyright © 2024 Telegram. All rights reserved.</string>
 	<key>SOURCE</key>
 	<string>${SOURCE}</string>
+	<key>RegramRootBundleIdentifier</key>
+	<string>app.regram.macos</string>
+	<key>RegramApiId</key>
+	<string>$(REGRAM_API_ID)</string>
+	<key>RegramApiHash</key>
+	<string>$(REGRAM_API_HASH)</string>
+	<key>RegramApplicationGroup</key>
+	<string>$(AppIdentifierPrefix)app.regram.macos</string>
+	<key>RegramTeamIdentifier</key>
+	<string>$(DEVELOPMENT_TEAM)</string>
 </dict>
 </plist>

@@ -21,6 +21,7 @@ import TelegramLinks
 import ChatHistoryModel
 import FilePanels
 import WallpaperUI
+import RegramServices
 
 public func generateSingleColorImage(size: CGSize, color: NSColor) -> CGImage? {
     return generateImage(size, contextGenerator: { size, context in
@@ -246,6 +247,7 @@ public enum ThemeSettingsEntryTag: ItemListItemTag {
     case autoNight
     case chatMode
     case accentColor
+    case dockIcon
     public func isEqual(to other: ItemListItemTag) -> Bool {
         if let other = other as? ThemeSettingsEntryTag, self == other {
             return true
@@ -266,6 +268,8 @@ public enum ThemeSettingsEntryTag: ItemListItemTag {
             return .general(_id_theme_chat_mode)
         case .accentColor:
             return .custom(_id_theme_accent_list)
+        case .dockIcon:
+            return .custom(_id_dock_icon)
         }
     }
 }
@@ -302,8 +306,8 @@ private final class AppAppearanceViewArguments {
     public let toggleDarkMode:(Bool)->Void
     public let toggleRevealThemes:()->Void
     public let userNameColor:()->Void
-    public let selectAppIcon:(TelegramApplicationIcons.Icon)->Void
-    public init(context: any AccountContextProtocol, togglePalette: @escaping(InstallThemeSource)->Void, toggleBubbles: @escaping(Bool)->Void, toggleFontSize: @escaping(CGFloat)->Void, selectAccentColor: @escaping(AppearanceAccentColor?)->Void, selectChatBackground:@escaping()->Void, openAutoNightSettings:@escaping()->Void, removeTheme:@escaping(TelegramTheme)->Void, editTheme: @escaping(TelegramTheme)->Void, shareTheme:@escaping(TelegramTheme)->Void, shareLocal:@escaping(ColorPalette)->Void, toggleDarkMode: @escaping(Bool)->Void, toggleRevealThemes:@escaping()->Void, userNameColor:@escaping()->Void, selectAppIcon:@escaping(TelegramApplicationIcons.Icon)->Void) {
+    public let selectAppIcon:(String)->Void
+    public init(context: any AccountContextProtocol, togglePalette: @escaping(InstallThemeSource)->Void, toggleBubbles: @escaping(Bool)->Void, toggleFontSize: @escaping(CGFloat)->Void, selectAccentColor: @escaping(AppearanceAccentColor?)->Void, selectChatBackground:@escaping()->Void, openAutoNightSettings:@escaping()->Void, removeTheme:@escaping(TelegramTheme)->Void, editTheme: @escaping(TelegramTheme)->Void, shareTheme:@escaping(TelegramTheme)->Void, shareLocal:@escaping(ColorPalette)->Void, toggleDarkMode: @escaping(Bool)->Void, toggleRevealThemes:@escaping()->Void, userNameColor:@escaping()->Void, selectAppIcon:@escaping(String)->Void) {
         self.context = context
         self.togglePalette = togglePalette
         self.toggleBubbles = toggleBubbles
@@ -338,7 +342,7 @@ private let _id_name_color = InputDataIdentifier("_id_name_color")
 
 private let _id_dock_icon = InputDataIdentifier("_id_dock_icon")
 
-private func appAppearanceEntries(appearance: Appearance, state: State, settings: ThemePaletteSettings, cloudThemes: [TelegramTheme], generated:  CloudThemesCachedData, autoNightSettings: AutoNightThemePreferences, animatedEmojiStickers: [String: StickerPackItem], dockIcons: TelegramApplicationIcons, dockSettings: DockSettings, arguments: AppAppearanceViewArguments) -> [InputDataEntry] {
+private func appAppearanceEntries(appearance: Appearance, state: State, settings: ThemePaletteSettings, cloudThemes: [TelegramTheme], generated:  CloudThemesCachedData, autoNightSettings: AutoNightThemePreferences, animatedEmojiStickers: [String: StickerPackItem], selectedIcon: String, arguments: AppAppearanceViewArguments) -> [InputDataEntry] {
     
     var entries:[InputDataEntry] = []
     var sectionId: Int32 = 0
@@ -556,22 +560,20 @@ private func appAppearanceEntries(appearance: Appearance, state: State, settings
     
     #if BETA || STABLE
     
-    if !dockIcons.icons.isEmpty {
-        struct DockTuple : Equatable {
-            let icons: TelegramApplicationIcons
-            let settings: DockSettings
-        }
-        let dockTuple = DockTuple(icons: dockIcons, settings: dockSettings)
-        entries.append(.desc(sectionId: sectionId, index: index, text: .plain(strings().appearanceSettingsDockIcon), data: .init(viewType: .textTopItem)))
-        index += 1
-        entries.append(InputDataEntry.custom(sectionId: sectionId, index: index, value: .none, identifier: _id_dock_icon, equatable: InputDataEquatable(dockTuple), comparable: nil, item: { initialSize, stableId in
-            return DockIconRowItem(initialSize, stableId: stableId, viewType: .singleItem, context: arguments.context, dockIcons: dockIcons.icons, selected: dockTuple.settings.iconSelected, action: arguments.selectAppIcon)
-        }))
-        index += 1
-        
-        entries.append(.sectionId(sectionId, type: .normal))
-        sectionId += 1
+    struct DockSelection: Equatable {
+        let icon: String
+        let dark: Bool
+        let language: String
     }
+    let dockSelection = DockSelection(icon: selectedIcon, dark: appearance.presentation.colors.isDark, language: appCurrentLanguage.primaryLanguage.languageCode)
+    entries.append(.desc(sectionId: sectionId, index: index, text: .plain(strings().appearanceSettingsDockIcon), data: .init(viewType: .textTopItem)))
+    index += 1
+    entries.append(.custom(sectionId: sectionId, index: index, value: .none, identifier: _id_dock_icon, equatable: InputDataEquatable(dockSelection), comparable: nil, item: { initialSize, stableId in
+        DockIconRowItem(initialSize, stableId: stableId, viewType: .singleItem, selected: selectedIcon, action: arguments.selectAppIcon)
+    }))
+    index += 1
+    entries.append(.sectionId(sectionId, type: .normal))
+    sectionId += 1
     
     #endif
     
@@ -778,15 +780,7 @@ public func AppAppearanceViewController(context: any AccountContextProtocol, foc
     }, userNameColor: {
         context.bindings.rootNavigation().push(SettingsHooks.shared.makeSelectColorController(context, context.myPeer!))
     }, selectAppIcon: { icon in
-        
-        if icon.isPremium, !context.isPremium {
-            SettingsNavigationHooks.shared.showPremiumBoarding(context, .settings, false, context.window, nil)
-            return
-        }
-        
-        _ = updateDockSettings(accountManager: context.sharedContext.accountManager, { settings in
-            return settings.withUpdatedIcon(icon.file.fileName)
-        }).startStandalone()
+        RegramBranding.selectIcon(icon, dark: theme.colors.isDark)
     })
     
     
@@ -809,8 +803,8 @@ public func AppAppearanceViewController(context: any AccountContextProtocol, foc
             }
     } |> deliverOnMainQueue
     
-    let signal:Signal<InputDataSignalValue, NoError> = combineLatest(queue: prepareQueue, themeUnmodifiedSettings(accountManager: context.sharedContext.accountManager), SettingsHooks.shared.cloudThemes(context), nightSettings, appearanceSignal, animatedEmojiStickers, statePromise.get(), context.engine.resources.applicationIcons(), dockSettings(accountManager: context.sharedContext.accountManager)) |> map { themeSettings, themes, autoNightSettings, appearance, animatedEmojiStickers, state, dockIcons, dockSettings in
-        return appAppearanceEntries(appearance: appearance, state: state, settings: themeSettings, cloudThemes: themes.themes.reversed(), generated: themes, autoNightSettings: autoNightSettings, animatedEmojiStickers: animatedEmojiStickers, dockIcons: dockIcons, dockSettings: dockSettings, arguments: arguments)
+    let signal:Signal<InputDataSignalValue, NoError> = combineLatest(queue: prepareQueue, themeUnmodifiedSettings(accountManager: context.sharedContext.accountManager), SettingsHooks.shared.cloudThemes(context), nightSettings, appearanceSignal, animatedEmojiStickers, statePromise.get(), RegramBranding.selection) |> map { themeSettings, themes, autoNightSettings, appearance, animatedEmojiStickers, state, selectedIcon in
+        return appAppearanceEntries(appearance: appearance, state: state, settings: themeSettings, cloudThemes: themes.themes.reversed(), generated: themes, autoNightSettings: autoNightSettings, animatedEmojiStickers: animatedEmojiStickers, selectedIcon: selectedIcon, arguments: arguments)
     }
     |> map { entries in
          return InputDataSignalValue(entries: entries, animated: true)
@@ -870,6 +864,7 @@ public func AppAppearanceViewController(context: any AccountContextProtocol, foc
         
     })
     
+    controller.makeFirstFast = focusOnItemTag == nil
     controller.updateRightBarView = { view in
         if let view = view as? ImageBarView {
             view.button.set(image: theme.icons.chatActions, for: .Normal)

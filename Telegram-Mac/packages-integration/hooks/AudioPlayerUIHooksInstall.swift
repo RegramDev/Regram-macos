@@ -5,12 +5,16 @@ import Postbox
 import SwiftSignalKit
 import AudioPlayerUI
 import AudioPlayerCore
+import ChatHistoryModel
 
 extension InstantVideoPIP: @retroactive InlineAudioPlayerInstantVideoPIP {
 
 }
 
 func installAudioPlayerUIHooks() {
+    AudioPlayerHooks.install(AudioPlayerHooks(shouldIncludeMessage: { message, accountId in
+        !regramShouldHideMessage(message, accountId: accountId)
+    }, messageVisibilityChanges: { accountId in regramMessageFilterChanges(accountId: accountId) }))
     AudioPlayerUIHooks.install(AudioPlayerUIHooks(makeInstantVideoPip: { controller in
         return InstantVideoPIP(controller, context: controller.context.concrete, window: controller.context.concrete.window)
     }, updateInstantVideoPip: { instantVideoPip, tableView, controller in

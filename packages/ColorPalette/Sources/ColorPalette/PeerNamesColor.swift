@@ -9,36 +9,40 @@ public class PeerNameColors: Equatable {
     }
     
     public struct Colors: Equatable {
-        public let main: NSColor
-        public let secondary: NSColor?
-        public let tertiary: NSColor?
+        private let originalMain: NSColor
+        private let originalSecondary: NSColor?
+        private let originalTertiary: NSColor?
         
+        public var main: NSColor { PeerNameColorProvider.color(originalMain) }
+        public var secondary: NSColor? { originalSecondary.map(PeerNameColorProvider.color) }
+        public var tertiary: NSColor? { originalTertiary.map(PeerNameColorProvider.color) }
+
         public init(main: NSColor, secondary: NSColor?, tertiary: NSColor?) {
-            self.main = main
-            self.secondary = secondary
-            self.tertiary = tertiary
+            self.originalMain = main
+            self.originalSecondary = secondary
+            self.originalTertiary = tertiary
         }
         
         public init(main: NSColor) {
-            self.main = main
-            self.secondary = nil
-            self.tertiary = nil
+            self.originalMain = main
+            self.originalSecondary = nil
+            self.originalTertiary = nil
         }
         
         public init?(colors: [NSColor]) {
             guard let first = colors.first else {
                 return nil
             }
-            self.main = first
+            self.originalMain = first
             if colors.count == 3 {
-                self.secondary = colors[1]
-                self.tertiary = colors[2]
+                self.originalSecondary = colors[1]
+                self.originalTertiary = colors[2]
             } else if colors.count == 2, let second = colors.last {
-                self.secondary = second
-                self.tertiary = nil
+                self.originalSecondary = second
+                self.originalTertiary = nil
             } else {
-                self.secondary = nil
-                self.tertiary = nil
+                self.originalSecondary = nil
+                self.originalTertiary = nil
             }
         }
     }

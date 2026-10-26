@@ -33,7 +33,6 @@ let package = Package(
                            .product(name: "TgVoipWebrtc", package: "TgVoipWebrtc", condition: nil),
                            .product(name: "TelegramVoip", package: "TelegramVoip", condition: nil),
                            .product(name: "YuvConversion", package: "YuvConversion", condition: nil)],
-            path: "Sources/",
-            resources: [.copy("CallScreenShaders.metal")])
+            path: "Sources/")
     ]
 )

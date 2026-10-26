@@ -1,30 +1,48 @@
 import Cocoa
 
 public final class ApiEnvironment {
-    public static var apiId:Int32 {
-        return 9
-    }
-    public static var apiHash:String {
-        return "3975f648bb682ee889f35483bc618d1c"
-    }
+    public static let apiId: Int32 = {
+        guard let value = Bundle.main.object(forInfoDictionaryKey: "RegramApiId") as? String,
+              let id = Int32(value), id > 0 else {
+            preconditionFailure("Configure REGRAM_API_ID in Telegram-Mac/ApiCredentials.local.xcconfig")
+        }
+        return id
+    }()
+
+    public static let apiHash: String = {
+        guard let value = Bundle.main.object(forInfoDictionaryKey: "RegramApiHash") as? String,
+              value.count == 32, value.allSatisfy({ $0.isHexDigit }) else {
+            preconditionFailure("Configure REGRAM_API_HASH in Telegram-Mac/ApiCredentials.local.xcconfig")
+        }
+        return value
+    }()
     
     public static var bundleId: String {
-        return "ru.keepcoder.Telegram"
+        return Bundle.main.object(forInfoDictionaryKey: "RegramRootBundleIdentifier") as? String ?? "app.regram.macos"
     }
     public static var teamId: String {
-        return "6N38VWS5BX"
+        return Bundle.main.object(forInfoDictionaryKey: "RegramTeamIdentifier") as? String ?? ""
     }
     
     
     
-    public static var containerURL: URL? {
-        let appGroupName = ApiEnvironment.group
-        let containerUrl = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupName)?.appendingPathComponent(prefix)
-        if let containerUrl = containerUrl {
-            try? FileManager.default.createDirectory(at: containerUrl, withIntermediateDirectories: true, attributes: nil)
-            return containerUrl
+    private static let dataRootURL: URL? = {
+        let manager = FileManager.default
+        let group = teamId.isEmpty ? nil : manager.containerURL(forSecurityApplicationGroupIdentifier: ApiEnvironment.group)
+        let local = manager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?.appendingPathComponent(bundleId, isDirectory: true)
+        for candidate in [group, local].compactMap({ $0 }) {
+            do {
+                try manager.createDirectory(at: candidate, withIntermediateDirectories: true)
+                if manager.isWritableFile(atPath: candidate.path) { return candidate }
+            } catch {}
         }
         return nil
+    }()
+
+    public static var containerURL: URL? {
+        guard let directory = dataRootURL?.appendingPathComponent(prefix) else { return nil }
+        do { try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true); return directory }
+        catch { return nil }
     }
     
     public static func migrate() {
@@ -43,14 +61,10 @@ public final class ApiEnvironment {
         }
     }
     
-    public static var legacyContainerURL: URL? {
-        let appGroupName = ApiEnvironment.group
-        let containerUrl = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupName)
-        return containerUrl
-    }
+    public static var legacyContainerURL: URL? { dataRootURL }
     
     public static var group: String {
-        return teamId + "." + bundleId
+        return Bundle.main.object(forInfoDictionaryKey: "RegramApplicationGroup") as? String ?? (teamId.isEmpty ? bundleId : teamId + "." + bundleId)
     }
     
     public static var appData: Data {

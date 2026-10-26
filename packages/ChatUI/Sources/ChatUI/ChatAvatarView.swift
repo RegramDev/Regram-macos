@@ -1,3 +1,4 @@
+import RegramCore
 import Cocoa
 import Foundation
 import TGUIKit
@@ -33,6 +34,8 @@ public final class ChatAvatarView : Control {
         
         let context = item.chatInteraction.interactionContext
         
+        let settings = RegramPreferences.shared.settings(accountId: item.context.peerId.toInt64())
+        let storyStats = settings["hideStories"].bool || settings["features.disableChatAvatarStories"].bool ? nil : storyStats
         let animated: Bool = self.peer != nil
         
         if let storyStats = storyStats, peer.id != item.context.peerId, message?.id.peerId.namespace == Namespaces.Peer.CloudChannel || message?.id.peerId.namespace == Namespaces.Peer.CloudGroup {

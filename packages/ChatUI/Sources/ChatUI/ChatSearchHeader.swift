@@ -979,6 +979,7 @@ class ChatSearchHeader : View, Notifable, ChatHeaderProtocol {
     
     
     private func initialize(_ state: ChatHeaderState) {
+        let context = chatInteraction.interactionContext
         
         self.tokenDisposable.set(self.searchView.tokenPromise.get().start(next: { [weak self] state in
             self?.inputInteraction.update({$0.updatedTokenState(state)})
@@ -1066,7 +1067,14 @@ class ChatSearchHeader : View, Notifable, ChatHeaderProtocol {
             }
         } |> deliverOnMainQueue
         
-        self.disposable.set(apply.start(next: { [weak self] messages in
+        let visibleResults = combineLatest(apply, regramMessageFilterChanges(accountId: context.peerId.toInt64()))
+        |> map { result, _ in
+            let visible = regramVisibleMessages(result.0, accountId: context.peerId.toInt64())
+            let hiddenCount = result.0.count - visible.count
+            return (visible, result.1, result.2, max(visible.count, result.3 - hiddenCount))
+        }
+        |> deliverOnMainQueue
+        self.disposable.set(visibleResults.start(next: { [weak self] messages in
             guard let `self` = self else {return}
             self.parentInteractions.updateSearchRequest(SearchMessagesResultState(messages.2, messages.0))
             let previous = self.inputInteraction.state

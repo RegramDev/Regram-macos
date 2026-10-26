@@ -1,3 +1,4 @@
+import RegramCore
 import Cocoa
 import SwiftSignalKit
 import TelegramCore
@@ -541,7 +542,7 @@ public class PCallSession {
         self.currentNetworkType = data.networkType
         self.devicesContext = CallsCoreHooks.shared.devicesContext(sharedContext)
         self.enableStunMarking = false
-        self.enableTCP = false
+        self.enableTCP = RegramPreferences.shared.settings(accountId: account.peerId.toInt64())["enableVoipTcp"].bool
         self.preferredVideoCodec = nil
         
         if self.isVideo {

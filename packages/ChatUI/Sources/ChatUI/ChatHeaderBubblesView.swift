@@ -1,3 +1,4 @@
+import RegramCore
 import Cocoa
 import TGUIKit
 import Postbox
@@ -590,6 +591,8 @@ final class ChatHeaderBubblesView: View, InteractionContentViewProtocol {
     }
 
     func update(_ peerView: PeerView?, story: PeerExpiringStoryListContext.State?, counters: ChatTitleCounters, animated: Bool) {
+        let settings = RegramPreferences.shared.settings(accountId: chatInteraction.interactionContext.peerId.toInt64())
+        let story = settings["hideStories"].bool || settings["features.disableChatAvatarStories"].bool ? nil : story
         self.counters = counters
         self.peerView = peerView
         self.story = story

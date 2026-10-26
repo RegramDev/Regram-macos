@@ -1,4 +1,6 @@
 import Cocoa
+import RegramServices
+import RegramCore
 import ExternalVideoUtils
 import AlertsUI
 import FilePanels
@@ -536,7 +538,7 @@ public class GalleryViewer: NSResponder {
 
         self.indexDisposable.set((pager.selectedIndex.get() |> deliverOnMainQueue).start(next: { [weak self] selectedIndex in
             guard let `self` = self else {return}
-            self.controls.update(self.pager.selectedItem)
+            self.controls.update(self.pager.selectedItem, cachedData: self.cachedPeerData)
             self.updateCaptureExclusion()
         }))
     }
@@ -572,14 +574,14 @@ public class GalleryViewer: NSResponder {
             
             //self?.controls.index.set(.single((firstIndex + 1, totalCount)))
             self.pager.set(index: firstIndex, animated: false)
-            self.controls.update(self.pager.selectedItem)
+            self.controls.update(self.pager.selectedItem, cachedData: self.cachedPeerData)
             return true
 
         })
 
         self.indexDisposable.set((pager.selectedIndex.get() |> deliverOnMainQueue).start(next: { [weak self] selectedIndex in
             guard let `self` = self else {return}
-            self.controls.update(self.pager.selectedItem)
+            self.controls.update(self.pager.selectedItem, cachedData: self.cachedPeerData)
             self.updateCaptureExclusion()
         }))
     }
@@ -611,14 +613,14 @@ public class GalleryViewer: NSResponder {
             _ = self.pager.merge(with: UpdateTransition(deleted: [], inserted: inserted, updated: []))
             
             self.pager.set(index: firstIndex, animated: false)
-            self.controls.update(self.pager.selectedItem)
+            self.controls.update(self.pager.selectedItem, cachedData: self.cachedPeerData)
             return true
             
         })
         
         self.indexDisposable.set((pager.selectedIndex.get() |> deliverOnMainQueue).start(next: { [weak self] selectedIndex in
             guard let `self` = self else {return}
-            self.controls.update(self.pager.selectedItem)
+            self.controls.update(self.pager.selectedItem, cachedData: self.cachedPeerData)
             self.updateCaptureExclusion()
         }))
 
@@ -645,14 +647,14 @@ public class GalleryViewer: NSResponder {
             _ = self.pager.merge(with: UpdateTransition(deleted: [], inserted: inserted, updated: []))
             
             self.pager.set(index: firstIndex, animated: false)
-            self.controls.update(self.pager.selectedItem)
+            self.controls.update(self.pager.selectedItem, cachedData: self.cachedPeerData)
             return true
 
             })
 
         self.indexDisposable.set((pager.selectedIndex.get() |> deliverOnMainQueue).start(next: { [weak self] selectedIndex in
             guard let `self` = self else {return}
-            self.controls.update(self.pager.selectedItem)
+            self.controls.update(self.pager.selectedItem, cachedData: self.cachedPeerData)
             self.updateCaptureExclusion()
         }))
 
@@ -667,6 +669,8 @@ public class GalleryViewer: NSResponder {
         let chatMode = self.chatMode
         let chatLocation = self.chatLocation
         let previous:Atomic<[ChatHistoryEntry]> = Atomic(value:[])
+        let rawHistory:Atomic<[ChatHistoryEntry]> = Atomic(value:[])
+        let aloneItems:Atomic<[MGalleryItem]> = Atomic(value: item.map { [$0] } ?? [])
         let current:Atomic<[ChatHistoryEntry]> = Atomic(value:[])
         let currentIndex:Atomic<Int?> = Atomic(value:nil)
         let selectedMessageIndex:Atomic<MessageIndex?> = Atomic(value:nil)
@@ -757,8 +761,8 @@ public class GalleryViewer: NSResponder {
                             $0?._asMessage()
                         }
                     }
-                    return messageSignal |> map { message in
-                        if let message {
+                    return combineLatest(messageSignal, regramMessageFilterChanges(accountId: context.peerId.toInt64())) |> map { message, _ in
+                        if let message, !regramShouldHideMessage(message, accountId: context.peerId.toInt64()) {
                             let entries:[ChatHistoryEntry] = expandRichMediaEntries([.MessageEntry(message, MessageIndex(message), false, .list, .Full(rank: nil, rankType: .none, header: .normal), nil, ChatHistoryEntryData(nil, MessageEntryAdditionalData(), AutoplayMediaPreferences.defaultSettings))])
                             var inserted: [(Int, MGalleryItem)] = []
 
@@ -785,19 +789,23 @@ public class GalleryViewer: NSResponder {
                                     }
                                 }
                             }
+                            let items = inserted.map { $0.1 }
                             return GalleryHistoryUpdate(entries: entries, transition: { _ in
-                                return UpdateTransition(deleted: [], inserted: inserted, updated: [])
+                                let from = aloneItems.swap(items)
+                                let (removed, inserted, updated) = proccessEntriesWithoutReverse(from, right: items, { $0 })
+                                return UpdateTransition(deleted: removed, inserted: inserted, updated: updated)
                             })
                         } else {
                             return GalleryHistoryUpdate(entries: [], transition: { _ in
-                                return UpdateTransition(deleted: [0], inserted: [], updated: [])
+                                return UpdateTransition(deleted: Array(aloneItems.swap([]).indices), inserted: [], updated: [])
                             })
                         }
                         
                     } |> deliverOnMainQueue
                     
                 case .history:
-                    return signal |> mapToSignal { view, _, _ -> Signal<GalleryHistoryUpdate, NoError> in
+                    return combineLatest(signal, regramMessageFilterChanges(accountId: context.peerId.toInt64())) |> mapToSignal { history, _ -> Signal<GalleryHistoryUpdate, NoError> in
+                        let view = history.0
                         let entries:[ChatHistoryEntry] = expandRichMediaEntries(messageEntries(view.entries, includeHoles : false, translate: translate, contentConfig: context.contentConfig).filter { entry -> Bool in
                             switch entry {
                             case let .MessageEntry(message, _, _, _, _, _, _):
@@ -841,10 +849,8 @@ public class GalleryViewer: NSResponder {
                         return .single(GalleryHistoryUpdate(entries: entries, bounds: (view.earlierId, view.laterId), anchor: index, window: window, transition: galleryTransition(to: entries, context: context, pagerSize: pagerSize)))
                     }
                 case .recentDownloaded:
-                    return recentDownloadItems(postbox: context.account.postbox) |> mapToSignal { downloaded in
-                        let messages = downloaded.map {
-                            $0.message
-                        }.map {
+                    return combineLatest(recentDownloadItems(postbox: context.account.postbox), regramMessageFilterChanges(accountId: context.peerId.toInt64())) |> mapToSignal { downloaded, _ in
+                        let messages = regramVisibleMessages(downloaded.map(\.message), accountId: context.peerId.toInt64()).map {
                             MessageHistoryEntry(message: $0, isRead: true, location: nil, monthLocation: nil, attributes: MutableMessageHistoryEntryAttributes(authorIsContact: false))
                         }
                         let entries:[ChatHistoryEntry] = messageEntries(messages, includeHoles : false, contentConfig: context.contentConfig).filter { entry -> Bool in
@@ -859,9 +865,9 @@ public class GalleryViewer: NSResponder {
                         
                     }
                 case .secret:
-                    return context.account.postbox.messageView(index.id) |> mapToSignal { view -> Signal<GalleryHistoryUpdate, NoError> in
+                    return combineLatest(context.account.postbox.messageView(index.id), regramMessageFilterChanges(accountId: context.peerId.toInt64())) |> mapToSignal { view, _ -> Signal<GalleryHistoryUpdate, NoError> in
                         var entries:[ChatHistoryEntry] = []
-                        if let message = view.message, !(message.anyMedia is TelegramMediaExpiredContent) {
+                        if let message = view.message, !(message.anyMedia is TelegramMediaExpiredContent), !regramShouldHideMessage(message, accountId: context.peerId.toInt64()) {
                             entries.append(.MessageEntry(message, MessageIndex(message), false, .list, .Full(rank: nil, rankType: .none, header: .normal), nil, ChatHistoryEntryData(nil, MessageEntryAdditionalData(), AutoplayMediaPreferences.defaultSettings)))
                         }
                         return .single(GalleryHistoryUpdate(entries: entries, transition: galleryTransition(to: entries, context: context, pagerSize: pagerSize)))
@@ -869,7 +875,8 @@ public class GalleryViewer: NSResponder {
                 case .profile:
                     return .complete()
                 case let .messages(messages):
-                    let messages = messages.map {
+                    return regramMessageFilterChanges(accountId: context.peerId.toInt64()) |> mapToSignal { _ in
+                    let messages = regramVisibleMessages(messages, accountId: context.peerId.toInt64()).map {
                         MessageHistoryEntry(message: $0, isRead: true, location: nil, monthLocation: nil, attributes: MutableMessageHistoryEntryAttributes(authorIsContact: false))
                     }
                     let entries:[ChatHistoryEntry] = expandRichMediaEntries(messageEntries(messages, includeHoles : false, contentConfig: context.contentConfig).filter { entry -> Bool in
@@ -881,6 +888,7 @@ public class GalleryViewer: NSResponder {
                         }
                     })
                     return .single(GalleryHistoryUpdate(entries: entries, transition: galleryTransition(to: entries, context: context, pagerSize: pagerSize)))
+                    }
                 }
               
             }  |> deliverOnMainQueue
@@ -893,7 +901,7 @@ public class GalleryViewer: NSResponder {
                         let known = loadedRange.with { $0 }
                         if let window = update.window {
                             if let known = known {
-                                entries = (previous.with { $0 }.filter { $0.index < window.lower || $0.index > window.upper } + update.entries).sorted(by: { $0.index < $1.index })
+                                entries = (rawHistory.with { $0 }.filter { $0.index < window.lower || $0.index > window.upper } + update.entries).sorted(by: { $0.index < $1.index })
                                 let extendsEarlier = window.lower < known.lower
                                 let extendsLater = window.upper > known.upper
                                 let current = indexes.with { $0 }
@@ -906,6 +914,8 @@ public class GalleryViewer: NSResponder {
                         } else if known == nil {
                             _ = indexes.swap(bounds)
                         }
+                        _ = rawHistory.swap(entries)
+                        entries = entries.filter { $0.message.map { !regramShouldHideMessage($0, accountId: context.peerId.toInt64()) } ?? true }
                         transition = galleryTransition(to: entries, context: context, pagerSize: pagerSize)(previous.swap(entries))
                     } else {
                         transition = update.transition(previous.swap(entries))
@@ -914,7 +924,11 @@ public class GalleryViewer: NSResponder {
                     let new = reversed ? entries.reversed() : entries
                     
                     _ = current.swap(new)
-                    
+                    if new.isEmpty {
+                        strongSelf.close()
+                        strongSelf.ready.set(.single(true))
+                        return
+                    }
                     let selectedMessage = selectedMessageIndex.with { $0 }
 
                     if let pending = pendingLoad.with({ $0 }), let anchor = update.anchor, pending.anchor == anchor {
@@ -944,7 +958,8 @@ public class GalleryViewer: NSResponder {
                     if !isEmpty {
                         
                         
-                        if let newIndex = current {
+                        if let selected = current {
+                            let newIndex = min(max(0, selected), new.count - 1)
                             _ = restoringSelection.swap(true)
                             strongSelf.pager.selectedIndex.set(newIndex)
                             strongSelf.pager.set(index: newIndex, animated: false)
@@ -979,9 +994,9 @@ public class GalleryViewer: NSResponder {
             if let location = current.location {
                 let total = location.count
                 _ = reversed ? total - location.index : location.index
-                self.controls.update(self.pager.selectedItem)
+                self.controls.update(self.pager.selectedItem, cachedData: self.cachedPeerData)
             } else  {
-                self.controls.update(self.pager.selectedItem)
+                self.controls.update(self.pager.selectedItem, cachedData: self.cachedPeerData)
             }
 
             if let message = entries[selectedIndex].message, message.containsSecretMedia {
@@ -1008,7 +1023,7 @@ public class GalleryViewer: NSResponder {
         
         var items:[ContextMenuItem] = []
         
-        let isProtected = pager.selectedItem?.entry.isProtected == true || pager.selectedItem?.entry.message?.isCopyProtected(cachedData: self.cachedPeerData) == true
+        let isProtected = pager.selectedItem.map { !$0.entry.regramCanExport(accountId: context.peerId.toInt64(), cachedData: cachedPeerData) } ?? true
         var keepSaveAs: Bool = true
         let context = self.context
 
@@ -1396,21 +1411,31 @@ public class GalleryViewer: NSResponder {
         let window = self.window
 
         if let item = self.pager.selectedItem, item.entry.message?.adAttribute == nil {
+            let textExportAllowed = item.entry.regramCanExport(accountId: context.peerId.toInt64(), cachedData: cachedPeerData) && item.entry.message?.isCopyProtected(cachedData: cachedPeerData) != true
+            let generation = presentationGeneration
+            let textAction: (@escaping () -> Void) -> Void = { [weak self] action in
+                guard let self else { return }
+                self.operationDisposable.set((regramValidateGalleryExport(context: context, entry: item.entry, permitsProtectedOverride: false) |> deliverOnMainQueue).start(next: { [weak self] allowed in
+                    guard allowed, let self, viewer === self, self.presentationGeneration == generation,
+                          self.pager.selectedItem?.entry.stableId == item.entry.stableId,
+                          item.entry.regramCanExport(accountId: context.peerId.toInt64(), cachedData: self.cachedPeerData),
+                          item.entry.message?.isCopyProtected(cachedData: self.cachedPeerData) != true else { return }
+                    action()
+                }))
+            }
             if !(item is MGalleryExternalVideoItem) {
-                if item.entry.message?.isCopyProtected(cachedData: self.cachedPeerData) == true {
-
-                } else {
+                if item.entry.regramCanExport(accountId: context.peerId.toInt64(), cachedData: cachedPeerData) {
                     menu.addItem(ContextMenuItem(strings().galleryContextSaveAs, handler: { [weak self] in
                         self?.saveAs()
                     }, itemImage: MenuAnimation.menu_save_as.value))
                 }
             }
-            if item.entry.message?.isCopyProtected(cachedData: self.cachedPeerData) == true {
+            if !textExportAllowed {
                 
             } else {
                 if let text = self.pager.selectedText {
                     menu.addItem(ContextMenuItem(strings().chatCopySelectedText, handler: {
-                        copyToClipboard(text)
+                        textAction { copyToClipboard(text) }
                     }, itemImage: MenuAnimation.menu_copy.value))
                     
                     let fromLang = Translate.detectLanguage(for: text)
@@ -1418,7 +1443,7 @@ public class GalleryViewer: NSResponder {
                     
                     if fromLang == nil || !toLang.contains(fromLang!) {
                         menu.addItem(ContextMenuItem.init(strings().peerInfoTranslate, handler: {
-                            GalleryHooks.shared.showTranslate(context, fromLang, appAppearance.languageCode, text, window)
+                            textAction { GalleryHooks.shared.showTranslate(context, fromLang, appAppearance.languageCode, text, window) }
                         }, itemImage: MenuAnimation.menu_translate.value))
                     }
                 }
@@ -1430,20 +1455,18 @@ public class GalleryViewer: NSResponder {
                     self?.showMessage()
                 }, itemImage: MenuAnimation.menu_show_message.value))
             }
-            if item.entry.isProtected == true || item.entry.message?.isCopyProtected(cachedData: self.cachedPeerData) == true {
-
-            } else {
+            if item.entry.regramCanExport(accountId: context.peerId.toInt64(), cachedData: cachedPeerData) {
                 menu.addItem(ContextMenuItem(strings().galleryContextCopyToClipboard, handler: { [weak self] in
                     self?.copy(nil)
                 }, itemImage: MenuAnimation.menu_copy_media.value))
             }
             
-            if let recognition = self.pager.recognition, self.pager.selectedText == nil {
+            if let recognition = self.pager.recognition, self.pager.selectedText == nil, textExportAllowed {
                 if #available(macOS 10.15, *) {
                     if recognition.canTranslate() {
                         let text: String = !recognition.hasTranslation() ? strings().galleryTranslate : strings().galleryHideTranslation
                         menu.addItem(ContextMenuItem.init(text, handler: { [weak recognition] in
-                            recognition?.toggleTranslate(to: appAppearance.languageCode)
+                            textAction { [weak recognition] in recognition?.toggleTranslate(to: appAppearance.languageCode) }
                         }, itemImage: MenuAnimation.menu_translate.value))
                     }
                 }
@@ -1474,7 +1497,16 @@ public class GalleryViewer: NSResponder {
     
     public func saveAs(_ fast: Bool = false) -> Void {
         if let item = self.pager.selectedItem, item.entry.message?.adAttribute == nil {
-            let isProtected = item.entry.isProtected || item.entry.message?.isCopyProtected(cachedData: self.cachedPeerData) == true
+            let generation = presentationGeneration
+            let entryId = item.entry.stableId
+            let version = item.entry.message?.stableVersion
+            let exportContext = context
+            let exportIsCurrent: () -> Bool = { [weak self] in
+                guard let self, viewer === self, self.presentationGeneration == generation, let selected = self.pager.selectedItem,
+                      selected.entry.stableId == entryId, selected.entry.message?.stableVersion == version else { return false }
+                return selected.entry.regramCanExport(accountId: self.context.peerId.toInt64(), cachedData: self.cachedPeerData)
+            }
+            let isProtected = !item.entry.regramCanExport(accountId: context.peerId.toInt64(), cachedData: cachedPeerData)
 
             if !(item is MGalleryExternalVideoItem), !isProtected {
                 let isPhoto = item is MGalleryPhotoItem || item is MGalleryPeerPhotoItem
@@ -1490,8 +1522,13 @@ public class GalleryViewer: NSResponder {
                         return .complete()
                     }
                 }
-                operationDisposable.set((path |> deliverOnMainQueue).start(next: { [weak self] path in
-                    if let strongSelf = self {
+                let validated = path |> mapToSignal { path in
+                    regramValidateGalleryExport(context: exportContext, entry: item.entry) |> filter { $0 } |> map { _ in path }
+                }
+                operationDisposable.set((validated |> deliverOnMainQueue).start(next: { [weak self] path in
+                    if let strongSelf = self, viewer === strongSelf, strongSelf.presentationGeneration == generation,
+                       let selected = strongSelf.pager.selectedItem, selected.entry.stableId == entryId, selected.entry.message?.stableVersion == version,
+                       selected.entry.regramCanExport(accountId: strongSelf.context.peerId.toInt64(), cachedData: strongSelf.cachedPeerData) {
                         if fast {
 
                             let text: String
@@ -1538,10 +1575,10 @@ public class GalleryViewer: NSResponder {
 
                                 _ = (copyToDownloads(file, postbox: context.account.postbox, saveAnyway: true) |> map { _ in } |> deliverOnMainQueue |> take(1) |> then (showSaveModal(for: strongSelf.window, context: context, animation: LocalAnimatedSticker.success_saved, shouldBlur: false, text: layout, delay: 3.0))).start()
                             } else {
-                                savePanel(file: path.nsstring.deletingPathExtension, ext: path.nsstring.pathExtension, for: strongSelf.window)
+                                regramSaveGalleryFile(path: path, window: strongSelf.window, isCurrent: exportIsCurrent, validate: { regramValidateGalleryExport(context: exportContext, entry: item.entry) })
                             }
                         } else {
-                            savePanel(file: path.nsstring.deletingPathExtension, ext: path.nsstring.pathExtension, for: strongSelf.window)
+                            regramSaveGalleryFile(path: path, window: strongSelf.window, isCurrent: exportIsCurrent, validate: { regramValidateGalleryExport(context: exportContext, entry: item.entry) })
                         }
                     }
                 }))
@@ -1628,11 +1665,27 @@ public class GalleryViewer: NSResponder {
     
     @objc public func copy(_ sender:Any? = nil) -> Void {
         
-        if let item = self.pager.selectedItem, !self.pager.copySelectedText() {
-            if let message = item.entry.message, item.entry.isProtected || message.isCopyProtected(cachedData: self.cachedPeerData) {
+        if let item = self.pager.selectedItem {
+            let generation = presentationGeneration
+            let entryId = item.entry.stableId
+            let version = item.entry.message?.stableVersion
+            let exportContext = context
+            if let message = item.entry.message, !item.entry.regramCanExport(accountId: context.peerId.toInt64(), cachedData: cachedPeerData) {
                 showProtectedCopyAlert(message, for: self.window)
-            } else  if !(item is MGalleryExternalVideoItem), item.entry.message?.containsSecretMedia != true {
-                operationDisposable.set((item.path.get() |> take(1) |> deliverOnMainQueue).start(next: { path in
+            } else if self.pager.copySelectedText() {
+                return
+            } else if !(item is MGalleryExternalVideoItem), item.entry.regramCanExport(accountId: context.peerId.toInt64(), cachedData: cachedPeerData) {
+                let validated = item.path.get() |> take(1) |> mapToSignal { path in
+                    regramValidateGalleryExport(context: exportContext, entry: item.entry) |> filter { $0 } |> map { _ in path }
+                }
+                operationDisposable.set((validated |> deliverOnMainQueue).start(next: { [weak self] path in
+                    guard let self, viewer === self, self.presentationGeneration == generation,
+                          let selected = self.pager.selectedItem, selected.entry.stableId == entryId, selected.entry.message?.stableVersion == version,
+                          selected.entry.regramCanExport(accountId: self.context.peerId.toInt64(), cachedData: self.cachedPeerData) else { return }
+                    if RegramPreferences.shared.settings(accountId: self.context.peerId.toInt64())["clipboardOriginalImages"].bool, selected is MGalleryPhotoItem || selected is MGalleryPeerPhotoItem {
+                        RegramClipboardImages.copyOriginalImage(path: path, to: .general)
+                        return
+                    }
                     let pb = NSPasteboard.general
                     pb.clearContents()
                     var url = NSURL(fileURLWithPath: path)

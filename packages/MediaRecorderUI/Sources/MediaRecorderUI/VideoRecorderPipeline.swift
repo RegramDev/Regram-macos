@@ -156,7 +156,7 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
     public static let videoMessageMaxDuration: Double = 60
 
     private var liveUploading: PreUploadManager?
-    public init(path: String, config: VideoMessageConfig, liveUploading: PreUploadManager?) {
+    public init(path: String, config: VideoMessageConfig, liveUploading: PreUploadManager?, forceBuiltInMic: Bool = false) {
         self.path = path
         let url = URL(fileURLWithPath: path)
         self.url = url
@@ -194,9 +194,12 @@ public class VideoRecorderPipeline : NSObject, AVCaptureVideoDataOutputSampleBuf
             audioDevices.insert(device, at: 0)
         }
             
-        let videoDevice = videoDevices.filter({ $0.isConnected && !$0.isSuspended }).first(where: { $0.position == .front || $0.position == .unspecified })
+        let connectedVideoDevices = videoDevices.filter { $0.isConnected && !$0.isSuspended }
+        let videoDevice = connectedVideoDevices.first(where: { $0.position == .front || $0.position == .unspecified })
         
-        let audioDevice = audioDevices.first(where: { $0.isConnected && !$0.isSuspended})
+        let connectedAudioDevices = audioDevices.filter { $0.isConnected && !$0.isSuspended }
+        let builtInUid = forceBuiltInMic ? regramBuiltInAudioInputUniqueId() : nil
+        let audioDevice = builtInUid.flatMap { uid in connectedAudioDevices.first(where: { $0.uniqueID == uid }) } ?? connectedAudioDevices.first
 
 
         if let videoDevice = videoDevice {

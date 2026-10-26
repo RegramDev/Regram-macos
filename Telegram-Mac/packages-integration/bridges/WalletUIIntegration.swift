@@ -59,7 +59,7 @@ func showWalletSendMoney(context: AccountContext, walletContext: WalletContext, 
 
 
 @available(macOS 10.15, *)
-func showWalletPeerBalance(context: AccountContext, walletContext: WalletContext, peer: Peer, morphSource: (() -> NSView?)? = nil) {
+func showWalletPeerBalance(context: AccountContext, walletContext: WalletContext?, peer: Peer, morphSource: (() -> NSView?)? = nil) {
     WalletUI.showWalletPeerBalance(context: context, environment: AppWalletUIEnvironment(context), walletContext: walletContext, peer: peer, morphSource: morphSource)
 }
 

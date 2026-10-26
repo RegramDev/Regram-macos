@@ -9,6 +9,8 @@ let package = Package(
         .library(name: "ChatHistoryModel", targets: ["ChatHistoryModel"]),
     ],
     dependencies: [
+        .package(name: "RegramServices", path: "../RegramServices"),
+        .package(name: "RegramCore", path: "../RegramCore"),
         .package(name: "SSignalKit", path: "../../submodules/telegram-ios/submodules/SSignalKit"),
         .package(name: "TelegramCore", path: "../../submodules/telegram-ios/submodules/TelegramCore"),
         .package(name: "Postbox", path: "../../submodules/telegram-ios/submodules/Postbox"),
@@ -48,6 +50,9 @@ let package = Package(
         .target(
             name: "ChatHistoryModel",
             dependencies: [
+                .product(name: "RegramServices", package: "RegramServices"),
+                .product(name: "RegramCore", package: "RegramCore"),
+                .product(name: "RegramSignals", package: "RegramCore"),
                 .product(name: "SwiftSignalKit", package: "SSignalKit", condition: nil),
                 .product(name: "TelegramCore", package: "TelegramCore", condition: nil),
                 .product(name: "Postbox", package: "Postbox", condition: nil),
@@ -83,13 +88,18 @@ let package = Package(
                 .product(name: "EmojiReplacements", package: "EmojiReplacements", condition: nil),
                 .product(name: "AvatarUI", package: "AvatarUI", condition: nil),
             ],
-            path: "Sources/ChatHistoryModel"),
+            path: "Sources/ChatHistoryModel",
+            resources: [.process("Resources")]),
         .testTarget(
             name: "ChatHistoryModelTests",
             dependencies: [
                 "ChatHistoryModel",
+                .product(name: "RegramCore", package: "RegramCore"),
+                .product(name: "RegramServices", package: "RegramServices"),
+                .product(name: "MessageUtils", package: "MessageUtils"),
                 .product(name: "TelegramCore", package: "TelegramCore"),
                 .product(name: "Postbox", package: "Postbox"),
+                .product(name: "SwiftSignalKit", package: "SSignalKit"),
             ],
             path: "Tests/ChatHistoryModelTests"),
     ]

@@ -10,6 +10,8 @@ let package = Package(
     ],
     dependencies: [
         .package(name: "CurrencyFormat", path: "../CurrencyFormat"),
+        .package(name: "RegramCore", path: "../RegramCore"),
+        .package(name: "ChatHistoryModel", path: "../ChatHistoryModel"),
         .package(name: "TelegramUtils", path: "../TelegramUtils"),
         .package(name: "InputDataUI", path: "../InputDataUI"),
         .package(name: "SSignalKit", path: "../../submodules/telegram-ios/submodules/SSignalKit"),
@@ -36,6 +38,8 @@ let package = Package(
             name: "WalletUI",
             dependencies: [
                 .product(name: "CurrencyFormat", package: "CurrencyFormat"),
+                .product(name: "RegramCore", package: "RegramCore"),
+                .product(name: "ChatHistoryModel", package: "ChatHistoryModel"),
                 .product(name: "TelegramUtils", package: "TelegramUtils"),
                 .product(name: "InputDataUI", package: "InputDataUI"),
                 .product(name: "TGUIKit", package: "TGUIKit", condition: nil),
@@ -59,6 +63,6 @@ let package = Package(
             ],
             path: "Sources/WalletUI",
             resources: [.copy("Resources/ChatListNoResults.tgs"), .copy("Resources/GramDiamondLight.tgs"), .copy("Resources/WalletCommentLock.tgs"), .copy("Resources/WalletTransactionKey.pdf"), .copy("Resources/WalletTransactionKeyLarge.pdf"), .copy("Resources/WalletAddressInfo.pdf")]),
-        .testTarget(name: "WalletUITests", dependencies: ["WalletUI", .product(name: "GZIP", package: "GZIP"), .product(name: "SceneEffects", package: "SceneEffects"), .product(name: "PasscodeCore", package: "PasscodeCore"), .product(name: "WalletContext", package: "WalletContext")]),
+        .testTarget(name: "WalletUITests", dependencies: ["WalletUI", .product(name: "RegramCore", package: "RegramCore"), .product(name: "TelegramCore", package: "TelegramCore"), .product(name: "Postbox", package: "Postbox"), .product(name: "GZIP", package: "GZIP"), .product(name: "SceneEffects", package: "SceneEffects"), .product(name: "PasscodeCore", package: "PasscodeCore"), .product(name: "WalletContext", package: "WalletContext")]),
     ]
 )

@@ -1,4 +1,5 @@
 import Cocoa
+import RegramServices
 import TGUIKit
 import TelegramCore
 import InAppVideoServices
@@ -382,6 +383,7 @@ public class ChatMessageItem: ChatRowItem {
              }
              
              
+             self.messageText = regramReceivingText(self.messageText, accountId: context.peerId.toInt64())
              let isRichMessage = message.attributes.contains(where: { $0 is RichTextMessageAttribute })
              let isStreaming = !isRichMessage && message.attributes.contains(where: { $0 is TypingDraftMessageAttribute }) && message.adAttribute == nil
              let existingState: FoldingTextLayout.StreamingState?
@@ -798,7 +800,10 @@ public class ChatMessageItem: ChatRowItem {
 
 
         
-        let string = NSMutableAttributedString(string: text, attributes: [NSAttributedString.Key.font: NSFont.normal(fontSize), NSAttributedString.Key.foregroundColor: textColor])
+        func messageFont(_ native: () -> NSFont) -> NSFont {
+            RegramFonts.messageFont(base: InterfaceFontProvider.withNativeFonts(native), accountId: context.peerId.toInt64())
+        }
+        let string = NSMutableAttributedString(string: text, attributes: [NSAttributedString.Key.font: messageFont { NSFont.normal(fontSize) }, NSAttributedString.Key.foregroundColor: textColor])
         
         let new = addLocallyGeneratedEntities(text, enabledTypes: [.timecode], entities: entities, mediaDuration: mediaDuration)
         var nsString: NSString?
@@ -1069,9 +1074,9 @@ public class ChatMessageItem: ChatRowItem {
             case .monospace, .blockQuote:
                 font = .code(fontSize)
             case .italic:
-                font = .italic(fontSize)
+                font = messageFont { .italic(fontSize) }
             case .bold:
-                font = .bold(fontSize)
+                font = messageFont { .bold(fontSize) }
             default:
                 break
             }
@@ -1087,7 +1092,7 @@ public class ChatMessageItem: ChatRowItem {
             return attr == .italic ? range : nil
         }
         chatForEachBoldItalicRange(bold: boldRanges, italic: italicRanges) { intersection in
-            string.addAttribute(.font, value: NSFont.boldItalic(fontSize), range: intersection)
+            string.addAttribute(.font, value: messageFont { .boldItalic(fontSize) }, range: intersection)
         }
 
         return string.copy() as! NSAttributedString

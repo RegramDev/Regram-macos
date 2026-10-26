@@ -1,3 +1,5 @@
+import ChatHistoryModel
+import RegramCore
 import Cocoa
 import TGUIKit
 import TelegramCore
@@ -161,7 +163,11 @@ public final class SelectColorParentController : SectionViewController {
             let backgroundEmojiId = nameData.backgroundEmojiId
             let profileColor = profileData.selected_profile
             let profileBackgroundEmojiId = profileData.backgroundEmojiId_profile
-            
+            if regramLocalGiftsEnabled(context: context) {
+                if regramSaveLocalGiftAppearance(context: context, nameColor: nameColor, profileColor: profileColor?.nameColor, replyFileId: backgroundEmojiId, backgroundFileId: profileBackgroundEmojiId, emojiStatus: profileData.emojiStatus) { self.executeReturn() }
+                return
+            }
+            guard (profileData.emojiStatus?.fileId ?? 0) >= 0, !regramIsLocalGiftAppearance(nameColor: nameColor, emojiStatus: profileData.emojiStatus), (backgroundEmojiId ?? 0) >= 0, (profileBackgroundEmojiId ?? 0) >= 0, profileData.emojiStatusGift.map({ !regramIsLocalGift(.unique($0)) }) ?? true else { self.executeReturn(); return }
             var signals:[Signal<Never, SelectColorSaveError>] = []
             signals.append(SelectColorStatusUpdate.request(context: context, peer: profileData.peer, status: profileData.emojiStatus, gift: profileData.emojiStatusGift))
             signals.append(context.engine.accountData.updateNameColorAndEmoji(nameColor: nameColor.getUpdate(backgroundEmojiId), profileColor: profileColor?.nameColor, profileBackgroundEmojiId: profileBackgroundEmojiId) |> ignoreValues |> mapError { _ in SelectColorSaveError.generic })

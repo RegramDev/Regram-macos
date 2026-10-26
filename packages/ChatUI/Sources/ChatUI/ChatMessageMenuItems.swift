@@ -17,6 +17,8 @@ import InputTextView
 import LocalAnimations
 import Localization
 import MessageUtils
+import RegramCore
+import RegramServices
 import PremiumUI
 import StarsUI
 import Strings
@@ -278,7 +280,7 @@ public func chatMenuItemsData(for message: Message, textLayout: (TextViewLayout?
         _fileFinderPath = fileFinderPath(media, account.postbox)
         
     } else if let media = image {
-        if let resource = media.representations.last?.resource {
+        if let resource = media.representations.max(by: { Int64($0.dimensions.width) * Int64($0.dimensions.height) < Int64($1.dimensions.width) * Int64($1.dimensions.height) })?.resource {
             _resourceData = account.postbox.mediaBox.resourceData(resource) |> map(Optional.init)
         }
     }
@@ -299,16 +301,25 @@ public func chatMenuItemsData(for message: Message, textLayout: (TextViewLayout?
     }
 }
 
-private func copyImageToPasteboard(path: String) -> Bool {
-    guard let path = copyToTemp(path: path, ext: "jpg") else {
-        return false
+private func copyImageToPasteboard(path: String, message: Message, interaction: ChatInteraction) {
+    let context = interaction.interactionContext
+    let permission = context.account.postbox.transaction { transaction -> Bool in
+        guard let current = transaction.getMessage(message.id), current.stableVersion == message.stableVersion else { return false }
+        return regramCanSaveMessage(current, accountId: context.peerId.toInt64(), cachedData: transaction.getPeerCachedData(peerId: current.id.peerId))
     }
-    let url = NSURL(fileURLWithPath: path)
-    let image = NSImage(contentsOf: url as URL)
-    let pb = NSPasteboard.general
-    pb.clearContents()
-    pb.writeObjects([url, image].compactMap { $0 })
-    return true
+    interaction.regramServiceDisposable.set((permission |> deliverOnMainQueue).start(next: { [weak interaction] allowed in
+        guard let interaction, allowed, !context.isFrozen, interaction.peerId == message.id.peerId else { return }
+        let copied: Bool
+        if RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["clipboardOriginalImages"].bool {
+            copied = RegramClipboardImages.copyOriginalImage(path: path, to: .general)
+        } else if let path = copyToTemp(path: path, ext: "jpg") {
+            let url = NSURL(fileURLWithPath: path)
+            let image = NSImage(contentsOf: url as URL)
+            NSPasteboard.general.clearContents()
+            copied = NSPasteboard.general.writeObjects([url, image].compactMap { $0 })
+        } else { copied = false }
+        if copied { showModalText(for: context.window, text: strings().contextAlertCopied) }
+    }))
 }
 
 private func copyRichTextMessage(_ message: Message, text: String, page: InstantPage, isTranslated: Bool) {
@@ -340,7 +351,9 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
         return .complete()
     }
 
-    return chatMenuItemsData(for: message, textLayout: textLayout, entry: entry, chatInteraction: chatInteraction, source: source) |> map { [chatInteraction] data in
+    return chatMenuItemsData(for: message, textLayout: textLayout, entry: entry, chatInteraction: chatInteraction, source: source) |> mapToSignal { data in
+        regramFilterImportData(for: data) |> map { (data, $0) }
+    } |> deliverOnMainQueue |> map { [chatInteraction] data, filterImportData in
         
         let peer = data.message.peers[data.message.id.peerId]
         let isNotFailed = !message.flags.contains(.Failed) && !message.flags.contains(.Unsent) && !data.message.flags.contains(.Sending)
@@ -353,6 +366,8 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
         let mode = chatInteraction.mode
         let isIncoming = data.message.isIncoming(context.account, false)
         let translateConfig = AppConfigTranslateState(rawValue: context.appConfiguration.getStringValue("translations_manual_enabled", orElse: "enabled")) ?? .disabled
+        let regramUsesExternalTranslation = !["default", "system"].contains(RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["translationBackend"].string)
+        let canShowTranslation = translateConfig.canTranslate || regramUsesExternalTranslation
         var isService = data.message.extendedMedia is TelegramMediaAction || mode.isSavedMode || mode == .preview || chatInteraction.isLogInteraction
         
 
@@ -385,24 +400,22 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                         if !LinkHooks.shared.globalLinkExecutor().copyAttributedString(attributedString) {
                             copyToClipboard(attributedString.string)
                         }
-                    }, itemImage: MenuAnimation.menu_copy.value))
+                    }, itemImage: MenuAnimation.menu_copy.value).regramAction(.copy))
                 } else if let richAttribute = data.message.attributes.first(where: { $0 is RichTextMessageAttribute }) as? RichTextMessageAttribute {
                     let (text, _) = richTextPlainPreview(from: richAttribute.instantPage)
                     if !text.isEmpty {
                         items.append(ContextMenuItem(strings().chatContextCopyText, handler: {
                             copyToClipboard(text)
-                        }, itemImage: MenuAnimation.menu_copy.value))
+                        }, itemImage: MenuAnimation.menu_copy.value).regramAction(.copy))
                     }
                 } else if !data.message.text.isEmpty {
                     items.append(ContextMenuItem(strings().chatContextCopyText, handler: {
                         copyToClipboard(data.message.text)
-                    }, itemImage: MenuAnimation.menu_copy.value))
+                    }, itemImage: MenuAnimation.menu_copy.value).regramAction(.copy))
                 } else if data.image != nil, let resourceData = data.resourceData, resourceData.complete {
                     items.append(ContextMenuItem(strings().chatContextCopyMedia, handler: {
-                        if copyImageToPasteboard(path: resourceData.path) {
-                            showModalText(for: context.window, text: strings().contextAlertCopied)
-                        }
-                    }, itemImage: MenuAnimation.menu_copy_media.value, keyEquivalent: .cmdc))
+                        copyImageToPasteboard(path: resourceData.path, message: data.message, interaction: chatInteraction)
+                    }, itemImage: MenuAnimation.menu_copy_media.value, keyEquivalent: .cmdc).regramAction(.copy))
                 }
             }
 
@@ -410,7 +423,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                 let forwardingAction = ChatForwardMenuAction(chatInteraction: data.chatInteraction, sources: [data.message, replacementMessage])
                 items.append(ContextMenuItem(strings().messageContextForward, handler: {
                     forwardingAction.openPicker(messages: [replacementMessage])
-                }, itemImage: MenuAnimation.menu_forward.value))
+                }, itemImage: MenuAnimation.menu_forward.value).regramAction(.forward))
             }
 
             let revertTitle = NSMutableAttributedString()
@@ -437,12 +450,12 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                             copyToClipboard(textLayout.attributedString.string)
                         }
                     }
-                }, itemImage: MenuAnimation.menu_copy.value))
+                }, itemImage: MenuAnimation.menu_copy.value).regramAction(.copy))
             }
             if canDeleteMessage(data.message, account: account, chatLocation: data.chatLocation, mode: data.chatMode) {
                 items.append(ContextMenuItem(strings().messageContextDelete, handler: {
                     data.chatInteraction.deleteMessages([data.message.id], nil)
-                }, itemMode: .destruct, itemImage: MenuAnimation.menu_delete.value))
+                }, itemMode: .destruct, itemImage: MenuAnimation.menu_delete.value).regramAction(.delete))
             }
             for item in items {
                 item.contextObject = data
@@ -499,14 +512,14 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                 submenu.addItem(ContextMenuItem(strings().contextCopy, handler: {
                     copyToClipboard(taskText ?? "")
                     showModalText(for: context.window, text: strings().shareLinkCopied)
-                }, itemImage: MenuAnimation.menu_copy.value))
+                }, itemImage: MenuAnimation.menu_copy.value).regramAction(.copy))
 
                 if canEditMessage(message, chatInteraction: chatInteraction, context: context) {
                     submenu.addItem(ContextMenuItem(strings().chatContextTodoEdit, handler: { [weak chatInteraction] in
                         if let chatInteraction {
                             ChatNavigationHooks.shared.showNewTodo(chatInteraction, .edit(message, taskId: taskId), context.window, nil)
                         }
-                    }, itemImage: MenuAnimation.menu_edit.value))
+                    }, itemImage: MenuAnimation.menu_edit.value).regramAction(.edit))
                 }
 
                 if canEditMessage(message, chatInteraction: chatInteraction, context: context) {
@@ -534,7 +547,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                                 }
                             )
                         }
-                    }, itemMode: .destruct, itemImage: MenuAnimation.menu_delete.value))
+                    }, itemMode: .destruct, itemImage: MenuAnimation.menu_delete.value).regramAction(.delete))
                 }
                 
                 
@@ -650,7 +663,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                     let info = text.replacingOccurrences(of: "[url]", with: "[\(link)](\(link))")
                     let data = ModalAlertData(title: strings().chatMessageSponsoredWhat, info: info, alignment: .left, width: 400, showCloseButton: true)
                     showModalAlert(for: context.window, data: data, completion: { _ in })
-                }, itemImage: MenuAnimation.menu_report.value))
+                }, itemImage: MenuAnimation.menu_report.value).regramAction(.report))
 
             }
             
@@ -706,7 +719,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                 } else {
                     _ = context.engine.messages.sendScheduledMessageNowInteractively(messageId: messageId).start()
                 }
-            }, itemImage: MenuAnimation.menu_send_now.value))
+            }, itemImage: MenuAnimation.menu_send_now.value).regramAction(.sendScheduledNow))
 
             if data.message.pendingProcessingAttribute == nil {
                 firstBlock.append(ContextMenuItem(strings().chatContextScheduledReschedule, handler: {
@@ -716,7 +729,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                         
                         _ = showModalProgress(signal: context.engine.messages.requestEditMessage(messageId: messageId, text: data.message.text, media: .keep, entities: data.message.textEntities, richText: nil, inlineStickers: data.message.associatedMedia, scheduleInfoAttribute: .init(scheduleTime: schedule, repeatPeriod: repeatPeriod)), for: context.window).start()
                    }), for: context.window)
-                }, itemImage: MenuAnimation.menu_schedule_message.value))
+                }, itemImage: MenuAnimation.menu_schedule_message.value).regramAction(.editScheduledTime))
             }
         }
         
@@ -741,19 +754,19 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
             }
             firstBlock.append(ContextMenuItem(replyTitle, handler: {
                 data.chatInteraction.setupReplyMessage(data.message, .init(messageId: data.message.id, quote: nil, innerSubject: innerSubject))
-            }, itemImage: MenuAnimation.menu_reply.value, keyEquivalent: .cmdr))
+            }, itemImage: MenuAnimation.menu_reply.value, keyEquivalent: .cmdr).regramAction(.reply))
         }
 
         if let action = data.message.media.first as? TelegramMediaAction, case .starGift = action.action {
             firstBlock.append(ContextMenuItem(isIncoming ? strings().chatServiceSendGift(message.peers[message.id.peerId]?.displayTitle ?? "") : strings().chatServiceSendAnother, handler: {
                 showModal(with: GiftingController(context: context, peerId: message.id.peerId, isBirthday: false), for: context.window)
-            }, itemImage: MenuAnimation.menu_gift.value))
+            }, itemImage: MenuAnimation.menu_gift.value).regramAction(.sendGift))
         }
 
         if #available(macOS 10.15, *), let action = data.message.media.first as? TelegramMediaAction, case .gramTransfer = action.action, context.appConfiguration.getBoolValue("wallet_available", orElse: false), let user = message.peers[message.id.peerId] as? TelegramUser {
             firstBlock.append(ContextMenuItem(strings().chatMessageMenuItemsSendMoney, handler: {
                 showWalletSendMoney(chatInteraction: data.chatInteraction, user: user, flyIntoChat: false)
-            }, itemImage: MenuAnimation.menu_gram.value))
+            }, itemImage: MenuAnimation.menu_gram.value).regramAction(.sendMoney))
         }
         
         
@@ -765,7 +778,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                         if !isLoading, isNotFailed {
                             data.chatInteraction.vote(messageId, [], true)
                         }
-                    }, itemImage: MenuAnimation.menu_retract_vote.value))
+                    }, itemImage: MenuAnimation.menu_retract_vote.value).regramAction(.unvotePoll))
                 }
                 if data.message.forwardInfo == nil {
                     let canClose: Bool = canEditMessage(data.message, chatInteraction: data.chatInteraction, context: context, ignorePoll: true)
@@ -774,14 +787,14 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                             verifyAlert_button(for: context.window, header: poll.isQuiz ? strings().chatQuizStopConfirmHeader : strings().chatPollStopConfirmHeader, information: poll.isQuiz ? strings().chatQuizStopConfirmText : strings().chatPollStopConfirmText, ok: strings().alertConfirmStop, successHandler: { [weak chatInteraction] _ in
                                 chatInteraction?.closePoll(messageId)
                             })
-                        }, itemImage: MenuAnimation.menu_stop_poll.value))
+                        }, itemImage: MenuAnimation.menu_stop_poll.value).regramAction(.stopPoll))
                     }
                 }
             }
             if poll.results.canViewStats {
                 add_secondBlock.append(ContextMenuItem(strings().chatMessageMenuItemsViewStats, handler: {
                     ChatNavigationHooks.shared.pushMessagePollStats(context, messageId)
-                }, itemImage: MenuAnimation.menu_statistics.value))
+                }, itemImage: MenuAnimation.menu_statistics.value).regramAction(.viewStats))
             }
 //            if let restriction = pollVoteRestrictionMenuText(poll: poll, chatPeer: peer) {
 //                sevenBlock.append(ContextMenuItem(restriction, handler: nil, itemImage: MenuAnimation.menu_show_info.value, removeTail: false, overrideWidth: 200))
@@ -795,7 +808,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                     if isPollAuthor || canOptionAuthorDelete {
                         add_secondBlock.append(ContextMenuItem(strings().chatMenuDeleteOption, handler: { [weak chatInteraction] in
                             chatInteraction?.deletePollOption(messageId, opaqueIdentifier)
-                        }, itemMode: .normal, itemImage: MenuAnimation.menu_delete.value))
+                        }, itemMode: .normal, itemImage: MenuAnimation.menu_delete.value).regramAction(.delete))
                     }
                 }
             }
@@ -816,7 +829,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                 let text = modeIsReplies ? strings().messageContextViewRepliesOther(Int(attr.count)) : strings().messageContextViewCommentsOther(Int(attr.count))
                 secondBlock.append(ContextMenuItem(text, handler: {
                     data.chatInteraction.openReplyThread(messageId, !modeIsReplies, true, modeIsReplies ? .replies(origin: messageId) : .comments(origin: messageId))
-                }, itemImage: MenuAnimation.menu_view_replies.value))
+                }, itemImage: MenuAnimation.menu_view_replies.value).regramAction(.messageReplies))
             }
         }
         
@@ -836,15 +849,15 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
             let (text, entities) = richTextPlainPreview(from: richAttribute.instantPage)
             let language = Translate.detectLanguage(for: text)
             let toLang = context.sharedContext.baseSettings.doNotTranslate.union([appAppearance.languageCode])
-            if !text.isEmpty, language == nil || !toLang.contains(language!), !muteTranslate, !isService, translateConfig.canTranslate {
+            if !text.isEmpty, language == nil || !toLang.contains(language!), !muteTranslate, !isService, canShowTranslation {
                 thirdBlock.append(ContextMenuItem(strings().chatContextTranslate, handler: {
                     showModal(with: ChatHistoryUIHooks.shared.makeTranslateModalObserved(context, language, appAppearance.languageCode, text, entities, source: .richMessage(message.id, richAttribute.instantPage), onToneChanged: { tone in
                         data.chatInteraction.setTranslateTone(tone)
                     }, translateEntireChat: {
                         data.chatInteraction.translateTo(appAppearance.languageCode)
                     }), for: context.window)
-                    data.chatInteraction.enableTranslatePaywall()
-                }, itemImage: MenuAnimation.menu_translate.value))
+                    if !regramUsesExternalTranslation { data.chatInteraction.enableTranslatePaywall() }
+                }, itemImage: MenuAnimation.menu_translate.value).regramAction(.translate))
             }
         }
 
@@ -865,7 +878,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
             let language = Translate.detectLanguage(for: text)
                         
             let toLang = context.sharedContext.baseSettings.doNotTranslate.union([appAppearance.languageCode])
-            if language == nil || !toLang.contains(language!), !muteTranslate, !isService, translateConfig.canTranslate {
+            if language == nil || !toLang.contains(language!), !muteTranslate, !isService, canShowTranslation {
                 _ = peer?.canSendMessage(data.chatMode.isThreadMode) == true
                 thirdBlock.append(ContextMenuItem(strings().chatContextTranslate, handler: {
                     showModal(with: ChatHistoryUIHooks.shared.makeTranslateModalObserved(context, language, appAppearance.languageCode, text, entities, source: .poll(message.id), onToneChanged: { tone in
@@ -873,8 +886,8 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                     }, translateEntireChat: {
                         data.chatInteraction.translateTo(appAppearance.languageCode)
                     }), for: context.window)
-                    data.chatInteraction.enableTranslatePaywall()
-                }, itemImage: MenuAnimation.menu_translate.value))
+                    if !regramUsesExternalTranslation { data.chatInteraction.enableTranslatePaywall() }
+                }, itemImage: MenuAnimation.menu_translate.value).regramAction(.translate))
             }
         }
 
@@ -890,15 +903,15 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                 // Rich messages get their own Translate item above (flattened preview + translateRichMessage) —
                 // skip the plain-text item so the menu doesn't offer two.
                 let isRichMessage = message.attributes.contains(where: { $0 is RichTextMessageAttribute })
-                if !isRichMessage, language == nil || !toLang.contains(language!), !muteTranslate, !isService, translateConfig.canTranslate {
+                if !isRichMessage, language == nil || !toLang.contains(language!), !muteTranslate, !isService, canShowTranslation {
                     thirdBlock.append(ContextMenuItem(strings().chatContextTranslate, handler: {
                         showModal(with: ChatHistoryUIHooks.shared.makeTranslateModalObserved(context, language, appAppearance.languageCode, text, entities, source: .message(messageId), onToneChanged: { tone in
                             data.chatInteraction.setTranslateTone(tone)
                         }, translateEntireChat: {
                             data.chatInteraction.translateTo(appAppearance.languageCode)
                         }), for: context.window)
-                        data.chatInteraction.enableTranslatePaywall()
-                    }, itemImage: MenuAnimation.menu_translate.value))
+                        if !regramUsesExternalTranslation { data.chatInteraction.enableTranslatePaywall() }
+                    }, itemImage: MenuAnimation.menu_translate.value).regramAction(.translate))
                 }
 
                 if let entry {
@@ -907,7 +920,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                             if entry.additionalData.summarize == nil {
                                 thirdBlock.append(ContextMenuItem(strings().chatContextSummarize, handler: {
                                     data.chatInteraction.summarize(message)
-                                }, itemImage: MenuAnimation.menu_collapse.value))
+                                }, itemImage: MenuAnimation.menu_collapse.value).regramAction(.summarize))
                             }
                             break
                         }
@@ -919,7 +932,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                     if message.attributes.contains(where: { $0 is RichTextMessageAttribute }), selectManager.richSelectedText(for: message.id) != nil {
                         thirdBlock.append(ContextMenuItem(strings().chatCopySelectedText, handler: {
                             selectManager.copy(selectManager)
-                        }, itemImage: MenuAnimation.menu_copy.value, keyEquivalent: .cmdc))
+                        }, itemImage: MenuAnimation.menu_copy.value, keyEquivalent: .cmdc).regramAction(.copy))
                     } else if let richAttribute = message.attributes.compactMap({ $0 as? RichTextMessageAttribute }).first {
                         var translatedPage: InstantPage?
                         if let translate = entry?.additionalData.translate, case let .complete(toLang) = translate {
@@ -931,7 +944,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                             let isTranslated = translatedPage != nil
                             thirdBlock.append(ContextMenuItem(strings().chatContextCopyText, handler: {
                                 copyRichTextMessage(message, text: richText, page: page, isTranslated: isTranslated)
-                            }, itemImage: MenuAnimation.menu_copy.value, keyEquivalent: .cmdc))
+                            }, itemImage: MenuAnimation.menu_copy.value, keyEquivalent: .cmdc).regramAction(.copy))
                         }
                     } else {
                         thirdBlock.append(ContextMenuItem(strings().chatContextCopyText, handler: { [weak textLayout] in
@@ -940,7 +953,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                                     copyToClipboard(textLayout.attributedString.string)
                                 }
                             }
-                        }, itemImage: MenuAnimation.menu_copy.value))
+                        }, itemImage: MenuAnimation.menu_copy.value).regramAction(.copy))
                     }
                 }
                 
@@ -967,7 +980,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                             }
                         }
                         
-                    }, itemImage: MenuAnimation.menu_copy.value))
+                    }, itemImage: MenuAnimation.menu_copy.value).regramAction(.copy))
                 } else if !protected {
                     let attr = textLayout.attributedString.mutableCopy() as! NSMutableAttributedString
                     attr.enumerateAttributes(in: attr.range, options: [], using: { data, range, _ in
@@ -991,7 +1004,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                         let toLang = context.sharedContext.baseSettings.doNotTranslate.union([appAppearance.languageCode])
                         
                         
-                        if language == nil || !toLang.contains(language!), !muteTranslate, !isService, translateConfig.canTranslate {
+                        if language == nil || !toLang.contains(language!), !muteTranslate, !isService, canShowTranslation {
                             _ = peer?.canSendMessage(data.chatMode.isThreadMode) == true
                             thirdBlock.append(ContextMenuItem(strings().chatContextTranslate, handler: {
                                 showModal(with: ChatHistoryUIHooks.shared.makeTranslateModalObserved(context, language, appAppearance.languageCode, text, entities, source: .selectedText, onToneChanged: { tone in
@@ -999,8 +1012,8 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                                 }, translateEntireChat: {
                                     data.chatInteraction.translateTo(appAppearance.languageCode)
                                 }), for: context.window)
-                                data.chatInteraction.enableTranslatePaywall()
-                            }, itemImage: MenuAnimation.menu_translate.value))
+                                if !regramUsesExternalTranslation { data.chatInteraction.enableTranslatePaywall() }
+                            }, itemImage: MenuAnimation.menu_translate.value).regramAction(.translate))
                         }
                         thirdBlock.append(ContextMenuItem(strings().chatCopySelectedText, handler: { [weak textLayout] in
                             if let textLayout = textLayout {
@@ -1020,7 +1033,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                                     }
                                 }
                             }
-                        }, itemImage: MenuAnimation.menu_copy.value))
+                        }, itemImage: MenuAnimation.menu_copy.value).regramAction(.copy))
 
                     }
                 }
@@ -1031,7 +1044,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                 let text = state.text
                 let language = Translate.detectLanguage(for: text)
                 let toLang = context.sharedContext.baseSettings.doNotTranslate.union([appAppearance.languageCode])
-                if language == nil || !toLang.contains(language!), !isService, translateConfig.canTranslate {
+                if language == nil || !toLang.contains(language!), !isService, canShowTranslation {
                     _ = peer?.canSendMessage(data.chatMode.isThreadMode) == true
                     thirdBlock.append(ContextMenuItem(strings().chatContextTranslate, handler: {
                         showModal(with: ChatHistoryUIHooks.shared.makeTranslateModalObserved(context, language, appAppearance.languageCode, text, [], source: .transcription(messageId), onToneChanged: { tone in
@@ -1039,8 +1052,8 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                         }, translateEntireChat: {
                             data.chatInteraction.translateTo(appAppearance.languageCode)
                         }), for: context.window)
-                        data.chatInteraction.enableTranslatePaywall()
-                    }, itemImage: MenuAnimation.menu_translate.value))
+                        if !regramUsesExternalTranslation { data.chatInteraction.enableTranslatePaywall() }
+                    }, itemImage: MenuAnimation.menu_translate.value).regramAction(.translate))
                 }
             }
         }
@@ -1058,14 +1071,14 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                         }
                         showSuccess(window: context.window)
                     })
-                }, itemImage: MenuAnimation.menu_copy_link.value))
+                }, itemImage: MenuAnimation.menu_copy_link.value).regramAction(.copyLink))
             }
         }
         
         if canEditMessage(data.message, chatInteraction: data.chatInteraction, context: context), !isService {
             let edit = ContextMenuItem(strings().messageContextEdit, handler: {
                 data.chatInteraction.beginEditingMessage(data.message)
-            }, itemImage: MenuAnimation.menu_edit.value, keyEquivalent: .cmde)
+            }, itemImage: MenuAnimation.menu_edit.value, keyEquivalent: .cmde).regramAction(.edit)
             
             if let groupped = data.groupped, groupped.count > 1, let media = message.media.first as? TelegramMediaFile {
                 if !media.isVideo {
@@ -1091,13 +1104,19 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
             if data.message.author?.id == context.peerId || media.flags.contains(.othersCanAppend), media.items.count < optionsLimit {
                 secondBlock.append(ContextMenuItem(strings().chatContextMenuAddTask, handler: {
                     data.chatInteraction.appendTask(data.message)
-                }, itemImage: MenuAnimation.menu_add.value, locked: !context.isPremium))
+                }, itemImage: MenuAnimation.menu_add.value, locked: !context.isPremium).regramAction(.addTodoTask))
             }
         }
         
         if !data.message.isScheduledMessage, let peer = peer, !peer.isDeleted, isNotFailed, data.peerId == data.message.id.peerId, !isService, mode.customChatContents == nil, !isNonReplyableEphemeral {
 
             let needUnpin = data.pinnedMessage?.others.contains(data.message.id) == true
+            let updatePinned: (Bool, Bool) -> Void = { notify, onlyForPeer in
+                let perform = { data.chatInteraction.updatePinned(data.message.id, needUnpin, notify, onlyForPeer) }
+                if needUnpin, RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["features.confirmUnpin"].bool {
+                    verifyAlert(for: context.window, header: strings().chatConfirmUnpinHeader, information: strings().chatConfirmUnpin, ok: strings().chatConfirmUnpinOK, successHandler: { _ in perform() })
+                } else { perform() }
+            }
             let pinAndOld: Bool
             if let pinnedMessage = data.pinnedMessage, let last = pinnedMessage.others.last {
                 pinAndOld = last > data.message.id
@@ -1118,38 +1137,38 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                                 let info = pinAndOld ? strings().chatConfirmPinOld : strings().messageContextConfirmPin1
                                 
                                 verifyAlert(for: context.window, information: info, ok:  strings().messageContextPin, option: pinAndOld ? nil : strings().messageContextConfirmNotifyPin, successHandler: { result in
-                                    data.chatInteraction.updatePinned(data.message.id, needUnpin, result != .thrid, false)
+                                    updatePinned(result != .thrid, false)
                                 })
                             } else {
-                                data.chatInteraction.updatePinned(data.message.id, needUnpin, true, false)
+                                updatePinned(true, false)
                             }
-                        }, itemImage: pinImage))
+                        }, itemImage: pinImage).regramAction(needUnpin ? .unpin : .pin))
                     }
                 }
             } else if data.message.id.peerId == context.peerId {
                 secondBlock.append(ContextMenuItem(pinText, handler: {
-                    data.chatInteraction.updatePinned(data.message.id, needUnpin, true, false)
-                }, itemImage: pinImage))
+                    updatePinned(true, false)
+                }, itemImage: pinImage).regramAction(needUnpin ? .unpin : .pin))
             } else if let peer = peer as? TelegramGroup, peer.canPinMessage, (needUnpin || data.chatMode != .pinned) {
                 secondBlock.append(ContextMenuItem(pinText, handler: {
                     if !needUnpin {
                         verifyAlert(for: context.window, information: pinAndOld ? strings().chatConfirmPinOld : strings().messageContextConfirmPin1, ok: strings().messageContextPin, option: pinAndOld ? nil : strings().messageContextConfirmNotifyPin, successHandler: { result in
-                            data.chatInteraction.updatePinned(data.message.id, needUnpin, result == .thrid, false)
+                            updatePinned(result == .thrid, false)
                         })
                     } else {
-                        data.chatInteraction.updatePinned(data.message.id, needUnpin, false, false)
+                        updatePinned(false, false)
                     }
-                }, itemImage: pinImage))
+                }, itemImage: pinImage).regramAction(needUnpin ? .unpin : .pin))
             } else if data.canPinMessage, let peer = data.peer, (needUnpin || data.chatMode != .pinned) {
                 secondBlock.append(ContextMenuItem(pinText, handler: {
                     if !needUnpin {
                         verifyAlert(for: context.window, information: pinAndOld ? strings().chatConfirmPinOld : strings().messageContextConfirmPin1, ok: strings().messageContextPin, option: strings().chatConfirmPinFor(peer.displayTitle), optionIsSelected: false, successHandler: { result in
-                            data.chatInteraction.updatePinned(data.message.id, needUnpin, false, result != .thrid)
+                            updatePinned(false, result != .thrid)
                         })
                     } else {
-                        data.chatInteraction.updatePinned(data.message.id, needUnpin, false, false)
+                        updatePinned(false, false)
                     }
-                }, itemImage: pinImage))
+                }, itemImage: pinImage).regramAction(needUnpin ? .unpin : .pin))
             }
         }
         
@@ -1158,7 +1177,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
             let forwardingAction = ChatForwardMenuAction(chatInteraction: chatInteraction, sources: [data.message] + msgs)
             let forwardItem = ContextMenuItem(strings().messageContextForward, handler: {
                 forwardingAction.openPicker(messages: msgs)
-            }, itemImage: MenuAnimation.menu_forward.value)
+            }, itemImage: MenuAnimation.menu_forward.value).regramAction(.forward)
             let forwardMenu = ContextMenu()
             let forwardObject = ChatHistoryUIHooks.shared.makeForwardMessagesObjectObserved(context, [data.message], useGroupIfNeeded, chatInteraction.getMessages)
 
@@ -1273,7 +1292,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                 data.chatInteraction.withToggledSelectedMessage({
                     $0.withToggledSelectedMessage(data.message.id)
                 })
-            }, itemImage: MenuAnimation.menu_select_messages.value))
+            }, itemImage: MenuAnimation.menu_select_messages.value).regramAction(.select))
         }
         
         if let channel = data.message.peers[message.id.peerId] as? TelegramChannel, channel.isChannel, !isService {
@@ -1302,7 +1321,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                         thirdBlock.append(ContextMenuItem(strings().messageContextRemoveGif, handler: {
                             showModalText(for: context.window, text: strings().chatContextGifRemoved)
                             _ = removeSavedGif(postbox: account.postbox, mediaId: file.fileId).start()
-                        }, itemImage: MenuAnimation.menu_remove_gif.value))
+                        }, itemImage: MenuAnimation.menu_remove_gif.value).regramAction(.saveGif))
                     } else {
                         thirdBlock.append(ContextMenuItem(strings().messageContextSaveGif, handler: {
                             
@@ -1315,7 +1334,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                                 showModalText(for: context.window, text: strings().chatContextGifAdded)
                             }
                             _ = addSavedGif(postbox: account.postbox, fileReference: FileMediaReference.message(message: MessageReference(data.message), media: file)).start()
-                        }, itemImage: MenuAnimation.menu_add_gif.value))
+                        }, itemImage: MenuAnimation.menu_add_gif.value).regramAction(.saveGif))
                     }
                 }
                 if file.isSticker, let saved = data.isStickerSaved {
@@ -1323,7 +1342,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                     if let reference = file.stickerReference {
                         thirdBlock.append(ContextMenuItem(strings().contextViewStickerSet, handler: {
                             showModal(with: ChatMediaUIHooks.shared.makeStickerPackPreview(context, peerId, [.stickers(reference)]), for: context.window)
-                        }, itemImage: MenuAnimation.menu_view_sticker_set.value))
+                        }, itemImage: MenuAnimation.menu_view_sticker_set.value).regramAction(.viewStickerPack))
                     }
                     
                     let image = saved ? MenuAnimation.menu_remove_from_favorites.value : MenuAnimation.menu_add_to_favorites.value
@@ -1342,7 +1361,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                             showModalText(for: context.window, text: strings().chatContextStickerRemovedFromFavorites)
                             _ = removeSavedSticker(postbox: account.postbox, mediaId: file.fileId).start()
                         }
-                    }, itemImage: image))
+                    }, itemImage: image).regramAction(.favoriteSticker))
                 }
                 
                 if resourceData.complete {
@@ -1360,7 +1379,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                                     showModalText(for: context.window, text: strings().chatContextSaveRingtoneAddSuccess)
                                 })
                                 
-                            }, itemImage: MenuAnimation.menu_note_download.value))
+                            }, itemImage: MenuAnimation.menu_note_download.value).regramAction(.saveNotificationSound))
                         } else if contains {
                             thirdBlock.append(ContextMenuItem(strings().chatContextSaveRingtoneRemove, handler: {
                                 let signal = context.engine.peers.removeNotificationSound(file: .message(message: .init(message), media: file))
@@ -1370,14 +1389,14 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                                     showModalText(for: context.window, text: strings().chatContextSaveRingtoneRemoveSuccess)
                                 })
                                 
-                            }, itemImage: MenuAnimation.menu_note_slash.value))
+                            }, itemImage: MenuAnimation.menu_note_slash.value).regramAction(.saveNotificationSound))
                         }
                     }
                     if !data.isMediaStory, data.message.pendingProcessingAttribute == nil {
                         
                         if isHLSVideo(file: file), let quality = HLSQualitySet(baseFile: FileMediaReference.message(message: .init(message), media: file)) {
                             
-                            let download = ContextMenuItem(strings().galleryContextSaveVideo, itemImage: MenuAnimation.menu_save_as.value)
+                            let download = ContextMenuItem(strings().galleryContextSaveVideo, itemImage: MenuAnimation.menu_save_as.value).regramAction(.saveMedia)
                             let downloadMenu = ContextMenu()
 
                             let downloadOrShow:(TelegramMediaFile)->Void = { file in
@@ -1424,7 +1443,15 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                         } else {
                             thirdBlock.append(ContextMenuItem(strings().chatContextSaveMedia, handler: {
                                 saveAs(file, account: account)
-                            }, itemImage: MenuAnimation.menu_save_as.value, keyEquivalent: .cmds))
+                            }, itemImage: MenuAnimation.menu_save_as.value, keyEquivalent: .cmds).regramAction(.saveMedia))
+                            thirdBlock.append(ContextMenuItem(regramLocalizedString("ios.Native.SaveToFiles", languageCode: appCurrentLanguage.primaryLanguage.languageCode), handler: {
+                                saveAs(file, account: account)
+                            }, itemImage: MenuAnimation.menu_save_as.value).regramAction(.saveToFiles))
+                            if file.isSticker {
+                                thirdBlock.append(ContextMenuItem(regramLocalizedString("ios.Native.SaveSticker", languageCode: appCurrentLanguage.primaryLanguage.languageCode), handler: {
+                                    saveAs(file, account: account)
+                                }, itemImage: MenuAnimation.menu_save_as.value).regramAction(.saveStickerToCameraRoll))
+                            }
                         }
                        
                     }
@@ -1437,13 +1464,14 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                 if resourceData.complete {
                     let text = strings().chatContextCopyMedia
                     thirdBlock.append(ContextMenuItem(text, handler: {
-                        if copyImageToPasteboard(path: resourceData.path) {
-                            showModalText(for: context.window, text: strings().contextAlertCopied)
-                        }
-                    }, itemImage: MenuAnimation.menu_copy_media.value, keyEquivalent: .cmdc))
+                        copyImageToPasteboard(path: resourceData.path, message: data.message, interaction: chatInteraction)
+                    }, itemImage: MenuAnimation.menu_copy_media.value, keyEquivalent: .cmdc).regramAction(.copy))
                     thirdBlock.append(ContextMenuItem(strings().chatContextSaveMedia, handler: {
                         savePanel(file: resourceData.path, ext: "jpg", for: context.window)
-                    }, itemImage: MenuAnimation.menu_save_as.value, keyEquivalent: .cmds))
+                    }, itemImage: MenuAnimation.menu_save_as.value, keyEquivalent: .cmds).regramAction(.saveMedia))
+                    thirdBlock.append(ContextMenuItem(regramLocalizedString("ios.Native.SaveToFiles", languageCode: appCurrentLanguage.primaryLanguage.languageCode), handler: {
+                        savePanel(file: resourceData.path, ext: "jpg", for: context.window)
+                    }, itemImage: MenuAnimation.menu_save_as.value).regramAction(.saveToFiles))
                 }
             }
         }
@@ -1459,7 +1487,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
             if canFactCheck(message), userCanFactCheck {
                 fifthBlock.append(ContextMenuItem(strings().factCheckContextEdit, handler: {
                     showModal(with: FactCheckController(context: context, message: message), for: context.window)
-                }, itemImage: MenuAnimation.menu_verification.value))
+                }, itemImage: MenuAnimation.menu_verification.value).regramAction(.factCheck))
             }
         }
         
@@ -1467,7 +1495,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
             
             let reportItem = ContextMenuItem(strings().messageContextReport, handler: {
                 ChatNavigationHooks.shared.reportMessages(context, [message.id], strings().reportComplicatedMessageTitle)
-            }, itemImage: MenuAnimation.menu_report.value)
+            }, itemImage: MenuAnimation.menu_report.value).regramAction(.report)
                         
             fifthBlock.append(reportItem)
         }
@@ -1509,7 +1537,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
         if canDeleteMessage(data.message, account: account, chatLocation: data.chatLocation, mode: data.chatMode), !data.isLogInteraction {
             fifthBlock.append(ContextMenuItem(strings().messageContextDelete, handler: {
                 data.chatInteraction.deleteMessages([data.message.id], nil)
-            }, itemMode: .destruct, itemImage: MenuAnimation.menu_delete.value))
+            }, itemMode: .destruct, itemImage: MenuAnimation.menu_delete.value).regramAction(.delete))
         }
         
         if data.isLogInteraction {
@@ -1533,7 +1561,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
             fifthBlock.append(ContextMenuItem("Copy Media Id (dev)", handler: {
                 copyToClipboard("\(mediaId.id)")
                 showModalText(for: context.window, text: "Copied")
-            }, itemMode: .normal, itemImage: MenuAnimation.menu_copy.value))
+            }, itemMode: .normal, itemImage: MenuAnimation.menu_copy.value).regramAction(.copy))
             
             
            
@@ -1619,6 +1647,12 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                 items.append(contentsOf: block)
             }
         }
+        let regramItems = regramMessageMenu(message: message, messages: useGroupIfNeeded ? (data.groupped ?? [message]) : [message], interaction: chatInteraction, canReply: canReplyMessage(data.message, peerId: data.peerId, chatLocation: data.chatLocation, mode: data.chatMode, threadData: chatInteraction.presentation.threadInfo) && !data.isLogInteraction && !isNonReplyableEphemeral, canForward: canForwardMessage(data.message, chatInteraction: data.chatInteraction) && !isService, filterImportData: filterImportData)
+        if !regramItems.isEmpty {
+            items.append(ContextSeparatorItem())
+            items.append(contentsOf: regramItems)
+        }
+        items = regramOrderedMessageMenu(items, accountId: context.peerId.toInt64())
         for item in items {
             item.contextObject = data
         }

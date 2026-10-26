@@ -1,3 +1,4 @@
+import RegramCore
 import Cocoa
 import TelegramCore
 
@@ -56,6 +57,7 @@ protocol PeerInfoEntry {
 
 
 func peerInfoEntries<Context: AccountContextProtocol>(view: PeerView, threadData: MessageHistoryThreadData?, threadPeer: EnginePeer?, arguments: PeerInfoArguments<Context>, inputActivities: [PeerId: PeerInputActivity], channelMembers: [RenderedChannelParticipant], mediaTabsData: PeerMediaTabsData, inviteLinksCount: Int32, joinRequestsCount: Int32, availableReactions: AvailableReactions?, source: PeerInfoController<Context>.Source, stories: PeerExpiringStoryListContext.State?, personalChannel: UserInfoPersonalChannel?, revenueState: StarsRevenueStatsContextState?, tonRevenueState: StarsRevenueStatsContextState?, webAppPermissionsState: WebAppPermissionsState?, savedMuicProfileState: ProfileSavedMusicContext.State?) -> [PeerInfoEntry] {
+    let stories = RegramPreferences.shared.settings(accountId: arguments.context.peerId.toInt64())["hideStories"].bool ? nil : stories
     if let threadData = threadData {
         return topicInfoEntries(view: view, threadData: threadData, threadPeer: threadPeer, arguments: arguments, mediaTabsData: mediaTabsData)
     } else if peerViewMainPeer(view) is TelegramUser {

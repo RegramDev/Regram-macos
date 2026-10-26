@@ -854,6 +854,11 @@ open class Window: NSWindow {
             if eventType == .keyDown {
                 
                 applyResponderIfNeeded(event)
+
+                if let input = firstResponder as? NSTextView, input.hasMarkedText(), event.modifierFlags.intersection([.command, .control]).isEmpty {
+                    super.sendEvent(event)
+                    return
+                }
                 
                 cleanUndefinedHandlers()
                 

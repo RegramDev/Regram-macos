@@ -559,7 +559,7 @@ open class PeerMediaPhotosController<Context: AccountContextProtocol>: TableView
         
         let historyView: Atomic<MessageHistoryView?> = Atomic(value: nil)
         
-        historyDisposable.set(history.start(next: { update in
+        historyDisposable.set((combineLatest(history, regramMessageFilterChanges(accountId: context.peerId.toInt64())) |> map { update, _ in update }).start(next: { update in
             
             var messages:[Message]? = nil
             var isLoading: Bool = false
@@ -616,9 +616,9 @@ open class PeerMediaPhotosController<Context: AccountContextProtocol>: TableView
                     // synthetic message per media so every photo/video gets its own grid cell.
                     let predicate = sharedMediaPredicate(for: tags)
                     if !isExternalSearch {
-                        state.messages = expandSharedMediaMessages(messages.reversed(), where: predicate, reverseMedia: true)
+                        state.messages = expandSharedMediaMessages(regramVisibleMessages(Array(messages.reversed()), accountId: context.peerId.toInt64()), where: predicate, reverseMedia: true)
                     } else {
-                        state.messages = expandSharedMediaMessages(messages, where: predicate, reverseMedia: true)
+                        state.messages = expandSharedMediaMessages(regramVisibleMessages(messages, accountId: context.peerId.toInt64()), where: predicate, reverseMedia: true)
                     }
                 }
                 state.searchState = update.2

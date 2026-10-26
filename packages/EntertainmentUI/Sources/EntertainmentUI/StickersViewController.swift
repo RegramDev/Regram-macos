@@ -1,4 +1,5 @@
 import Cocoa
+import RegramCore
 import TGUIKit
 import ColorPalette
 import ComponentsUI
@@ -472,7 +473,7 @@ private func stickersEntries(view: ItemCollectionsView?, context: any AccountCon
                             }
                         }
                     }
-                    if files.count == 20 {
+                    if files.count == RGMediaPolicy.recentStickerLimit(settings: RegramPreferences.shared.settings(accountId: context.peerId.toInt64())) {
                         break
                     }
                 }

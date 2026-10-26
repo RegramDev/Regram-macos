@@ -1,3 +1,5 @@
+import ChatHistoryModel
+import RegramCore
 import Cocoa
 import Foundation
 import TGUIKit
@@ -1086,6 +1088,7 @@ private struct State : Equatable {
     public var starsState: StarsContext.State?
     public var author: EnginePeer?
     public var canDeleteGift: Bool = false
+    public var isLocalGift = false
 }
 
 private let _id_header = InputDataIdentifier("_id_header")
@@ -1605,7 +1608,7 @@ private func entries(_ state: State, arguments: Arguments) -> [InputDataEntry] {
                 if peer.id == arguments.context.peerId || peer._asPeer().groupAccess.canManageGifts {
                     if state.purpose.canUpgrade, !state.purpose.isUpgraded {
                         arguments.upgrade()
-                    } else if convertStarsAmount != nil {
+                    } else if convertStarsAmount != nil || state.isLocalGift {
                         arguments.displayOnMyPage()
                     } else {
                         arguments.close()
@@ -1777,8 +1780,11 @@ private func starTransactionCanDeleteGift(context: any AccountContextProtocol, t
     return owner.id == context.peerId
 }
 
-public func Star_TransactionScreen(context: (any AccountContextProtocol), fromPeerId: PeerId, peer: EnginePeer?, transaction: StarsContext.State.Transaction, purpose: Star_TransactionPurpose = .payment, reference: StarGiftReference? = nil, profileContext: ProfileGiftsContext? = nil, currency: CurrencyAmount.Currency = .stars) -> InputDataModalController {
+public func Star_TransactionScreen(context: (any AccountContextProtocol), fromPeerId: PeerId, peer: EnginePeer?, transaction: StarsContext.State.Transaction, purpose: Star_TransactionPurpose = .payment, reference: StarGiftReference? = nil, profileContext: ProfileGiftsContext? = nil, currency: CurrencyAmount.Currency = .stars, localPurchaseId: UUID? = nil) -> InputDataModalController {
 
+    let localMarker = localPurchaseId != nil || transaction.starGift.map(regramIsLocalGift) == true
+    let localDetails = localMarker ? RegramLocalGiftDetails(context: context, purchaseId: localPurchaseId ?? transaction.starGift.flatMap { regramLocalGiftPurchaseId(context: context, gift: $0) }) : nil
+    if localMarker && localDetails == nil { return regramUnavailableLocalGiftController(context: context) }
     let actionsDisposable = DisposableSet()
     var close:(()->Void)? = nil
     
@@ -1787,7 +1793,8 @@ public func Star_TransactionScreen(context: (any AccountContextProtocol), fromPe
 
     
     var initialState = State(transaction: transaction, currency: currency, purpose: purpose, peer: peer)
-    initialState.canDeleteGift = starTransactionCanDeleteGift(context: context, transaction: transaction, purpose: purpose, reference: reference)
+    initialState.isLocalGift = localMarker
+    initialState.canDeleteGift = localMarker || starTransactionCanDeleteGift(context: context, transaction: transaction, purpose: purpose, reference: reference)
     
     let statePromise = ValuePromise(initialState, ignoreRepeated: true)
     let stateValue = Atomic(value: initialState)
@@ -1795,6 +1802,17 @@ public func Star_TransactionScreen(context: (any AccountContextProtocol), fromPe
         statePromise.set(stateValue.modify (f))
     }
     
+    if let localDetails {
+        actionsDisposable.add(regramLocalAppearanceState(context: context).start(next: { local in
+            guard let current = localDetails.current(state: local) else { close?(); return }
+            updateState { state in
+                var state = state
+                state.purpose = regramLocalGiftPurpose(gift: current.gift, purchase: current.purchase)
+                return state
+            }
+        }))
+    }
+
     if let paidMessageId = transaction.paidMessageId {
         actionsDisposable.add(context.engine.data.get(TelegramEngine.EngineData.Item.Peer.Peer(id: paidMessageId.peerId)).start(next: { peer in
             updateState { current in
@@ -1910,6 +1928,7 @@ public func Star_TransactionScreen(context: (any AccountContextProtocol), fromPe
     }, openStars: {
         showModal(with: StarUsePromoController(context: context), for: window)
     }, convertStars: { [weak profileContext] in
+        if let localDetails { localDetails.unavailable(window: window); return }
         if let reference, let peer = peer {
             switch purpose {
             case let .starGift(_, convertStars, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _):
@@ -1945,6 +1964,7 @@ public func Star_TransactionScreen(context: (any AccountContextProtocol), fromPe
             }
         }
     }, displayOnMyPage: { [weak profileContext] in
+        if let localDetails { localDetails.toggleVisibility(window: window); return }
         
         if let reference {
             switch purpose {
@@ -1974,6 +1994,7 @@ public func Star_TransactionScreen(context: (any AccountContextProtocol), fromPe
         close?()
         StarsHooks.shared.openAffiliatePeer(context, fromPeerId, false)
     }, upgrade: {
+        if let localDetails { localDetails.upgrade(window: window, completion: { close?() }); return }
         if let gift = transaction.starGift, let id = gift.generic?.id, let peer, let reference {
             _ = showModalProgress(signal: context.engine.payments.starGiftUpgradePreview(giftId: id), for: window).startStandalone(next: { attributes in
                 close?()
@@ -1983,6 +2004,7 @@ public func Star_TransactionScreen(context: (any AccountContextProtocol), fromPe
             })
         }
     }, transferUnqiue: { gift in
+        if let localDetails { localDetails.unavailable(window: window); return }
         
         let state = stateValue.with { $0 }
         
@@ -2002,11 +2024,14 @@ public func Star_TransactionScreen(context: (any AccountContextProtocol), fromPe
         }
         
     }, copyNftLink: { gift in
+        if let localDetails { localDetails.unavailable(window: window); return }
         copyToClipboard(gift.link(context))
         showModalText(for: window, text: strings().contextAlertCopied)
     }, shareNft: { gift in
+        if let localDetails { localDetails.unavailable(window: window); return }
         StarsHooks.shared.shareLink(context, gift.link(context), window)
     }, startWearing: { gift in
+        if let localDetails { _ = localDetails.wear(true, window: window); return }
         showModal(with: StarGift_Nft_Controller(context: context, gift: .unique(gift), source: .previewWear(.init(context.myPeer!), gift)), for: window)
     }, changeFee: {
         
@@ -2023,6 +2048,7 @@ public func Star_TransactionScreen(context: (any AccountContextProtocol), fromPe
             }
         })
     }, giftUpgrade: { hash in
+        if let localDetails { localDetails.upgrade(window: window, completion: { close?() }); return }
         if let gift = transaction.starGift, let id = gift.generic?.id {
             switch transaction.peer {
             case let .peer(peer):
@@ -2037,6 +2063,7 @@ public func Star_TransactionScreen(context: (any AccountContextProtocol), fromPe
             }
         }
     }, deleteGift: { [weak profileContext] in
+        if let localDetails { localDetails.remove(window: window, completion: { close?() }); return }
         guard let reference else {
             return
         }
@@ -2068,7 +2095,10 @@ public func Star_TransactionScreen(context: (any AccountContextProtocol), fromPe
         }
     }
     
+    controller.willDisappear = { _ in localDetails?.setActive(false) }
+    controller.willAppear = { _ in localDetails?.setActive(true) }
     controller.onDeinit = {
+        localDetails?.setActive(false)
         actionsDisposable.dispose()
     }
     

@@ -429,8 +429,12 @@ public func SendAudioModalController(context: any AccountContextProtocol, chatIn
         }
     }))
 
-    let signal = statePromise.get() |> deliverOnPrepareQueue |> map { state in
-        return InputDataSignalValue(entries: entries(state, arguments: arguments))
+    let signal = combineLatest(statePromise.get(), regramMessageFilterChanges(accountId: context.peerId.toInt64())) |> deliverOnPrepareQueue |> map { state, _ in
+        var visible = state
+        visible.savedMusic = regramVisibleMessages(state.savedMusic, accountId: context.peerId.toInt64())
+        visible.sharedAudio = regramVisibleMessages(state.sharedAudio, accountId: context.peerId.toInt64())
+        visible.searchResults = state.searchResults.map { regramVisibleMessages($0, accountId: context.peerId.toInt64()) }
+        return InputDataSignalValue(entries: entries(visible, arguments: arguments))
     }
 
     let controller = InputDataController(dataSignal: signal, title: strings().sendAudioTitle)

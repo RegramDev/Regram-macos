@@ -1631,11 +1631,33 @@ public class APChatController : APController {
         self.messages = messages
         super.init(context: context, streamable: streamable, baseRate: baseRate, volume: volume)
     }
-    
-    
 
     public required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    @discardableResult private func stopExcludedPlayback(_ item: APSongItem?) -> Bool {
+        guard let item, case let .song(message) = item.entry,
+              let shouldIncludeMessage = AudioPlayerHooks.shared.shouldIncludeMessage,
+              !shouldIncludeMessage(message, context.peerId.toInt64()) else { return false }
+        self.current = -1
+        self.complete()
+        return true
+    }
+
+    public override func playOrPause() -> Bool {
+        guard !stopExcludedPlayback(self.song) else { return false }
+        return super.playOrPause()
+    }
+
+    public override func play() -> Bool {
+        guard !stopExcludedPlayback(self.song) else { return false }
+        return super.play()
+    }
+
+    fileprivate override func dequeueCurrent() {
+        guard !stopExcludedPlayback(self.currentSong) else { return }
+        super.dequeueCurrent()
     }
 
     public override func start() {
@@ -1648,9 +1670,29 @@ public class APChatController : APController {
         let chatLocationInput = self.chatLocationInput
         let index = self.index
         let mode = self.mode
+        let accountId = context.peerId.toInt64()
+        let hooks = AudioPlayerHooks.shared
+        let visibilityChanges: Signal<Void, NoError> = (.single(()) |> then(hooks.messageVisibilityChanges?(accountId) ?? .complete()))
+        |> deliverOnMainQueue
+        |> beforeNext { [weak self] _ in
+            if let self { self.stopExcludedPlayback(self.song) }
+        }
+        let visibleEntries: ([Message]) -> [APEntry] = { source in
+            var entries: [APEntry] = []
+            for parent in source where hooks.shouldIncludeMessage?(parent, accountId) ?? true {
+                let messages = tags.contains(.music) ? expandSharedMediaMessages([parent], where: sharedMediaPredicate(for: tags)) : [parent]
+                for message in messages {
+                    if let media = message.anyMedia as? TelegramMediaFile, media.isMusicFile || media.isInstantVideo || media.isVoice {
+                        guard message.id.peerId.isSecretChat || message.autoclearTimeout == nil else { continue }
+                        entries.append(.song(message))
+                    }
+                }
+            }
+            return entries
+        }
         let apply: Signal<APTransition, NoError>
         if messages.isEmpty {
-            apply = history.get() |> distinctUntilChanged |> mapToSignal { location -> Signal<(MessageHistoryView, ViewUpdateType, InitialMessageHistoryData?), NoError> in
+            let rawHistory = history.get() |> distinctUntilChanged |> mapToSignal { location -> Signal<(MessageHistoryView, ViewUpdateType, InitialMessageHistoryData?), NoError> in
                 switch mode {
                 case .scheduled:
                     return account.viewTracker.scheduledMessagesViewForLocation(chatLocationInput, additionalData: [])
@@ -1662,60 +1704,50 @@ public class APChatController : APController {
                         return account.viewTracker.aroundMessageHistoryViewForLocation(chatLocationInput, index: MessageHistoryAnchorIndex.message(index), anchorIndex: MessageHistoryAnchorIndex.message(index), count: 100, fixedCombinedReadStates: nil, tag: tagMask, orderStatistics: [], additionalData: [])
                     }
                 }
-               
-                
-                } |> map { view -> (APHistory?,APHistory) in
-                    var entries:[APEntry] = []
-                    for viewEntry in view.0.entries {
-                        let messages = tags.contains(.music) ? expandSharedMediaMessages([viewEntry.message], where: sharedMediaPredicate(for: tags)) : [viewEntry.message]
-                        for message in messages {
-                            if let media = message.anyMedia as? TelegramMediaFile, media.isMusicFile || media.isInstantVideo || media.isVoice {
-                                guard message.id.peerId.isSecretChat || message.autoclearTimeout == nil else { continue }
-                                entries.append(.song(message))
-                            }
-                        }
-                    }
-                    
-                    let new = APHistory(original: view.0, filtred: entries)
-                    return (list.swap(new),new)
+            }
+            apply = combineLatest(rawHistory, visibilityChanges)
+                |> deliverOn(prepareQueue)
+                |> map { view, _ -> (APHistory?, APHistory) in
+                    let new = APHistory(original: view.0, filtred: visibleEntries(view.0.entries.map(\.message)))
+                    return (list.swap(new), new)
                 }
                 |> mapToQueue { view -> Signal<APTransition, NoError> in
-                    let transition = prepareItems(from: view.0?.filtred, to: view.1.filtred, account: account)
-                    return transition
+                    prepareItems(from: view.0?.filtred, to: view.1.filtred, account: account)
                 } |> deliverOnMainQueue
         } else {
-            var entries:[APEntry] = []
-            for message in messages {
-                entries.append(.song(message))
-            }
-            apply = prepareItems(from: [], to: entries, account: account) |> deliverOnMainQueue
+            let messages = self.messages
+            let previous = Atomic<[APEntry]>(value: [])
+            apply = visibilityChanges |> deliverOn(prepareQueue) |> mapToQueue { _ in
+                let entries = visibleEntries(messages)
+                return prepareItems(from: previous.swap(entries), to: entries, account: account)
+            } |> deliverOnMainQueue
         }
-        
 
-        let first:Atomic<Bool> = Atomic(value:true)
-        disposable.set(apply.start(next: {[weak self] (transition) in
-
+        let first = Atomic<Bool>(value: true)
+        disposable.set(apply.start(next: { [weak self] transition in
+            guard let self else { return }
             let isFirst = first.swap(false)
-
-            self?.merge(with: transition)
-
+            self.merge(with: transition)
             if isFirst {
-                if let index = index {
-                    let list:[APItem] = items.with { $0 }
-                    for i in 0 ..< list.count {
-                        if list[i].entry.index == index {
-                            self?.current = i
-                            break
-                        }
+                if let index {
+                    let list: [APItem] = items.with { $0 }
+                    guard let current = list.firstIndex(where: { $0.entry.index == index }) else {
+                        self.complete()
+                        self.ready.set(.single(true))
+                        return
                     }
+                    self.current = current
                 }
-
-                self?.dequeueCurrent()
-                self?.ready.set(.single(true))
+                if self.pullItems.isEmpty {
+                    self.complete()
+                } else {
+                    self.dequeueCurrent()
+                }
+                self.ready.set(.single(true))
             }
         }))
 
-        if let index = index {
+        if let index {
             history.set(.single(.index(index)) |> delay(0.1, queue: Queue.mainQueue()))
         } else {
             history.set(.single(.initial) |> delay(0.1, queue: Queue.mainQueue()))

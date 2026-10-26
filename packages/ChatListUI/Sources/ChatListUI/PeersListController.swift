@@ -1,3 +1,5 @@
+import RegramCore
+import RegramSignals
 import Cocoa
 import TGUIKit
 import Postbox
@@ -1060,7 +1062,7 @@ public class PeerListContainerView : Control {
             guard contentBottomInset != oldValue else {
                 return
             }
-            tableView.contentInsets.bottom = contentBottomInset
+            tableView.contentInsets.bottom = contentBottomInset + regramBottomFoldersHeight
             updateScrollerInset(animated: false)
             updateBottomControls(size: frame.size, transition: .immediate)
         }
@@ -1685,7 +1687,7 @@ public class PeerListContainerView : Control {
 
         transition.updateFrame(view: searchView, frame: searchRect)
         searchView.updateLayout(size: searchRect.size, transition: transition)
-        searchView.isHidden = state.splitState == .minimisize || (mode.isForumLike && !displaysFullForumHeader)
+        searchView.isHidden = !regramShowsTopSearch || state.splitState == .minimisize || (mode.isForumLike && !displaysFullForumHeader)
         
 
 
@@ -1793,8 +1795,13 @@ public class PeerListContainerView : Control {
         
         if let foldersItem = foldersItem, let view = foldersView {
             let controlSize = NSMakeSize(size.width, foldersItem.height)
-            
-            let rect = CGRect(origin: NSMakePoint(0, navigationHeight - controlSize.height), size: controlSize)
+            let parent: NSView = regramFoldersAtBottom ? self : containerView
+            if view.superview !== parent {
+                view.removeFromSuperview()
+                parent.addSubview(view)
+            }
+            let folderY = regramFoldersAtBottom ? size.height - contentBottomInset - controlSize.height : navigationHeight - controlSize.height
+            let rect = CGRect(origin: NSMakePoint(0, folderY), size: controlSize)
                         
             transition.updateFrame(view: view, frame: rect)
             view.set(item: foldersItem, animated: transition.isAnimated)
@@ -1838,12 +1845,12 @@ public class PeerListContainerView : Control {
 
         if state.splitState != .minimisize, state.mode.isPlain || state.mode.isCommunity {
 
-            offset += 40
+            offset += regramShowsTopSearch ? 40 : 0
 
             if let storiesItem = self.storiesItem {
                 offset += storiesItem.navigationHeight
             }
-            if let foldersItem = self.foldersItem {
+            if let foldersItem = self.foldersItem, !regramFoldersAtBottom {
                 offset += foldersItem.height
             }
         } else if state.splitState == .minimisize {
@@ -1871,6 +1878,20 @@ public class PeerListContainerView : Control {
 //        }
         return height
     }
+
+    private var regramShowsTopSearch: Bool {
+        guard let state, state.mode == .plain, state.searchState != .Focus, let context = arguments?.context else { return true }
+        return RegramBottomBarSettings(settings: RegramPreferences.shared.settings(accountId: context.peerId.toInt64())).topSearchVisible
+    }
+
+    private var regramFoldersAtBottom: Bool {
+        guard let state, state.splitState != .minimisize, state.mode.isPlain || state.mode.isCommunity, let context = arguments?.context else { return false }
+        return RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["native.foldersAtBottom"].bool
+    }
+
+    private var regramBottomFoldersHeight: CGFloat {
+        regramFoldersAtBottom ? foldersItem?.height ?? 0 : 0
+    }
     
     public func updateScrollerInset(animated: Bool) {
         var top: CGFloat = 0
@@ -1881,7 +1902,8 @@ public class PeerListContainerView : Control {
             }
             return true
         })
-        tableView.scrollerInsets = .init(left: 0, right: 0, top: top, bottom: contentBottomInset)
+        tableView.contentInsets.bottom = contentBottomInset + regramBottomFoldersHeight
+        tableView.scrollerInsets = .init(left: 0, right: 0, top: top, bottom: contentBottomInset + regramBottomFoldersHeight)
         updateTableMask(spaceHeight: top)
     }
 
@@ -1890,12 +1912,12 @@ public class PeerListContainerView : Control {
         guard tableHeight > 0 else { return }
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        tableMaskLayer.frame = NSMakeRect(0, spaceHeight, tableView.bounds.width, max(0, tableHeight - spaceHeight))
+        tableMaskLayer.frame = NSMakeRect(0, spaceHeight, tableView.bounds.width, max(0, tableHeight - spaceHeight - regramBottomFoldersHeight))
         CATransaction.commit()
     }
     
     public func updateBottomControls(size: NSSize, transition: ContainedViewLayoutTransition) {
-        var bottomControlsY = size.height - contentBottomInset
+        var bottomControlsY = size.height - contentBottomInset - regramBottomFoldersHeight
         for view in [downloads as NSView?, removalUndo as NSView?].compactMap({ $0 }) {
             let edge: CGFloat = 12
             let y = bottomControlsY - view.frame.height - edge
@@ -2472,6 +2494,11 @@ open class PeersListController<Context: AccountContextProtocol>: TelegramGeneric
     open override func viewDidLoad() {
         super.viewDidLoad()
         updateContainerContentInsets(containerContentInsets, transition: .immediate)
+        actionsDisposable.add((regramPreferenceChanges(accountId: context.peerId.toInt64()) |> deliverOnMainQueue).start(next: { [weak self] _ in
+            guard let self else { return }
+            self.genericView.updateLayout(self.genericView.frame.size, transition: .immediate)
+            self.genericView.updateScrollerInset(animated: false)
+        }))
         let context = self.context
         let mode = self.mode
         let isContacts = self.isContacts
@@ -2680,7 +2707,11 @@ open class PeersListController<Context: AccountContextProtocol>: TelegramGeneric
         let storyList = self.storyList
         let storyState: Signal<EngineStorySubscriptions?, NoError>
         if let storyList = storyList {
-            storyState = storyList |> map(Optional.init)
+            let hidden = regramPreferenceChanges(accountId: context.peerId.toInt64()) |> map { _ in
+                let settings = RegramPreferences.shared.settings(accountId: context.peerId.toInt64())
+                return settings["hideStories"].bool || settings["features.hideTopStories"].bool
+            } |> distinctUntilChanged
+            storyState = hidden |> mapToSignal { hidden -> Signal<EngineStorySubscriptions?, NoError> in hidden ? .single(nil) : storyList |> map(Optional.init) }
         } else {
             storyState = .single(nil)
         }

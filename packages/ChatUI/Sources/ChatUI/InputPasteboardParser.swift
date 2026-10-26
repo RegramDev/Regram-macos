@@ -18,11 +18,27 @@ import FoundationUtils
 import ChatHistoryModel
 import AlertsUI
 import PremiumUI
+import RegramCore
+import RegramServices
+
+private func regramPastedPhotoPath(_ path: String) -> String {
+    let source = URL(fileURLWithPath: path)
+    let target = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(RGMediaPolicy.pastedPhotoFilenamePrefix + UUID().uuidString).appendingPathExtension(source.pathExtension)
+    do {
+        try FileManager.default.moveItem(at: source, to: target)
+        return target.path
+    } catch {
+        return path
+    }
+}
 
 public class InputPasteboardParser: NSObject {
 
     
     public class func getPasteboardUrls(_ pasteboard: NSPasteboard, context: any AccountContextProtocol) -> Signal<[URL], NoError> {
+        if RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["clipboardOriginalImages"].bool, let original = RegramClipboardImages.snapshot(from: pasteboard), original.containsImage {
+            return .single((try? RegramClipboardImages.preparingPhotos(original))?.urls.filter { fileSize($0.path).map { fileSizeLimitExceed(context: context, fileSize: $0) } ?? false } ?? [])
+        }
         let items = pasteboard.pasteboardItems
         
         if let items = items, !items.isEmpty {
@@ -56,7 +72,7 @@ public class InputPasteboardParser: NSObject {
             if !files.isEmpty {
                 return .single(files)
             } else if let image = image {
-                return putToTemp(image: image, compress: false) |> map {[URL(fileURLWithPath: $0)]} |> deliverOnMainQueue
+                return putToTemp(image: image, compress: false) |> map { [URL(fileURLWithPath: regramPastedPhotoPath($0))] } |> deliverOnMainQueue
             }
             
         }
@@ -120,6 +136,20 @@ public class InputPasteboardParser: NSObject {
     }
     
     public class func proccess(pasteboard:NSPasteboard, chatInteraction:ChatInteraction, window:Window) -> Bool {
+        let originalImages = RegramPreferences.shared.settings(accountId: chatInteraction.interactionContext.peerId.toInt64())["clipboardOriginalImages"].bool
+        if originalImages, let original = RegramClipboardImages.snapshot(from: pasteboard), original.containsImage {
+            let valid = original.urls.filter { fileSize($0.path).map { fileSizeLimitExceed(context: chatInteraction.interactionContext, fileSize: $0) } ?? false }
+            guard valid.count == original.urls.count else { showFileLimit(context: chatInteraction.interactionContext, fileSize: nil); return false }
+            if let peer = chatInteraction.presentation.peer, let text = permissionText(from: peer, for: .banSendMedia) { alert(for: window, info: text); return false }
+            guard let photos = try? RegramClipboardImages.preparingPhotos(original) else { alert(for: window, info: strings().unknownError); return false }
+            if valid.count == 1, chatInteraction.presentation.interfaceState.editState?.canEditMedia == true {
+                let replacement = chatInteraction.beginMediaReplacement()
+                _ = (Sender.generateMedia(for: MediaSenderContainer(path: photos.urls[0].path, isFile: false), account: chatInteraction.interactionContext.account, isSecretRelated: chatInteraction.peerId.namespace == Namespaces.Peer.SecretChat) |> deliverOnMainQueue).start(next: { [weak chatInteraction] media, _ in
+                    chatInteraction?.applyMediaReplacement(media, request: replacement)
+                })
+            } else { chatInteraction.showPreviewSender(photos.urls, photos.asMedia, nil) }
+            return false
+        }
         let items = pasteboard.pasteboardItems
         
         
@@ -202,7 +232,7 @@ public class InputPasteboardParser: NSObject {
                 return false
             } else if let image = image, let editState = chatInteraction.presentation.interfaceState.editState, editState.canEditMedia {
                 let replacement = chatInteraction.beginMediaReplacement()
-                _ = (putToTemp(image: image) |> mapToSignal {Sender.generateMedia(for: MediaSenderContainer(path: $0, isFile: false), account: chatInteraction.interactionContext.account, isSecretRelated: chatInteraction.peerId.namespace == Namespaces.Peer.SecretChat) } |> deliverOnMainQueue).start(next: { [weak chatInteraction] media, _ in
+                _ = (putToTemp(image: image, compress: false) |> mapToSignal {Sender.generateMedia(for: MediaSenderContainer(path: regramPastedPhotoPath($0), isFile: false), account: chatInteraction.interactionContext.account, isSecretRelated: chatInteraction.peerId.namespace == Namespaces.Peer.SecretChat) } |> deliverOnMainQueue).start(next: { [weak chatInteraction] media, _ in
                     chatInteraction?.applyMediaReplacement(media, request: replacement)
                 })
                 return false
@@ -213,7 +243,7 @@ public class InputPasteboardParser: NSObject {
                 return false
             } else if let image = image {
                 _ = (putToTemp(image: image, compress: false) |> deliverOnMainQueue).start(next: { [weak chatInteraction] (path) in
-                    chatInteraction?.showPreviewSender([URL(fileURLWithPath: path)], true, nil)
+                    chatInteraction?.showPreviewSender([URL(fileURLWithPath: regramPastedPhotoPath(path))], true, nil)
                 })
                 return false
             }

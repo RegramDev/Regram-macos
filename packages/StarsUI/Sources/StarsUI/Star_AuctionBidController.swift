@@ -1,3 +1,5 @@
+import ChatHistoryModel
+import RegramCore
 import Cocoa
 import Foundation
 import TGUIKit
@@ -807,6 +809,8 @@ public func Star_AuctionBidController(context: (any AccountContextProtocol), pee
     
     
     let actionsDisposable = DisposableSet()
+    var beganLocally = regramLocalGiftsEnabled(context: context) || regramIsLocalGift(.generic(gift))
+    actionsDisposable.add(regramLocalGiftsState(context: context).start(next: { if $0.enabled { beganLocally = true } }))
 
     let initialState = State(gift: gift, topPeers: [], currentDate: context.timestamp)
     
@@ -842,13 +846,13 @@ public func Star_AuctionBidController(context: (any AccountContextProtocol), pee
     
     timer.start()
     
-    actionsDisposable.add(combineLatest(starsContext.state, auctionContext.state).startStrict(next: { starsState, auctionState in
+    actionsDisposable.add(combineLatest(starsContext.state, auctionContext.state, regramLocalGiftsState(context: context)).startStrict(next: { starsState, auctionState, local in
         
         let previousState = stateValue.with { $0 }
         
         updateState { current in
             var current = current
-            current.myBalance = starsState?.balance.value ?? 0
+            current.myBalance = local.enabled ? local.balance : (starsState?.balance.value ?? 0)
             let myPreviousState = current.auctionState?.myState
             current.auctionState = auctionState
             
@@ -926,6 +930,14 @@ public func Star_AuctionBidController(context: (any AccountContextProtocol), pee
     
     
     let placeBid:(Int64)->Signal<SendBotPaymentResult, SendBotPaymentFormError> = { value in
+        if beganLocally || regramLocalGiftsEnabled(context: context) || regramIsLocalGift(.generic(gift)) {
+            switch regramBuyLocalGift(context: context, gift: .generic(gift), price: value) {
+            case .success:
+                alert(for: window, header: regramGiftString("LocalGifts.Success"), info: regramGiftString("LocalGifts.SuccessHint"), completion: { close?() })
+                return .complete()
+            case let .failure(error): return .fail(.serverProvided(regramGiftError(error)))
+            }
+        }
         let state = stateValue.with { $0 }
         
   
@@ -962,7 +974,8 @@ public func Star_AuctionBidController(context: (any AccountContextProtocol), pee
             default:
                 return .fail(.generic)
             }
-        } |> mapToSignal { inputData -> Signal<SendBotPaymentResult, SendBotPaymentFormError> in
+        } |> deliverOnMainQueue |> mapToSignal { inputData -> Signal<SendBotPaymentResult, SendBotPaymentFormError> in
+            guard !beganLocally, !regramLocalGiftsEnabled(context: context), !regramIsLocalGift(.generic(gift)) else { return .fail(.serverProvided(regramGiftString("LocalGifts.Disabled"))) }
             return context.engine.payments.sendStarsPaymentForm(formId: inputData.id, source: source)
         }
         

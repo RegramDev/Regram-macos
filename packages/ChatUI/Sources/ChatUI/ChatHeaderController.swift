@@ -19,6 +19,9 @@ import TelegramUtils
 import Strings
 import MessageUtils
 import InlineStickerLayer
+import RegramServices
+import RegramCore
+import InputDataUI
 
 
 
@@ -38,6 +41,23 @@ struct EmojiTag : Equatable {
 
 
 struct ChatHeaderState : Identifiable, Equatable {
+    struct Translation: Equatable {
+        let translate: Bool
+        let from: String?
+        let to: String
+        let paywall: Bool
+        let tone: TranslationTone
+
+        init?(_ state: ChatPresentationInterfaceState.TranslateState) {
+            guard RegramChatLanguagePolicy.canDisplay(source: state.from ?? "", target: state.to, interfaceLanguage: appCurrentLanguage.primaryLanguage.languageCode, active: state.translate) else { return nil }
+            translate = state.translate
+            from = state.from
+            to = state.to
+            paywall = state.paywall
+            tone = state.tone
+        }
+    }
+
     enum Value : Equatable {
         case none
         case search(ChatSearchInteractions, Peer?, String?, [EmojiTag]?, EmojiTag?, ChatLocation)
@@ -167,7 +187,7 @@ struct ChatHeaderState : Identifiable, Equatable {
 
     var main: Value
     var voiceChat: ChatActiveGroupCallInfo?
-    var translate: ChatPresentationInterfaceState.TranslateState?
+    var translate: Translation?
     var botManager: ChatBotManagerData?
     var botAd: BotAdMessage?
     var monoforumHorizontal: MonoforumData?
@@ -1058,7 +1078,7 @@ class ChatPinnedView : Control, ChatHeaderProtocol {
         self.dismiss.set(image: pinnedMessage.totalCount <= 1 ? theme.icons.chat_header_dismiss : theme.icons.chat_header_pinned_list, for: .Normal)
         self.dismiss.setAccessibilityLabel(pinnedMessage.totalCount <= 1 ? strings().voiceOverCommonClose : strings().chatTitlePinnedMessagesOther(Int(pinnedMessage.totalCount)))
         
-        if pinnedMessage.messageId != self.pinnedMessage?.messageId || translate != self.translate {
+        if pinnedMessage != self.pinnedMessage || translate != self.translate {
             let oldContainer = self.container
             let newContainer = ChatAccessoryView()
             newContainer.userInteractionEnabled = false
@@ -1163,7 +1183,7 @@ class ChatPinnedView : Control, ChatHeaderProtocol {
         }
         self.pinnedMessage = pinnedMessage
         self.translate = translate
-        updateLocalizationAndTheme(theme: theme)
+        applyAppearance(theme)
     }
     
     private func installReplyMarkup(_ button: ReplyMarkupButton, message: Message, animated: Bool) {
@@ -1235,6 +1255,10 @@ class ChatPinnedView : Control, ChatHeaderProtocol {
             node?.update()
         }
 
+        applyAppearance(theme)
+    }
+
+    private func applyAppearance(_ theme: TelegramPresentationTheme) {
         self.backgroundColor = .clear
         if let pinnedMessage = pinnedMessage {
             self.dismiss.set(image: pinnedMessage.totalCount <= 1 ? theme.icons.chat_header_dismiss : theme.icons.chat_header_pinned_list, for: .Normal)
@@ -2646,15 +2670,6 @@ private final class ChatTranslateHeader : Control, ChatHeaderProtocol {
         let menu = ContextMenu(betterInside: true)
         var items: [ContextMenuItem] = []
 
-        if translate.paywall {
-            items.append(ContextMenuItem(strings().chatTranslateMenuHide, handler: { [weak self] in
-                self?.chatInteraction.hideTranslation()
-            }, itemImage: MenuAnimation.menu_clear_history.value))
-            
-            menu.items = items
-            return menu
-        }
-        
         
         let other = ContextMenuItem(strings().chatTranslateMenuTo, itemImage: MenuAnimation.menu_translate.value)
         
@@ -2719,10 +2734,16 @@ private final class ChatTranslateHeader : Control, ChatHeaderProtocol {
         
         items.append(ContextSeparatorItem())
 
-        let item = ContextMenuItem(strings().chatTranslationPoweredByCocoon, handler: { [weak self] in
+        let context = chatInteraction.interactionContext
+        let provider = RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["translationBackend"].string
+        let language = appCurrentLanguage.primaryLanguage.languageCode
+        let providerTitle = regramLocalizedString("Settings.Translation.Backend", languageCode: language) + ": " + regramLocalizedString("Settings.Translation.Backend." + provider, languageCode: language)
+        let item = ContextMenuItem(providerTitle, handler: { [weak self] in
             guard let context = self?.chatInteraction.interactionContext else { return }
-            ChatUIHooks.shared.showAboutCocoonModal(context)
-        }, itemImage: MenuAnimation.menu_cocoon.value, removeTail: false, overrideWidth: 200)
+            if let controller = FeatureNavigationHooks.shared.makeRegramController(context, "settings.translation/translationBackend") {
+                context.bindings.rootNavigation().push(controller)
+            }
+        }, itemImage: MenuAnimation.menu_translate.value, removeTail: false, overrideWidth: 200)
 
         items.append(item)
         

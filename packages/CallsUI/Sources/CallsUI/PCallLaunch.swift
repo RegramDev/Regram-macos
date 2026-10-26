@@ -1,3 +1,4 @@
+import RegramCore
 import Cocoa
 import SwiftSignalKit
 import TelegramCore
@@ -24,6 +25,26 @@ public func phoneCall(context: any AccountContextProtocol, peerId:PeerId, ignore
 }
 
 public func phoneCall(account: Account, sharedContext: any SharedAccountContextProtocol, window: Window?, peerId:PeerId, ignoreSame:Bool = false, isVideo: Bool = false) -> Signal<PCallResult, NoError> {
+    let settings = RegramPreferences.shared.settings(accountId: account.peerId.toInt64())
+    guard settings["confirmCalls"].bool else {
+        return performPhoneCall(account: account, sharedContext: sharedContext, window: window, peerId: peerId, ignoreSame: ignoreSame, isVideo: isVideo)
+    }
+    return account.postbox.transaction { $0.getPeer(peerId) }
+    |> deliverOnMainQueue
+    |> mapToSignal { peer -> Signal<PCallResult, NoError> in
+        guard let window = window ?? CallsCoreHooks.shared.activeWindow() else { return .single(.fail) }
+        let language = appCurrentLanguage.primaryLanguage.languageCode
+        let format = regramLocalizedString(isVideo ? "profile.confirmVideoCall" : "profile.confirmVoiceCall", languageCode: language)
+        let information = String(format: format, peer?.displayTitle ?? "")
+        return verifyAlertSignal(for: window, information: information, ok: strings().modalYes, completeWhenDismissed: true)
+        |> mapToSignal { result -> Signal<PCallResult, NoError> in
+            guard result == .basic else { return .single(.fail) }
+            return performPhoneCall(account: account, sharedContext: sharedContext, window: window, peerId: peerId, ignoreSame: ignoreSame, isVideo: isVideo)
+        }
+    }
+}
+
+private func performPhoneCall(account: Account, sharedContext: any SharedAccountContextProtocol, window: Window?, peerId: PeerId, ignoreSame: Bool, isVideo: Bool) -> Signal<PCallResult, NoError> {
     
     let alertWindow = window ?? CallsCoreHooks.shared.activeWindow()
     

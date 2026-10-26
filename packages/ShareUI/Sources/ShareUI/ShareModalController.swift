@@ -1,4 +1,6 @@
 import Cocoa
+import RegramCore
+import RegramSignals
 import TGUIKit
 import SwiftSignalKit
 import TelegramCore
@@ -966,9 +968,9 @@ public class ShareStoryObject : ShareObject {
         
         let needRepost = peerIds.contains(where: { $0.id._internalGetInt64Value() == 1000 && $0.namespace._internalGetInt32Value() == 7 })
         
-        let peerIds = peerIds.filter { $0.id._internalGetInt64Value() != 1000 && $0.namespace._internalGetInt32Value() != 7 }
+        let peerIds = peerIds.filter { !($0.id._internalGetInt64Value() == 1000 && $0.namespace._internalGetInt32Value() == 7) }
         
-        if needRepost {
+        if needRepost && RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["showRepostToStoryV2"].bool {
             self.repostAction()
         }
         
@@ -1154,6 +1156,7 @@ public enum ForwardMessagesResult {
 
 public final class ForwardMessagesObject : ShareObject {
     fileprivate let messages: [Message]
+    private let hideNames: Bool
     
     public var messageIds: [MessageId] {
         return messages.map { $0.id }
@@ -1162,9 +1165,10 @@ public final class ForwardMessagesObject : ShareObject {
     private let album: Bool
     private let getMessages:(([MessageId], Bool)->Signal<[Message], NoError>)?
 
-    public init(_ context: any AccountContextProtocol, messages: [Message], emptyPerformOnClose: Bool = false, album: Bool = false, getMessages:(([MessageId], Bool)->Signal<[Message], NoError>)? = nil) {
+    public init(_ context: any AccountContextProtocol, messages: [Message], emptyPerformOnClose: Bool = false, album: Bool = false, hideNames: Bool = false, getMessages:(([MessageId], Bool)->Signal<[Message], NoError>)? = nil) {
 
         self.messages = messages
+        self.hideNames = hideNames
         self.album = album
         self.getMessages = getMessages
         super.init(context, emptyPerformOnClose: emptyPerformOnClose)
@@ -1215,7 +1219,7 @@ public final class ForwardMessagesObject : ShareObject {
 
     private func performForward(to peerIds: [PeerId], threadId: Int64?, comment: ChatTextInputState?, sendPaidMessageStars: [PeerId: StarsAmount], observedResult: ((ForwardMessagesResult) -> Void)? = nil) -> Signal<Never, String> {
         
-        if peerIds.count == 1 {
+        if peerIds.count == 1 && !hideNames {
             let context = self.context
             let album = self.album
             let messageIds = self.messageIds
@@ -1368,7 +1372,7 @@ public final class ForwardMessagesObject : ShareObject {
             
             let context = self.context
             let messageIds = self.messageIds
-            var signals: [Signal<[MessageId?], NoError>] = []
+            var signals: [Signal<ShareRecipientDelivery, NoError>] = []
             let attrs:(PeerId)->[MessageAttribute] = { [weak self] peerId in
                 return self?.attributes(peerId, sendPaidMessageStars: sendPaidMessageStars[peerId]) ?? []
             }
@@ -1387,7 +1391,7 @@ public final class ForwardMessagesObject : ShareObject {
                 let threadId = threadIds[peerId] ?? threadId
                 
                 signals.append(viewSignal |> mapToSignal { (peer, sendAs) in
-                    let forward: Signal<[MessageId?], NoError> = Sender.forwardMessages(messageIds: messageIds, context: context, peerId: peerId, replyId: nil, threadId: threadId, silent: FastSettings.isChannelMessagesMuted(peerId) || withoutSound, atDate: date, sendAsPeerId: sendAs)
+                    let forward: Signal<[MessageId?], NoError> = Sender.forwardMessages(messageIds: messageIds, context: context, peerId: peerId, replyId: nil, threadId: threadId, hideNames: self.hideNames, hideCaptions: false, silent: FastSettings.isChannelMessagesMuted(peerId) || withoutSound, atDate: date, sendAsPeerId: sendAs, sendPaidMessageStars: sendPaidMessageStars[peerId])
                     var caption: Signal<[MessageId?], NoError>?
                     if let comment = comment, !comment.inputText.isEmpty, peer.canSendMessage() {
                         let parsingUrlType: ParsingType
@@ -1405,14 +1409,24 @@ public final class ForwardMessagesObject : ShareObject {
                         
                         caption = Sender.enqueue(message: EnqueueMessage.message(text: comment.inputText, attributes: attributes, inlineStickers: [:], mediaReference: nil, threadId: threadId, replyToMessageId: nil, replyToStoryId: nil, localGroupingKey: nil, correlationId: nil, bubbleUpEmojiOrStickersets: []), context: context, peerId: peerId)
                     }
-                    if let caption = caption {
-                        return (caption |> then(forward))
-                    } else {
-                        return (forward)
+                    let expectedCommentCount = caption == nil ? 0 : 1
+                    let commentResult: Signal<[MessageId?]?, NoError> = caption.map { shareFirstResult($0 |> map(Optional.some), or: nil) } ?? .single(nil)
+                    return commentResult |> mapToSignal { commentIds in
+                        shareFirstResult(forward |> map(Optional.some), or: nil) |> map { forwardedIds in
+                            ShareRecipientDelivery(peerId: peerId, comment: expectedCommentCount == 0 ? nil : ShareDeliveryPart(expectedCount: expectedCommentCount, result: commentIds), content: ShareDeliveryPart(expectedCount: messageIds.count, result: forwardedIds))
+                        }
                     }
                 })
             }
             return combineLatest(signals)
+            |> map { deliveries in
+                switch SharePickerResult(deliveries: deliveries) {
+                case .accepted: observedResult?(.accepted)
+                case .partiallyAccepted: observedResult?(.partiallyAccepted)
+                case .rejected: observedResult?(.rejected)
+                default: observedResult?(.acceptanceUnknown)
+                }
+            }
             |> castError(String.self)
             |> ignoreValues
         }
@@ -2339,12 +2353,13 @@ public class ShareModalController: ModalViewController, Notifable, TableViewDele
         
         if share.hasFolders {
             var first: Bool = true
-            let filterView = chatListFilterPreferences(engine: context.engine) |> deliverOnMainQueue
-            filterDisposable.set(filterView.start(next: { filters in
+            let filterView = combineLatest(chatListFilterPreferences(engine: context.engine), regramPreferenceChanges(accountId: context.peerId.toInt64())) |> deliverOnMainQueue
+            filterDisposable.set(filterView.start(next: { filters, settings in
                 updateFilter( { current in
                     var current = current
-                    current = current.withUpdatedTabs(filters.list)
-                    if !first, let updated = filters.list.first(where: { ShareUIHooks.shared.chatListFilterId($0) == ShareUIHooks.shared.chatListFilterId(current.filter) }) {
+                    let showFolders = settings["features.showFoldersInShareSheet"].bool
+                    current = current.withUpdatedTabs(showFolders ? filters.list : [])
+                    if showFolders, !first, let updated = filters.list.first(where: { ShareUIHooks.shared.chatListFilterId($0) == ShareUIHooks.shared.chatListFilterId(current.filter) }) {
                         current = current.withUpdatedFilter(updated)
                     } else {
                         current = current.withUpdatedFilter(.allChats)
@@ -2376,7 +2391,7 @@ public class ShareModalController: ModalViewController, Notifable, TableViewDele
         }
         
         
-        let list:Signal<TableUpdateTransition, NoError> = combineLatest(queue: prepareQueue, search.get() |> distinctUntilChanged, destinationPeerId.get(), multipleSelection.get(), chatList) |> mapToSignal { query, destinationPeerId, multipleSelection, chatList -> Signal<TableUpdateTransition, NoError> in
+        let list:Signal<TableUpdateTransition, NoError> = combineLatest(queue: prepareQueue, search.get() |> distinctUntilChanged, destinationPeerId.get(), multipleSelection.get(), chatList, regramPreferenceChanges(accountId: context.peerId.toInt64())) |> mapToSignal { query, destinationPeerId, multipleSelection, chatList, _ -> Signal<TableUpdateTransition, NoError> in
             
             if query.request.isEmpty {
                 if !multipleSelection && query.state == .Focus && destinationPeerId == nil {
@@ -2470,7 +2485,7 @@ public class ShareModalController: ModalViewController, Notifable, TableViewDele
                         
                         var offset: Int32 = Int32.max
                         
-                        if let additionTopItems = share.additionTopItems {
+                        if let additionTopItems = share.additionTopItems, !(share is ShareStoryObject) || RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["showRepostToStoryV2"].bool {
                             var index = ChatListIndex(pinningIndex: 0, messageIndex: MessageIndex(id: MessageId(peerId: PeerId(0), namespace: 0, id: offset), timestamp: offset))
 
                             if !additionTopItems.topSeparator.isEmpty {

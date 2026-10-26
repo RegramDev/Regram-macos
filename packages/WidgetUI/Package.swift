@@ -15,6 +15,7 @@ let deps: [(String, String)] = [
     ("AvatarUI", "../AvatarUI"),
     ("QuickSwitcher", "../QuickSwitcher"),
     ("SettingsUI", "../SettingsUI"),
+    ("RegramServices", "../RegramServices"),
     ("StickerSettingsUI", "../StickerSettingsUI"),
     ("PremiumUI", "../PremiumUI"),
 ]

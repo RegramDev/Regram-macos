@@ -1,3 +1,5 @@
+import RegramCore
+import RegramSignals
 import Cocoa
 import TGUIKit
 import TelegramCore
@@ -16,6 +18,7 @@ import AlertsUI
 import LocalAnimations
 import ProxyUtils
 import ChatModeTypes
+import ChatHistoryModel
 import CurrencyFormat
 
 
@@ -136,8 +139,13 @@ private final class AnyUpdateStateEquatable  : Equatable {
 }
 
 
+private struct AccountStarsBalance: Equatable {
+    let amount: StarsAmount
+    let isLocal: Bool
+}
+
 private enum AccountInfoEntry<Context: AccountContextProtocol> : TableItemListNodeEntry {
-    case info(index:Int, viewType: GeneralViewType, PeerEquatable, EngineStorySubscriptions.Item?)
+    case info(index:Int, viewType: GeneralViewType, PeerEquatable, EngineStorySubscriptions.Item?, regramRevision: Int64)
     case setStatus(index:Int, viewType: GeneralViewType, PeerEquatable)
     case setProfileColor(index:Int, viewType: GeneralViewType, PeerEquatable)
     case set2FaAlert(index:Int, viewType: GeneralViewType)
@@ -147,9 +155,10 @@ private enum AccountInfoEntry<Context: AccountContextProtocol> : TableItemListNo
     case proxy(index: Int, viewType: GeneralViewType, status: String?)
     case stories(index: Int, viewType: GeneralViewType)
     case attach(index: Int, AttachMenuBot, viewType: GeneralViewType)
+    case regram(index: Int, viewType: GeneralViewType)
     case general(index: Int, viewType: GeneralViewType)
     case stickers(index: Int, viewType: GeneralViewType)
-    case notifications(index: Int, viewType: GeneralViewType, status: NotificationAuthorizationStatus)
+    case notifications(index: Int, viewType: GeneralViewType, status: NotificationAuthorizationStatus, hidePermissionWarning: Bool)
     case language(index: Int, viewType: GeneralViewType, current: String)
     case appearance(index: Int, viewType: GeneralViewType)
     case privacy(index: Int, viewType: GeneralViewType, AccountPrivacySettings?, TwoStepVeriticationAccessConfiguration?, WebSessionsContextState)
@@ -161,7 +170,7 @@ private enum AccountInfoEntry<Context: AccountContextProtocol> : TableItemListNo
     case premium(index: Int, viewType: GeneralViewType)
     case business(index: Int, viewType: GeneralViewType)
     case giftPremium(index: Int, viewType: GeneralViewType)
-    case stars(index: Int, count: StarsAmount, viewType: GeneralViewType)
+    case stars(index: Int, count: AccountStarsBalance, viewType: GeneralViewType)
     case ton(index: Int, count: StarsAmount, viewType: GeneralViewType)
     case wallet(index: Int, balance: Int64?, viewType: GeneralViewType)
     case about(index: Int, viewType: GeneralViewType)
@@ -188,6 +197,8 @@ private enum AccountInfoEntry<Context: AccountContextProtocol> : TableItemListNo
             return .index(5)
         case .stories:
             return .index(6)
+        case .regram:
+            return .index(-100)
         case .general:
             return .index(7)
         case .proxy:
@@ -239,7 +250,7 @@ private enum AccountInfoEntry<Context: AccountContextProtocol> : TableItemListNo
     
     var index:Int {
         switch self {
-        case let .info(index, _, _, _):
+        case let .info(index, _, _, _, _):
             return index
         case let .setStatus(index, _, _):
             return index
@@ -257,13 +268,15 @@ private enum AccountInfoEntry<Context: AccountContextProtocol> : TableItemListNo
             return index
         case let .attach(index, _, _):
             return index
+        case let .regram(index, _):
+            return index
         case let  .general(index, _):
             return index
         case let  .proxy(index, _, _):
             return index
         case let .stickers(index, _):
             return index
-        case let .notifications(index, _, _):
+        case let .notifications(index, _, _, _):
             return index
         case let .language(index, _, _):
             return index
@@ -310,7 +323,7 @@ private enum AccountInfoEntry<Context: AccountContextProtocol> : TableItemListNo
     
     func item(_ arguments: AccountInfoArguments<Context>, initialSize: NSSize) -> TableRowItem {
         switch self {
-        case let .info(_, viewType, peer, storyStats):
+        case let .info(_, viewType, peer, storyStats, _):
             return AccountInfoItem(initialSize, stableId: stableId, viewType: viewType, inset: NSEdgeInsets(left: 12, right: 12), context: arguments.context, peer: peer.peer as! TelegramUser, storyStats: storyStats, action: {
                 let first: Atomic<Bool> = Atomic(value: true)
                 EditAccountInfoController(context: arguments.context, f: { controller in
@@ -360,6 +373,12 @@ private enum AccountInfoEntry<Context: AccountContextProtocol> : TableItemListNo
             return GeneralInteractedRowItem(initialSize, stableId: stableId, name: strings().accountSettingsAddAccount, nameStyle: ControlStyle(font: .normal(.title), foregroundColor: theme.colors.accentIcon), type: .none, viewType: viewType, action: {
                 arguments.addAccount(accounts)
             }, thumb: GeneralThumbAdditional(thumb: theme.icons.account_add_account, textInset: 35, thumbInset: 0), inset:NSEdgeInsets(left: 12, right: 12), customTheme: .initialize(theme, background: .clear))
+        case let .regram(_, viewType):
+            return GeneralInteractedRowItem(initialSize, stableId: stableId, name: "Regram Pro", icon: FeatureNavigationHooks.shared.regramSettingsIcon() ?? theme.icons.settingsGeneral, type: .next, viewType: viewType, action: {
+                if let controller = FeatureNavigationHooks.shared.makeRegramController(arguments.context, nil) {
+                    arguments.presentController(controller, true)
+                }
+            }, inset: NSEdgeInsets(left: 12, right: 12), customTheme: .initialize(theme, background: .clear))
         case let .general(_, viewType):
             return GeneralInteractedRowItem(initialSize, stableId: stableId, name: strings().accountSettingsGeneral, icon: theme.icons.settingsGeneral, activeIcon: theme.icons.settingsGeneralActive, type: .next, viewType: viewType, action: {
                 arguments.presentController(GeneralSettingsViewController(arguments.context), true)
@@ -414,8 +433,8 @@ private enum AccountInfoEntry<Context: AccountContextProtocol> : TableItemListNo
             return GeneralInteractedRowItem(initialSize, stableId: stableId, name: strings().accountSettingsStickersAndEmoji, icon: theme.icons.settingsStickers, activeIcon: theme.icons.settingsStickersActive, type: .next, viewType: viewType, action: {
                 arguments.presentController(SettingsNavigationHooks.shared.makeInstalledStickerPacksController(arguments.context, nil), true)
             }, inset:NSEdgeInsets(left: 12, right: 12), customTheme: .initialize(theme, background: .clear))
-        case let .notifications(_, viewType, status):
-            return GeneralInteractedRowItem(initialSize, stableId: stableId, name: strings().accountSettingsNotifications, icon: theme.icons.settingsNotifications, activeIcon: theme.icons.settingsNotificationsActive, type: status == .denied ? .image(TelegramThemeHooks.shared.image(.iconMessageSentFailed).precomposed()) : .next, viewType: viewType, action: {
+        case let .notifications(_, viewType, status, hidePermissionWarning):
+            return GeneralInteractedRowItem(initialSize, stableId: stableId, name: strings().accountSettingsNotifications, icon: theme.icons.settingsNotifications, activeIcon: theme.icons.settingsNotificationsActive, type: status == .denied && !hidePermissionWarning ? .image(TelegramThemeHooks.shared.image(.iconMessageSentFailed).precomposed()) : .next, viewType: viewType, action: {
                 arguments.presentController(NotificationPreferencesController(arguments.context), true)
             }, inset:NSEdgeInsets(left: 12, right: 12), customTheme: .initialize(theme, background: .clear))
         case let .language(_, viewType, current):
@@ -458,7 +477,7 @@ private enum AccountInfoEntry<Context: AccountContextProtocol> : TableItemListNo
         case let .giftPremium(_, viewType):
             return GeneralInteractedRowItem(initialSize, stableId: stableId, name: strings().accountSettingsSendGift, icon: theme.icons.settingsGiftPremium, activeIcon: theme.icons.settingsGiftPremium, type: .next, viewType: viewType, action: arguments.giftPremium, inset:NSEdgeInsets(left: 12, right: 12), customTheme: .initialize(theme, background: .clear))
         case let .stars(_, stars, viewType):
-            return GeneralInteractedRowItem(initialSize, stableId: stableId, name: strings().accountSettingsStars, icon: theme.icons.settingsStars, activeIcon: theme.icons.settingsStars, type: .nextContext(stars.value > 0 ? "\(stars.stringValue)" : ""), viewType: viewType, action: arguments.stars, inset:NSEdgeInsets(left: 12, right: 12), customTheme: .initialize(theme, background: .clear))
+            return GeneralInteractedRowItem(initialSize, stableId: stableId, name: strings().accountSettingsStars, icon: theme.icons.settingsStars, activeIcon: theme.icons.settingsStars, type: .nextContext(stars.isLocal || stars.amount.value > 0 ? stars.amount.stringValue : ""), viewType: viewType, action: arguments.stars, inset:NSEdgeInsets(left: 12, right: 12), customTheme: .initialize(theme, background: .clear))
         case let .ton(_, ton, viewType):
             return GeneralInteractedRowItem(initialSize, stableId: stableId, name: strings().accountViewControllerGramEarnings, icon: theme.icons.settingsWallet, activeIcon: theme.icons.settingsWalletActive, type: .nextContext(ton.value > 0 ? "\(ton.string(.ton))" : ""), viewType: viewType, action: arguments.ton, inset:NSEdgeInsets(left: 12, right: 12), customTheme: .initialize(theme, background: .clear))
         case let .wallet(_, balance, viewType):
@@ -521,7 +540,7 @@ private func settingsMoneyIcon() -> CGImage? {
     return image.precomposed(flipVertical: true)
 }
 
-private func accountInfoEntries<Context: AccountContextProtocol>(peerView:PeerView, context: Context, accounts: [AccountWithInfo], language: TelegramLocalization, privacySettings: AccountPrivacySettings?, webSessions: WebSessionsContextState, proxySettings: (ProxySettings, ConnectionStatus), passportVisible: Bool, appUpdateState: Any?, hasFilters: Bool, sessionsCount: Int, unAuthStatus: NotificationAuthorizationStatus, has2fa: Bool, twoStepConfiguration: TwoStepVeriticationAccessConfiguration?, storyStats: EngineStorySubscriptions?, attachMenuBots: [AttachMenuBot], stars: StarsContext.State?, ton: StarsContext.State?, walletBalance: Int64?) -> [AccountInfoEntry<Context>] {
+private func accountInfoEntries<Context: AccountContextProtocol>(peerView:PeerView, context: Context, accounts: [AccountWithInfo], language: TelegramLocalization, privacySettings: AccountPrivacySettings?, webSessions: WebSessionsContextState, proxySettings: (ProxySettings, ConnectionStatus), passportVisible: Bool, appUpdateState: Any?, hasFilters: Bool, sessionsCount: Int, unAuthStatus: NotificationAuthorizationStatus, has2fa: Bool, twoStepConfiguration: TwoStepVeriticationAccessConfiguration?, storyStats: EngineStorySubscriptions?, attachMenuBots: [AttachMenuBot], stars: AccountStarsBalance?, ton: StarsContext.State?, walletBalance: Int64?) -> [AccountInfoEntry<Context>] {
     var entries:[AccountInfoEntry<Context>] = []
     
     var index:Int = 0
@@ -529,7 +548,7 @@ private func accountInfoEntries<Context: AccountContextProtocol>(peerView:PeerVi
     if let peer = peerViewMainPeer(peerView) as? TelegramUser {
 //        entries.append(.whiteSpace(index: index, height: 20))
 //        index += 1
-        entries.append(.info(index: index, viewType: .singleItem, PeerEquatable(peer), storyStats?.accountItem))
+        entries.append(.info(index: index, viewType: .singleItem, PeerEquatable(peer), storyStats?.accountItem, regramRevision: RegramPreferences.shared.revision(accountId: context.peerId.toInt64())))
         index += 1
         
 //        entries.append(.whiteSpace(index: index, height: 20))
@@ -650,9 +669,11 @@ private func accountInfoEntries<Context: AccountContextProtocol>(peerView:PeerVi
     entries.append(.whiteSpace(index: index, height: 10))
     index += 1
     
+    entries.append(.regram(index: index, viewType: .singleItem))
+    index += 1
     entries.append(.general(index: index, viewType: .singleItem))
     index += 1
-    entries.append(.notifications(index: index, viewType: .singleItem, status: unAuthStatus))
+    entries.append(.notifications(index: index, viewType: .singleItem, status: unAuthStatus, hidePermissionWarning: RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["features.hideTabBarPermissionWarnings"].bool))
     index += 1
     entries.append(.privacy(index: index, viewType: .singleItem, privacySettings, twoStepConfiguration, webSessions))
     index += 1
@@ -697,7 +718,7 @@ private func accountInfoEntries<Context: AccountContextProtocol>(peerView:PeerVi
         let stars_purchase_blocked = context.appConfiguration.getBoolValue("stars_purchase_blocked", orElse: true)
         
         if !stars_purchase_blocked, let stars  {
-            entries.append(.stars(index: index, count: stars.balance, viewType: .singleItem))
+            entries.append(.stars(index: index, count: stars, viewType: .singleItem))
             index += 1
         }
         
@@ -1101,6 +1122,12 @@ open class AccountViewController<Context: AccountContextProtocol> : TelegramGene
             guard let self else { return }
             SettingsNavigationHooks.shared.openWebBotObserved(context, bot)
         }, stars: { [weak self] in
+            if regramLocalGiftsEnabled(context: context) {
+                if let controller = FeatureNavigationHooks.shared.makeRegramController(context, "localGifts/balance") {
+                    self?.arguments?.presentController(controller, true)
+                }
+                return
+            }
             SettingsNavigationHooks.shared.showStarsList(context, .stars, { [weak self] in (self?.tableView.item(stableId: AccountInfoEntryId.index(22))?.view as? GeneralContainableRowView)?.containerView })
         }, ton: { [weak self] in
             SettingsNavigationHooks.shared.showStarsList(context, .ton, { [weak self] in (self?.tableView.item(stableId: AccountInfoEntryId.index(23))?.view as? GeneralContainableRowView)?.containerView })
@@ -1193,7 +1220,14 @@ open class AccountViewController<Context: AccountContextProtocol> : TelegramGene
             walletBalance = .single(nil)
         }
 
-        let apply = combineLatest(queue: prepareQueue, context.account.viewTracker.peerView(context.account.peerId), context.sharedContext.activeAccountsWithInfo, appearanceSignal, settings.get(), appUpdateState, hasFilters.get(), sessionsCount, SettingsHooks.shared.authorizationStatus(context), twoStep, storyStats, acceptBots.get(), context.starsContext.state, context.tonContext.state, walletBalance) |> map { peerView, accounts, appearance, settings, appUpdateState, hasFilters, sessionsCount, unAuthStatus, twoStepConfiguration, storyStats, attachMenuBots, stars, ton, walletBalance -> TableUpdateTransition in
+        let starsBalance = combineLatest(context.starsContext.state, regramLocalGiftsState(context: context)) |> map { remote, local -> AccountStarsBalance? in
+            if local.enabled {
+                return AccountStarsBalance(amount: StarsAmount(value: local.balance, nanos: 0), isLocal: true)
+            }
+            return remote.map { AccountStarsBalance(amount: $0.balance, isLocal: false) }
+        } |> distinctUntilChanged
+
+        let apply = combineLatest(queue: prepareQueue, context.account.viewTracker.peerView(context.account.peerId), context.sharedContext.activeAccountsWithInfo, combineLatest(appearanceSignal, regramPreferenceChanges(accountId: context.peerId.toInt64())) |> map { appearance, _ in appearance }, settings.get(), appUpdateState, hasFilters.get(), sessionsCount, SettingsHooks.shared.authorizationStatus(context), twoStep, storyStats, acceptBots.get(), starsBalance, context.tonContext.state, walletBalance) |> map { peerView, accounts, appearance, settings, appUpdateState, hasFilters, sessionsCount, unAuthStatus, twoStepConfiguration, storyStats, attachMenuBots, stars, ton, walletBalance -> TableUpdateTransition in
             let entries = accountInfoEntries(peerView: peerView, context: context, accounts: accounts.accounts, language: appearance.language, privacySettings: settings.0, webSessions: settings.1, proxySettings: settings.2, passportVisible: settings.3.0, appUpdateState: appUpdateState, hasFilters: hasFilters, sessionsCount: sessionsCount, unAuthStatus: unAuthStatus, has2fa: settings.3.1, twoStepConfiguration: twoStepConfiguration, storyStats: storyStats, attachMenuBots: attachMenuBots, stars: stars, ton: ton, walletBalance: walletBalance).map {AppearanceWrapperEntry(entry: $0, appearance: appearance)}
             var size = atomicSize.modify {$0}
             size.width = max(size.width, 280)
@@ -1219,7 +1253,17 @@ open class AccountViewController<Context: AccountContextProtocol> : TelegramGene
     
     open override func navigationWillChangeController() {
         if let navigation = navigation as? MajorNavigationController {
-            if (navigation.controller as? SettingsSectionController)?.settingsSection == .dataAndStorage {
+            var isRegram = false
+            navigation.enumerateControllers { controller, _ in
+                guard let controller = controller as? InputDataController, controller.identifier.hasPrefix("regram.") else { return false }
+                isRegram = true
+                return true
+            }
+            if isRegram {
+                if let item = tableView.item(stableId: AnyHashable(AccountInfoEntryId.index(-100))) {
+                    _ = tableView.select(item: item)
+                }
+            } else if (navigation.controller as? SettingsSectionController)?.settingsSection == .dataAndStorage {
                 if let item = tableView.item(stableId: AnyHashable(AccountInfoEntryId.index(10))) {
                     _ = tableView.select(item: item)
                 }

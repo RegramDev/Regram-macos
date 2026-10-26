@@ -110,12 +110,14 @@ fi
 #    third-party: td/dav1d/mozjpeg/ffmpeg, etc.). Requires SSH access to
 #    github.com/gitlab.com, or HTTPS rewrites configured for those hosts.
 # ---------------------------------------------------------------------------
-log "Initialising git submodules (recursive)"
-if ! git -C "$REPO_DIR" submodule update --init --recursive; then
+log "Initialising native app submodules (recursive)"
+if ! git -C "$REPO_DIR" submodule update --init --recursive -- submodules/libtgvoip submodules/Sparkle submodules/telegram-ios submodules/rlottie submodules/tgcalls submodules/tg_owt submodules/libprisma submodules/regex submodules/tlottie; then
   warn "Submodule init failed. If you have no SSH keys for github/gitlab, enable HTTPS rewrites:"
   warn '    git config --global url."https://github.com/".insteadOf "git@github.com:"'
   warn '    git config --global url."https://gitlab.com/".insteadOf "git@gitlab.com:"'
   warn "then re-run this script."
+else
+  bash "$REPO_DIR/scripts/prepare-regram-core.sh"
 fi
 
 # ---------------------------------------------------------------------------

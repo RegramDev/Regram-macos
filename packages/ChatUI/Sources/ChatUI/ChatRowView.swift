@@ -1,4 +1,6 @@
 import Cocoa
+import InputDataUI
+import RegramCore
 import TGUIKit
 import TelegramCore
 import TGModernGrowingTextView
@@ -349,6 +351,7 @@ public class ChatRowView: TableRowView, Notifable, MultipleSelectable, ChatTextS
     public private(set) var captionShimmerViews: [CaptionShimmerView] = []
     
     private var shareView:ImageButton?
+    private var regramQuickTranslateView: RegramQuickTranslationButton?
     private var shareVisibleForCurrentItem: Bool = false
     private var reactionsView:ChatReactionsView?
     private var channelCommentsBubbleControl: ChannelCommentsBubbleControl?
@@ -726,6 +729,13 @@ public class ChatRowView: TableRowView, Notifable, MultipleSelectable, ChatTextS
     
     public override func mouseUp(with event: NSEvent) {
         super.mouseUp(with: event)
+        if event.clickCount == 1, !mouseDragged, let item = item as? ChatRowItem, item.message != nil,
+           !item.chatInteraction.isLogInteraction, !item.sending, item.chatInteraction.presentation.state == .normal,
+           RegramPreferences.shared.settings(accountId: item.context.peerId.toInt64())["features.tapMessageRowToOpenContextMenu"].bool,
+           !NSPointInRect(convert(event.locationInWindow, from: nil), rightView.frame) {
+            showContextMenu(event)
+            return
+        }
         
         if let item = item as? ChatRowItem, !item.chatInteraction.isLogInteraction && !item.chatInteraction.disableSelectAbility, !item.sending {
             if item.chatInteraction.presentation.state != .selecting {
@@ -781,6 +791,9 @@ public class ChatRowView: TableRowView, Notifable, MultipleSelectable, ChatTextS
     }
     
     public override func updateMouse(animated: Bool) {
+        if let item = item as? ChatRowItem {
+            regramQuickTranslateView?.isHidden = contextMenu != nil || item.chatInteraction.presentation.state == .selecting
+        }
         if let item = item as? ChatRowItem {
             let shouldBeVisible = shareVisibleForCurrentItem
                 && mouseInsideRow()
@@ -1308,8 +1321,34 @@ public class ChatRowView: TableRowView, Notifable, MultipleSelectable, ChatTextS
         } else {
             let rightFrame = self.rightFrame(item)
             point = NSMakePoint(frame.width - 20.0 - size.width, rightFrame.maxY)
+            if item.regramCanQuickTranslate, item.shareVisible || item.hasSource {
+                point.y = max(34, point.y)
+            }
         }
         return point
+    }
+
+    private func regramQuickTranslateFrame(_ item: ChatRowItem) -> CGRect {
+        let shareSize = shareView?.frame.size ?? NSMakeSize(floorToScreenPixels(backingScaleFactor, 31.5), floorToScreenPixels(backingScaleFactor, 31.5))
+        let shareFrame = CGRect(origin: shareViewPoint(item), size: shareSize)
+        return ChatRowGeometry.quickTranslationFrame(shareFrame: shareFrame, stacked: item.shareVisible || item.hasSource, rowHeight: item.height)
+    }
+
+    private func updateRegramQuickTranslate(_ item: ChatRowItem) {
+        if item.regramCanQuickTranslate {
+            let view: RegramQuickTranslationButton
+            if let current = regramQuickTranslateView { view = current }
+            else {
+                view = RegramQuickTranslationButton(frame: regramQuickTranslateFrame(item))
+                regramQuickTranslateView = view
+                rowView.addSubview(view)
+            }
+            view.update(item)
+            view.isHidden = item.chatInteraction.presentation.state == .selecting
+        } else {
+            regramQuickTranslateView?.removeFromSuperview()
+            regramQuickTranslateView = nil
+        }
     }
     
 
@@ -1464,10 +1503,30 @@ public class ChatRowView: TableRowView, Notifable, MultipleSelectable, ChatTextS
                         chatInteraction?.openInfoFromMessage(peer.id, true, nil, nil, message: item.message)
                     }, itemImage: MenuAnimation.menu_read.value))
 
+                    let group: Bool
+                    if item.chatInteraction.peer is TelegramGroup {
+                        group = true
+                    } else if let channel = item.chatInteraction.peer as? TelegramChannel, case .group = channel.info {
+                        group = true
+                    } else {
+                        group = false
+                    }
+                    if group {
+                        menu.addItem(ContextMenuItem(regramLocalizedString("ContextMenu.viewAuthorMessages", languageCode: appAppearance.languageCode), handler: {
+                            guard let interaction = chatInteraction else { return }
+                            let route = "authorMessages/\(interaction.peerId.toInt64())/\(peer.id.toInt64())/\(interaction.chatLocation.threadId ?? 0)"
+                            if let controller = FeatureNavigationHooks.shared.makeRegramController(interaction.interactionContext, route) {
+                                interaction.interactionContext.bindings.rootNavigation().push(controller)
+                            }
+                        }, itemImage: MenuAnimation.menu_search.value))
+                    }
+
                     menu.addItem(ContextMenuItem(strings().chatContextPeerMention, handler: {
                         let attr: NSMutableAttributedString = NSMutableAttributedString()
-
-                        if let addressName = peer.addressName {
+                        let enabled = chatInteraction.map { RegramPreferences.shared.settings(accountId: $0.interactionContext.peerId.toInt64())["mentionAsUserIdLink"].bool } ?? false
+                        if let nickname = regramNicknameMentionText(peer: peer, suffix: " ", enabled: enabled) {
+                            attr.append(nickname)
+                        } else if let addressName = peer.addressName {
                             attr.append(string: "@\(addressName) ", font: .normal(theme.fontSize))
                         } else {
                             attr.append(string: peer.compactDisplayTitle + " ", font: .normal(theme.fontSize))
@@ -2449,12 +2508,16 @@ public class ChatRowView: TableRowView, Notifable, MultipleSelectable, ChatTextS
         
         renderLayoutType(item, animated: animated)
 
+        updateRegramQuickTranslate(item)
         updateInteractionObserver(item.chatInteraction)
         
         updateSelectingState(selectingMode:item.chatInteraction.presentation.selectionState != nil, item: item, needUpdateColors: false)
         
         rightView.set(item:item, animated:animated)
         updateRightHosting(item)
+        rightView.isHidden = item.hidesStickerTimestamp
+        rightView.contentLayer.isHidden = item.hidesStickerTimestamp
+        if item.hidesStickerTimestamp { rightToolTip?.remove() }
         fillTopicLink(item, animated: animated)
         fillReply(item, animated: animated)
         fillName(item, animated: animated)
@@ -2498,7 +2561,9 @@ public class ChatRowView: TableRowView, Notifable, MultipleSelectable, ChatTextS
     
     public override func doubleClick(in location: NSPoint) {
         if let item = self.item as? ChatRowItem, isAllowedToDoubleAction(location), let message = item.message {
-            item.chatInteraction.setupReplyMessage(message, .init(messageId: message.id, quote: nil, innerSubject: nil))
+            if !regramHandleMessageDoubleClick(item, view: self, location: location) {
+                item.chatInteraction.setupReplyMessage(message, .init(messageId: message.id, quote: nil, innerSubject: nil))
+            }
         }
     }
     
@@ -2666,6 +2731,9 @@ public class ChatRowView: TableRowView, Notifable, MultipleSelectable, ChatTextS
 
         if let view = shareView {
             transition.updateFrame(view: view, frame: CGRect(origin: shareViewPoint(item), size: view.frame.size))
+        }
+        if let view = regramQuickTranslateView {
+            transition.updateFrame(view: view, frame: regramQuickTranslateFrame(item))
         }
         
         if let view = reactionsView {

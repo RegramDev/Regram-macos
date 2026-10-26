@@ -1,3 +1,4 @@
+import RegramCore
 import Cocoa
 import TGUIKit
 import Postbox
@@ -34,7 +35,7 @@ func installStoriesUIHooks() {
             PeerInfoController.push(navigation: context.bindings.rootNavigation(), context: context as! AccountContext, peerId: peerId)
         }
     }, showShareStory: { context, media, hasLink, storyId, repostAction, presentation in
-        let additionTopItems: ShareAdditionItems = .init(items: [.init(peer: TelegramStoryRepostPeerObject(), status: strings().storyRepostToMy)], topSeparator: "", bottomSeparator: "", selectable: false)
+        let additionTopItems: ShareAdditionItems? = RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["showRepostToStoryV2"].bool ? .init(items: [.init(peer: TelegramStoryRepostPeerObject(), status: strings().storyRepostToMy)], topSeparator: "", bottomSeparator: "", selectable: false) : nil
 
         showModal(with: ShareModalController(ShareStoryObject(context, media: media, hasLink: hasLink, storyId: storyId, additionTopItems: additionTopItems, repostAction: {
             repostAction()

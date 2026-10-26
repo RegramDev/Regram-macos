@@ -20,6 +20,7 @@ import TelegramTheme
 import TelegramUtils
 import InlineStickerLayer
 import InputView
+import RegramCore
 
 /// Resolves the gallery's open/close zoom source for a rich message's media. The rich message's media
 /// views are scattered across the canvas (not a single ordered container like grouped media), so the
@@ -1417,10 +1418,11 @@ public final class RichTextDraftPreviewView: View {
             editor.withPasteContext = { [weak self] paste in
                 paste()
             }
-            // Return follows the plain-input send preference: the configured send combo (Enter, or ⌘/⇧-Enter)
-            // sends; any other Return combo falls through (returns false) so the editor inserts a newline.
             editor.onReturnKey = { [weak self] in
-                guard let self = self, let event = NSApp.currentEvent, FastSettings.checkSendingAbility(for: event) else { return false }
+                guard let self, let interaction = self.chatInteraction, let event = NSApp.currentEvent else { return false }
+                let settings = RegramPreferences.shared.settings(accountId: interaction.interactionContext.peerId.toInt64())
+                let marked = (interaction.interactionContext.window.firstResponder as? NSTextInputClient)?.hasMarkedText() == true
+                guard RegramInputReturnPolicy.shouldSend(sendWithReturn: settings["sendWithReturnKey"].bool, modifiers: event.modifierFlags, hasMarkedText: marked) else { return false }
                 self.onSend?()
                 return true
             }

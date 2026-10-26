@@ -1,3 +1,4 @@
+import RegramCore
 import Cocoa
 import TGUIKit
 import Postbox
@@ -26,12 +27,27 @@ import FilePanels
 import PremiumStatusUI
 import SceneEffects
 import InlineStickerLayer
+import ChatHistoryModel
+import RegramSignals
 
+private func regramAccountInfoDisplayText(context: any AccountContextProtocol, peer: TelegramUser) -> NSAttributedString {
+    let text = NSMutableAttributedString()
+    if !RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["hidePhoneInSettings"].bool,
+       let phone = regramLocalDisplayedPhone(accountId: context.peerId.toInt64(), peerId: peer.id.toInt64(), testingEnvironment: context.account.testingEnvironment, phone: peer.phone), !phone.isEmpty {
+        let formatted = phone.hasPrefix("888") ? "+" + formatPhoneNumberToMask(phone, mask: "XXX XXXX XXXX") : SettingsHooks.shared.formatPhoneNumber(context, phone)
+        _ = text.append(string: formatted, color: theme.colors.grayText, font: .normal(.text))
+    }
+    if let username = peer.username, !username.isEmpty {
+        if !text.string.isEmpty { _ = text.append(string: "\n") }
+        _ = text.append(string: "@\(username)", color: theme.colors.grayText, font: .normal(.text))
+    }
+    return text
+}
 
 public class AccountInfoItem: GeneralRowItem {
     
-    fileprivate let textLayout: TextViewLayout
-    fileprivate let activeTextlayout: TextViewLayout
+    fileprivate var textLayout: TextViewLayout
+    fileprivate var activeTextlayout: TextViewLayout
     
     fileprivate let titleLayout: TextViewLayout
     fileprivate let titleActiveLayout: TextViewLayout
@@ -43,6 +59,7 @@ public class AccountInfoItem: GeneralRowItem {
 
     
     private let peerPhotosDisposable = MetaDisposable()
+    private let displayDisposable = MetaDisposable()
     
     public let setStatus:(Control, TelegramUser)->Void
     
@@ -54,7 +71,7 @@ public class AccountInfoItem: GeneralRowItem {
         self.storyStats = storyStats
         self.setStatus = setStatus
         self.openStory = openStory
-        let attr = NSMutableAttributedString()
+        let attr = regramAccountInfoDisplayText(context: context, peer: peer)
         
         if let storyStats = storyStats, storyStats.storyCount > 0 {
             self.avatarStoryIndicator = .init(story: storyStats, presentation: theme)
@@ -69,16 +86,6 @@ public class AccountInfoItem: GeneralRowItem {
         activeTitle.addAttribute(.foregroundColor, value: theme.colors.underSelectedColor, range: titleAttr.range)
         self.titleActiveLayout = .init(activeTitle, maximumNumberOfLines: 1)
         
-        if let phone = peer.phone {
-            _ = attr.append(string: SettingsHooks.shared.formatPhoneNumber(context, phone), color: theme.colors.grayText, font: .normal(.text))
-        }
-        if let username = peer.username, !username.isEmpty {
-            if !attr.string.isEmpty {
-                _ = attr.append(string: "\n")
-            }
-            _ = attr.append(string: "@\(username)", color: theme.colors.grayText, font: .normal(.text))
-        }
-        
         textLayout = TextViewLayout(attr, maximumNumberOfLines: 4)
         
         let active = attr.mutableCopy() as! NSMutableAttributedString
@@ -91,6 +98,17 @@ public class AccountInfoItem: GeneralRowItem {
         peerPhotosDisposable.set(signal.start(next: { [weak self] photos in
             self?.photos = photos.map { $0.value }
             self?.noteHeightOfRow()
+        }))
+        displayDisposable.set((combineLatest(regramLocalGiftsState(context: context), regramPreferenceChanges(accountId: context.peerId.toInt64())) |> deliverOnMainQueue).start(next: { [weak self] _, _ in
+            guard let self else { return }
+            let text = regramAccountInfoDisplayText(context: context, peer: self.peer)
+            guard !self.textLayout.attributedString.isEqual(to: text) else { return }
+            self.textLayout = TextViewLayout(text, maximumNumberOfLines: 4)
+            let active = text.mutableCopy() as! NSMutableAttributedString
+            active.addAttribute(.foregroundColor, value: theme.colors.underSelectedColor, range: active.range)
+            self.activeTextlayout = TextViewLayout(active, maximumNumberOfLines: 4)
+            _ = self.makeSize(self.width, oldWidth: self.width)
+            self.redraw()
         }))
         
     }
@@ -111,6 +129,7 @@ public class AccountInfoItem: GeneralRowItem {
     
     deinit {
         peerPhotosDisposable.dispose()
+        displayDisposable.dispose()
     }
     public override func makeSize(_ width: CGFloat, oldWidth: CGFloat) -> Bool {
         let success = super.makeSize(width, oldWidth: oldWidth)

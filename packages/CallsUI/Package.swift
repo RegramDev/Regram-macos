@@ -43,6 +43,7 @@ let package = Package(
         .library(name: "CallsUI", targets: ["CallsUI"]),
     ],
     dependencies: [
+        .package(name: "RegramCore", path: "../RegramCore"),
         .package(name: "SSignalKit", path: "../../submodules/telegram-ios/submodules/SSignalKit"),
         .package(name: "TelegramCore", path: "../../submodules/telegram-ios/submodules/TelegramCore"),
         .package(name: "Postbox", path: "../../submodules/telegram-ios/submodules/Postbox"),
@@ -53,6 +54,7 @@ let package = Package(
         .target(
             name: "CallsUI",
             dependencies: [
+                .product(name: "RegramCore", package: "RegramCore"),
                 .product(name: "SwiftSignalKit", package: "SSignalKit", condition: nil),
                 .product(name: "TelegramCore", package: "TelegramCore", condition: nil),
                 .product(name: "Postbox", package: "Postbox", condition: nil),

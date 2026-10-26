@@ -7,6 +7,8 @@ import SwiftSignalKit
 import Postbox
 import TelegramCore
 import WalletContext
+import RegramCore
+import ChatHistoryModel
 
 private let walletPeerBalanceInset: CGFloat = 20
 private let walletPeerBalanceCardWidth: CGFloat = 360
@@ -406,33 +408,38 @@ private final class WalletPeerBalanceView: View {
 private final class WalletPeerBalanceController: ModalViewController {
     private let context: any AccountContextProtocol
     private let environment: WalletUIEnvironment
-    private let walletContext: WalletContext
+    private let walletContext: WalletContext?
     private let peerId: PeerId
     private let name: String
     private let sendMoney: () -> Void
     private let transitionSource: WalletPeerBalanceSource?
+    private var localPresentation: Bool
     private var closing = false
     private var card: WalletCard?
     private var stickers: [WalletContext.CardSticker] = []
     private var artworkDisposables: [String: Disposable] = [:]
-    private var walletState: WalletContext.State
+    private var walletState: WalletContext.State?
+    private var localState = RGLocalGiftsState()
     private var backdropView: WalletPeerBalanceBackdropView?
     private var isDisappearing = false
     private let disposables = DisposableSet()
 
     private var address: String {
+        if localPresentation || regramLocalWalletEnabled(context: context, peerId: peerId) { return "" }
         return card?.address ?? ""
     }
 
-    init(context: any AccountContextProtocol, environment: WalletUIEnvironment, walletContext: WalletContext, peer: Peer, source: NSView?) {
+    init(context: any AccountContextProtocol, environment: WalletUIEnvironment, walletContext: WalletContext?, peer: Peer, source: NSView?) {
         self.context = context
         self.environment = environment
         self.walletContext = walletContext
         self.transitionSource = WalletPeerBalanceSource(view: source)
+        self.localPresentation = regramLocalWalletEnabled(context: context, peerId: peer.id)
         self.peerId = peer.id
         self.name = environment.peerTitle(peer, compact: false)
-        self.walletState = walletContext.stateValue
+        self.walletState = walletContext?.stateValue
         self.sendMoney = {
+            guard let walletContext else { return }
             showWalletSendMoney(context: context, environment: environment, walletContext: walletContext, peer: peer)
         }
         super.init(frame: NSMakeRect(0, 0, walletPeerBalanceCardWidth + walletPeerBalanceInset * 2, walletPeerBalanceInset + walletPeerBalanceCardHeight + walletPeerBalanceButtonGap + walletPeerBalanceButtonHeight + walletPeerBalanceInset))
@@ -537,7 +544,7 @@ private final class WalletPeerBalanceController: ModalViewController {
     }
 
     private var showsWalletInfo: Bool {
-        return !isOwnWallet && walletState.walletAddress == nil
+        return !isOwnWallet && walletState?.walletAddress == nil
     }
 
     private var actionTitle: String {
@@ -551,6 +558,9 @@ private final class WalletPeerBalanceController: ModalViewController {
     }
 
     private func performAction() {
+        guard !closing && !isDisappearing else { return }
+        if localPresentation || regramLocalWalletEnabled(context: context, peerId: peerId) { showLocalNotice(); return }
+        guard let walletContext else { return }
         if isOwnWallet {
             showWallet(context: context, environment: environment, walletContext: walletContext, for: context.window)
         } else if showsWalletInfo {
@@ -582,35 +592,56 @@ private final class WalletPeerBalanceController: ModalViewController {
         }))
 
         let peerId = self.peerId
-        disposables.add((context.engine.data.subscribe(TelegramEngine.EngineData.Item.Peer.CachedData(id: peerId))
-        |> map { cachedData -> WalletCard? in
-            return (cachedData as? CachedUserData)?.walletCard
+        let context = self.context
+        let localChanges: Signal<RGLocalGiftsState, NoError> = isOwnWallet ? regramLocalGiftsState(context: context) : .single(RGLocalGiftsState())
+        let cachedData: Signal<CachedPeerData?, NoError> = context.engine.data.subscribe(TelegramEngine.EngineData.Item.Peer.CachedData(id: peerId))
+        let cards: Signal<(WalletCard?, RGLocalGiftsState), NoError> = combineLatest(cachedData, localChanges)
+        |> map { cachedData, state -> (WalletCard?, RGLocalGiftsState) in
+            let projected = regramLocalProfileCachedData(context: context, peerId: peerId, cachedData: cachedData, localState: state) as? CachedUserData
+            return (projected?.walletCard, state)
         }
-        |> distinctUntilChanged
-        |> deliverOnMainQueue).start(next: { [weak self] card in
-            self?.updateWalletCard(card)
+        |> distinctUntilChanged(isEqual: { $0.0 == $1.0 && $0.1 == $1.1 })
+        disposables.add((cards |> deliverOnMainQueue).start(next: { [weak self] value in
+            guard let self else { return }
+            let (card, localState) = value
+            let localEnabled = regramLocalWalletEnabled(accountId: self.context.peerId.toInt64(), peerId: self.peerId.toInt64(), state: localState)
+            if self.localPresentation && !localEnabled { self.close(); return }
+            self.localPresentation = self.localPresentation || localEnabled
+            self.localState = localState
+            self.updateWalletCard(card)
         }))
 
-        disposables.add((walletContext.state
-        |> deliverOnMainQueue).start(next: { [weak self] state in
-            self?.walletState = state
-            self?.updateCard()
-        }))
+        if let walletContext {
+            disposables.add((walletContext.state |> deliverOnMainQueue).start(next: { [weak self] state in
+                self?.walletState = state
+                self?.updateCard()
+            }))
+        }
 
         updateCard()
         readyOnce()
     }
 
     private func openReceive() {
-        guard !address.isEmpty else {
+        guard !closing && !isDisappearing else { return }
+        if localPresentation || regramLocalWalletEnabled(context: context, peerId: peerId) { showLocalNotice(); return }
+        guard let walletContext, !address.isEmpty else {
             return
         }
         showModal(with: WalletReceiveController(context: context, environment: environment, walletContext: walletContext, address: address, isOwnWallet: false), for: context.window)
     }
 
+    private func showLocalNotice() {
+        showModalText(for: context.window, text: regramLocalizedString("LocalWallet.Notice", languageCode: appCurrentLanguage.primaryLanguage.languageCode))
+    }
+
     private func updateWalletCard(_ card: WalletCard?) {
         self.card = card
-        stickers = (card?.stickers ?? []).compactMap { WalletContext.CardSticker(serverSticker: $0, backgroundNftAddress: card?.backgroundNft?.address) }
+        if regramLocalWalletEnabled(accountId: context.peerId.toInt64(), peerId: peerId.toInt64(), state: localState) {
+            stickers = regramLocalWalletStickers(context: context, state: localState)
+        } else {
+            stickers = (card?.stickers ?? []).compactMap { WalletContext.CardSticker(serverSticker: $0, backgroundNftAddress: card?.backgroundNft?.address) }
+        }
         let ids = Set(stickers.map(\.gift.address))
         for (id, disposable) in artworkDisposables where !ids.contains(id) {
             disposable.dispose()
@@ -643,7 +674,7 @@ private final class WalletPeerBalanceController: ModalViewController {
         genericView.sendButton.set(text: actionTitle, for: .Normal)
         genericView.updateOwnership(name: name, balance: card?.balance)
         genericView.needsLayout = true
-        genericView.cardView.update(balance: balance, fiatText: walletFiatText(walletState, balance: balance), name: name.uppercased(), address: address, animated: false)
+        genericView.cardView.update(balance: balance, fiatText: walletState.flatMap { walletFiatText($0, balance: balance) }, name: name.uppercased(), address: address, animated: false)
         updateStickers()
     }
 }
@@ -651,7 +682,8 @@ private final class WalletPeerBalanceController: ModalViewController {
 @available(macOS 10.15, *)
 
 @available(macOS 10.15, *)
-public func showWalletPeerBalance(context: any AccountContextProtocol, environment: WalletUIEnvironment, walletContext: WalletContext, peer: Peer, morphSource: (() -> NSView?)? = nil) {
+public func showWalletPeerBalance(context: any AccountContextProtocol, environment: WalletUIEnvironment, walletContext: WalletContext?, peer: Peer, morphSource: (() -> NSView?)? = nil) {
+    guard walletContext != nil || regramLocalWalletEnabled(context: context, peerId: peer.id) else { return }
     let controller = WalletPeerBalanceController(context: context, environment: environment, walletContext: walletContext, peer: peer, source: morphSource?())
     let onDeinit = controller.onDeinit
     controller.onDeinit = {

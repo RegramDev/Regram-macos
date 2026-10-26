@@ -98,9 +98,9 @@ private final class ProgressiveEmissionState {
     }
 }
 
-public func chatMessagePhotoDatas(postbox: Postbox, imageReference: ImageMediaReference, fullRepresentationSize: CGSize = CGSize(width: 1280.0, height: 1280.0), autoFetchFullSize: Bool = false, tryAdditionalRepresentations: Bool = false, synchronousLoad: Bool = false, secureIdAccessContext: SecureIdAccessContext? = nil, peer: Peer? = nil, useMiniThumbnailIfAvailable: Bool = false, onlyThumbnail: Bool = false) -> Signal<ImageRenderData, NoError> {
+public func chatMessagePhotoDatas(postbox: Postbox, imageReference: ImageMediaReference, fullRepresentationSize: CGSize = CGSize(width: 1280.0, height: 1280.0), autoFetchFullSize: Bool = false, tryAdditionalRepresentations: Bool = false, synchronousLoad: Bool = false, secureIdAccessContext: SecureIdAccessContext? = nil, peer: Peer? = nil, useMiniThumbnailIfAvailable: Bool = false, onlyThumbnail: Bool = false, fullRepresentation: TelegramMediaImageRepresentation? = nil) -> Signal<ImageRenderData, NoError> {
     
-    if let progressiveRepresentation = progressiveImageRepresentation(imageReference.media.representations), progressiveRepresentation.progressiveSizes.count > 1, !onlyThumbnail {
+    if let progressiveRepresentation = progressiveImageRepresentation(imageReference.media.representations), progressiveRepresentation.progressiveSizes.count > 1, !onlyThumbnail, fullRepresentation.map({ $0.resource.id == progressiveRepresentation.resource.id }) ?? true {
         enum SizeSource {
             case miniThumbnail(data: Data)
             case image(size: Int64)
@@ -127,7 +127,7 @@ public func chatMessagePhotoDatas(postbox: Postbox, imageReference: ImageMediaRe
             }
         }
         sources.append(contentsOf: imageByteSizes.sorted().map { .image(size: $0) })
-        if let largest = imageReference.media.representationForDisplayAtSize(.init(fullRepresentationSize)) {
+        if let largest = fullRepresentation ?? imageReference.media.representationForDisplayAtSize(.init(fullRepresentationSize)) {
             sources.append(.resource(largest.resource))
         }
         
@@ -203,7 +203,7 @@ public func chatMessagePhotoDatas(postbox: Postbox, imageReference: ImageMediaRe
     }
 
     
-    if let smallestRepresentation = firstImageRepresentation(imageReference.media.representations), let largestRepresentation = imageReference.media.representationForDisplayAtSize(PixelDimensions(fullRepresentationSize)) {
+    if let smallestRepresentation = firstImageRepresentation(imageReference.media.representations), let largestRepresentation = fullRepresentation ?? imageReference.media.representationForDisplayAtSize(PixelDimensions(fullRepresentationSize)) {
         
         
         let maybeFullSize = postbox.mediaBox.resourceData(largestRepresentation.resource, option: .complete(waitUntilFetchStatus: false), attemptSynchronously: synchronousLoad)
@@ -506,73 +506,92 @@ private func chatMessageFileDatas(account: Account, fileReference: FileMediaRefe
 }
 
 
-public func chatGalleryPhoto(account: Account, imageReference: ImageMediaReference, toRepresentationSize:NSSize = NSMakeSize(1280, 1280), peer: Peer? = nil, scale:CGFloat, secureIdAccessContext: SecureIdAccessContext? = nil, synchronousLoad: Bool = false, drawChessboard: Bool = true) -> Signal<(TransformImageArguments) -> CGImage?, NoError> {
-    let signal = chatMessagePhotoDatas(postbox: account.postbox, imageReference: imageReference, fullRepresentationSize:toRepresentationSize, synchronousLoad: synchronousLoad, secureIdAccessContext: secureIdAccessContext, peer: peer)
+public func chatGalleryPhoto(account: Account, imageReference: ImageMediaReference, toRepresentationSize:NSSize = NSMakeSize(1280, 1280), peer: Peer? = nil, scale:CGFloat, secureIdAccessContext: SecureIdAccessContext? = nil, synchronousLoad: Bool = false, drawChessboard: Bool = true, fullRepresentation: TelegramMediaImageRepresentation? = nil) -> Signal<(TransformImageArguments) -> CGImage?, NoError> {
+    let preview = chatMessagePhotoDatas(postbox: account.postbox, imageReference: imageReference, fullRepresentationSize:toRepresentationSize, synchronousLoad: synchronousLoad, secureIdAccessContext: secureIdAccessContext, peer: peer, fullRepresentation: fullRepresentation)
     
+    let signal: Signal<ImageRenderData, NoError>
+    if let fullRepresentation {
+        let complete = account.postbox.mediaBox.resourceData(fullRepresentation.resource, option: .complete(waitUntilFetchStatus: false), attemptSynchronously: synchronousLoad) |> map { value -> ImageRenderData in
+            guard value.complete else { return ImageRenderData(nil, nil, false) }
+            let bytes: Data?
+            if fullRepresentation.resource is EncryptedMediaResource, let secureIdAccessContext {
+                bytes = decryptedResourceData(data: value, resource: fullRepresentation.resource, params: secureIdAccessContext)
+            } else { bytes = try? Data(contentsOf: URL(fileURLWithPath: value.path)) }
+            return ImageRenderData(nil, bytes, bytes != nil)
+        }
+        signal = galleryPhotoData(preview: preview, complete: complete)
+    } else { signal = preview }
+
     return signal |> map { data in
-        return { arguments in
-            
-            let fittedSize = arguments.imageSize.aspectFilled(arguments.boundingSize).fitted(arguments.imageSize)
-            
-            let fullSizeData = data.fullSizeData
-            let thumbnailData = data.thumbnailData
-            
-            let options = NSMutableDictionary()
-            
-            options.setValue(max(fittedSize.width * scale, fittedSize.height * scale) as NSNumber, forKey: kCGImageSourceThumbnailMaxPixelSize as String)
-            options.setValue(true as NSNumber, forKey: kCGImageSourceCreateThumbnailFromImageAlways as String)
-            options.setValue(false as NSNumber, forKey: kCGImageSourceShouldCache as String)
-            options.setValue(false as NSNumber, forKey: kCGImageSourceShouldCacheImmediately as String)
-            options.setValue(true as NSNumber, forKey: kCGImageSourceCreateThumbnailWithTransform as String)
+        return { arguments in galleryPhotoImage(data: data, arguments: arguments, scale: scale, drawChessboard: drawChessboard) }
+    }
+}
 
-            
-            
-            if let fullSizeData = fullSizeData {
-                if data.fullSizeData != nil {
-                    if let imageSource = CGImageSourceCreateWithData(fullSizeData as CFData, options), let image = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, options as CFDictionary) {
-                        return generateDisplayImage(image.size, contextGenerator: { (size, ctx) in
-                            ctx.clear(size.bounds)
-                            if drawChessboard {
-                                ctx.setFillColor(theme.colors.transparentBackground.cgColor)
-                                ctx.fill(NSMakeRect(0, 0, size.width, size.height))
-                            }
-                            ctx.draw(image, in: NSMakeRect(0, 0, size.width, size.height))
-                        }, scale: 1.0)
-                        
+public func galleryPhotoData(preview: Signal<ImageRenderData, NoError>, complete: Signal<ImageRenderData, NoError>) -> Signal<ImageRenderData, NoError> {
+    let seededPreview = Signal<ImageRenderData, NoError>.single(ImageRenderData(nil, nil, false)) |> then(preview)
+    return combineLatest(seededPreview, complete) |> map { preview, complete in
+        if complete.fullSizeComplete, complete.fullSizeData != nil { return complete }
+        return ImageRenderData(preview.thumbnailData ?? preview.fullSizeData, nil, false)
+    } |> take(until: { SignalTakeAction(passthrough: true, complete: $0.fullSizeComplete) })
+}
+
+public func galleryPhotoImage(data: ImageRenderData, arguments: TransformImageArguments, scale: CGFloat, drawChessboard: Bool = true) -> CGImage? {
+    let fittedSize = arguments.imageSize.aspectFilled(arguments.boundingSize).fitted(arguments.imageSize)
+
+    let fullSizeData = data.fullSizeData
+    let thumbnailData = data.thumbnailData ?? data.fullSizeData
+
+    let options = NSMutableDictionary()
+
+    options.setValue(max(fittedSize.width * scale, fittedSize.height * scale) as NSNumber, forKey: kCGImageSourceThumbnailMaxPixelSize as String)
+    options.setValue(true as NSNumber, forKey: kCGImageSourceCreateThumbnailFromImageAlways as String)
+    options.setValue(false as NSNumber, forKey: kCGImageSourceShouldCache as String)
+    options.setValue(false as NSNumber, forKey: kCGImageSourceShouldCacheImmediately as String)
+    options.setValue(true as NSNumber, forKey: kCGImageSourceCreateThumbnailWithTransform as String)
+
+
+
+    if let fullSizeData, data.fullSizeComplete {
+            if let imageSource = CGImageSourceCreateWithData(fullSizeData as CFData, options), CGImageSourceGetStatus(imageSource) == .statusComplete, let image = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, options as CFDictionary) {
+                return generateDisplayImage(image.size, contextGenerator: { (size, ctx) in
+                    ctx.clear(size.bounds)
+                    if drawChessboard {
+                        ctx.setFillColor(theme.colors.transparentBackground.cgColor)
+                        ctx.fill(NSMakeRect(0, 0, size.width, size.height))
                     }
-                    
-                }
-            }
-            
-            options.setValue(150 as NSNumber, forKey: kCGImageSourceThumbnailMaxPixelSize as String)
-
-            var thumbnailImage: CGImage?
-            if let thumbnailData = thumbnailData, let imageSource = CGImageSourceCreateWithData(thumbnailData as CFData, options), let image = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, options as CFDictionary) {
-                thumbnailImage = image
-            }
-            
-            if let thumbnailImage = thumbnailImage {
-                let thumbnailSize = CGSize(width: thumbnailImage.width, height: thumbnailImage.height)
-                let thumbnailContextSize = thumbnailSize.aspectFitted(CGSize(width: 150.0, height: 150.0))
-                let thumbnailContext = DrawingContext(size: thumbnailContextSize, scale: 1.0)
-                thumbnailContext.withContext { c in
-                    c.interpolationQuality = .none
-                    c.draw(thumbnailImage, in: CGRect(origin: CGPoint(), size: thumbnailContextSize))
-                }
-                telegramFastBlurMore(Int32(thumbnailContextSize.width), Int32(thumbnailContextSize.height), Int32(thumbnailContext.bytesPerRow), thumbnailContext.bytes)
-                
-                return generateDisplayImage(fittedSize, contextGenerator: { size, ctx in
-                    ctx.draw(thumbnailContext.generateImage()!, in: NSMakeRect(0, 0, size.width, size.height))
+                    ctx.draw(image, in: NSMakeRect(0, 0, size.width, size.height))
                 }, scale: 1.0)
                 
             }
-            return generateDisplayImage(fittedSize, contextGenerator: { (size, ctx) in
-                ctx.setFillColor(theme.colors.transparentBackground.cgColor)
-                ctx.fill(NSMakeRect(0, 0, size.width, size.height))
-            }, scale: 1.0)
-            
-        }
     }
+
+    options.setValue(150 as NSNumber, forKey: kCGImageSourceThumbnailMaxPixelSize as String)
+
+    var thumbnailImage: CGImage?
+    if let thumbnailData = thumbnailData, let imageSource = CGImageSourceCreateWithData(thumbnailData as CFData, options), let image = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, options as CFDictionary) {
+        thumbnailImage = image
+    }
+
+    if let thumbnailImage = thumbnailImage {
+        let thumbnailSize = CGSize(width: thumbnailImage.width, height: thumbnailImage.height)
+        let thumbnailContextSize = thumbnailSize.aspectFitted(CGSize(width: 150.0, height: 150.0))
+        let thumbnailContext = DrawingContext(size: thumbnailContextSize, scale: 1.0)
+        thumbnailContext.withContext { c in
+            c.interpolationQuality = .none
+            c.draw(thumbnailImage, in: CGRect(origin: CGPoint(), size: thumbnailContextSize))
+        }
+        telegramFastBlurMore(Int32(thumbnailContextSize.width), Int32(thumbnailContextSize.height), Int32(thumbnailContext.bytesPerRow), thumbnailContext.bytes)
+
+        return generateDisplayImage(fittedSize, contextGenerator: { size, ctx in
+            ctx.draw(thumbnailContext.generateImage()!, in: NSMakeRect(0, 0, size.width, size.height))
+        }, scale: 1.0)
+
+    }
+    return generateDisplayImage(fittedSize, contextGenerator: { (size, ctx) in
+        ctx.setFillColor(theme.colors.transparentBackground.cgColor)
+        ctx.fill(NSMakeRect(0, 0, size.width, size.height))
+    }, scale: 1.0)
+
 }
 
 public func chatMessagePhoto(account: Account, imageReference: ImageMediaReference, toRepresentationSize:NSSize = NSMakeSize(1280, 1280), peer: Peer? = nil, scale:CGFloat, synchronousLoad: Bool = false, autoFetchFullSize: Bool = false) -> Signal<ImageDataTransformation, NoError> {

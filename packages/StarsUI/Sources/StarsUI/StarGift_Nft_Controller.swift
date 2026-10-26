@@ -1,3 +1,5 @@
+import ChatHistoryModel
+import RegramCore
 import Cocoa
 import Foundation
 import TGUIKit
@@ -1019,14 +1021,14 @@ private final class HeaderItem : GeneralRowItem {
                 let actionColor: NSColor = (uniqueGift.backdrop?.first?.lightness ?? 1.0) > 0.8 ? .black : .white
                 actions = [.init(context: context, title: strings().starNftTransfer, image: TelegramThemeHooks.shared.image(.iconNFTTransfer).precomposed(.white), action: {
                     arguments.transfer()
-                }, locked: uniqueGift.hostPeerId != nil, color: actionColor), .init(context: context, title: state.weared ? strings().starNftTakeOff : strings().starNftWear, image: TelegramThemeHooks.shared.image(.iconNFTWear).precomposed(.white), action: {
+                }, locked: state.isLocalGift || uniqueGift.hostPeerId != nil, color: actionColor), .init(context: context, title: state.weared ? strings().starNftTakeOff : strings().starNftWear, image: TelegramThemeHooks.shared.image(.iconNFTWear).precomposed(.white), action: {
                     arguments.toggleWear(uniqueGift)
                 }, color: actionColor)]
 
                 if case .starGift = state.purpose {
                     actions.append(.init(context: context, title: uniqueGift.resellStars(context) != nil ? strings().starNftUnlist : strings().starNftSell, image: TelegramThemeHooks.shared.image(uniqueGift.resellStars(context) != nil ? .iconNftUnlist : .iconNftSell).precomposed(.white), action: {
                         arguments.sellNft(uniqueGift, false)
-                    }, locked: uniqueGift.hostPeerId != nil, color: actionColor))
+                    }, locked: state.isLocalGift || uniqueGift.hostPeerId != nil, color: actionColor))
                 } else {
                     actions.append(.init(context: context, title: strings().starNftShare, image: TelegramThemeHooks.shared.image(.iconNFTShare).precomposed(.white), action: {
                         arguments.shareNft(uniqueGift)
@@ -1327,23 +1329,26 @@ private final class HeaderView : GeneralRowView {
                 let owner = item.state.owner?._asPeer()
                 let visibility = item.state.profileVisibility
 
-                if case let .peerId(peerId) = uniqueGift.owner, peerId == item.arguments.context.peerId || owner?.groupAccess.isCreator == true, let pinnedInfo = item.state.pinnedInfo, visibility?.saved != false {
+                if let purchase = item.state.localPurchase, purchase.savedToProfile {
+                    menu.addItem(ContextMenuItem(purchase.pinnedToTop ? strings().messageContextUnpin : strings().messageContextPin, handler: item.arguments.togglePin, itemImage: purchase.pinnedToTop ? MenuAnimation.menu_unpin.value : MenuAnimation.menu_pin.value))
+                } else if case let .peerId(peerId) = uniqueGift.owner, peerId == item.arguments.context.peerId || owner?.groupAccess.isCreator == true, let pinnedInfo = item.state.pinnedInfo, visibility?.saved != false {
                     menu.addItem(ContextMenuItem(pinnedInfo.pinnedInfo ? strings().messageContextUnpin : strings().messageContextPin, handler: item.arguments.togglePin, itemImage: pinnedInfo.pinnedInfo ? MenuAnimation.menu_unpin.value : MenuAnimation.menu_pin.value))
                 }
 
-                menu.addItem(ContextMenuItem(strings().contextCopy, handler: {
-                    item.arguments.copyNftLink(uniqueGift)
-                }, itemImage: MenuAnimation.menu_copy_link.value))
-                
-                menu.addItem(ContextMenuItem(strings().storyMyInputShare, handler: {
-                    item.arguments.shareNft(uniqueGift)
-                }, itemImage: MenuAnimation.menu_share.value))
+                if !item.state.isLocalGift {
+                    menu.addItem(ContextMenuItem(strings().contextCopy, handler: {
+                        item.arguments.copyNftLink(uniqueGift)
+                    }, itemImage: MenuAnimation.menu_copy_link.value))
+                    menu.addItem(ContextMenuItem(strings().storyMyInputShare, handler: {
+                        item.arguments.shareNft(uniqueGift)
+                    }, itemImage: MenuAnimation.menu_share.value))
+                }
                 
                 
                 if case let .peerId(peerId) = uniqueGift.owner, peerId == item.arguments.context.peerId {
-                    if uniqueGift.flags.contains(.isThemeAvailable) {
+                    if uniqueGift.flags.contains(.isThemeAvailable) || (item.state.isLocalGift && uniqueGift.peerColor != nil) {
                         menu.addItem(ContextMenuItem(
-                            strings().giftContextMenuSetAsTheme,
+                            item.state.isLocalGift ? strings().selectColorUseGiftTitle : strings().giftContextMenuSetAsTheme,
                             handler: {
                                 item.arguments.setAsTheme(uniqueGift)
                             },
@@ -1359,27 +1364,31 @@ private final class HeaderView : GeneralRowView {
                         menu.addItem(ContextMenuItem(visibility.saved ? strings().giftViewContextHideFromProfile : strings().giftViewContextShowOnProfile, handler: item.arguments.toggleProfileVisibility, itemImage: visibility.saved ? MenuAnimation.menu_eye_slash.value : MenuAnimation.menu_eye.value))
                     }
                                         
-                    menu.addItem(ContextMenuItem(strings().giftTransferConfirmationTransferFree, handler: {
-                        item.arguments.transfer()
-                    }, itemImage: MenuAnimation.menu_replace.value))
-                    
-                    if uniqueGift.craftChancePermille != nil {
+                    if !item.state.isLocalGift {
+                        menu.addItem(ContextMenuItem(strings().giftTransferConfirmationTransferFree, handler: {
+                            item.arguments.transfer()
+                        }, itemImage: MenuAnimation.menu_replace.value))
+                    }
+                    if !item.state.isLocalGift && uniqueGift.craftChancePermille != nil {
                         menu.addItem(ContextMenuItem(strings().starGiftCraftMenuItem, handler: {
                             item.arguments.startCrafting()
                         }, itemImage: MenuAnimation.menu_craft.value))
                     }
                 }
                 
-                if let moveToGifts = StarsHooks.shared.giftMoveToGiftsAction(item.arguments.context, item.arguments.context.window, uniqueGift) {
+                if !item.state.isLocalGift, let moveToGifts = StarsHooks.shared.giftMoveToGiftsAction(item.arguments.context, item.arguments.context.window, uniqueGift) {
                     menu.addItem(ContextMenuItem(strings().giftTransferMoveToGifts, handler: moveToGifts, itemImage: MenuAnimation.menu_replace.value))
                 }
 
-                if !item.state.canManage, let peer = item.state.owner {
+                if !item.state.isLocalGift, !item.state.canManage, let peer = item.state.owner {
                     menu.addItem(ContextMenuItem(strings().starGiftNftOfferToBuy, handler: {
                         item.arguments.makeOffer(uniqueGift, peer)
                     }, itemImage: MenuAnimation.menu_paid.value))
                 }
                 
+                if item.state.localPurchase != nil {
+                    menu.addItem(ContextMenuItem(strings().giftViewContextDelete, handler: item.arguments.deleteLocalGift, itemMode: .destruct, itemImage: MenuAnimation.menu_delete.value))
+                }
                 return menu
             }
 
@@ -1388,7 +1397,7 @@ private final class HeaderView : GeneralRowView {
                     craftBtn.removeFromSuperview()
                     self.craftButton = nil
                 }
-            } else if item.state.canManage, item.state.gift.unique?.craftChancePermille != nil {
+            } else if !item.state.isLocalGift, item.state.canManage, item.state.gift.unique?.craftChancePermille != nil {
                 let craftBtn: ImageButton
                 if let view = self.craftButton {
                     craftBtn = view
@@ -1751,6 +1760,7 @@ private final class Arguments {
     public let showCraftSuccess:(StarGift.UniqueGift)->Void
     public let okAction:()->Void
     public var toggleProfileVisibility:()->Void = {}
+    public var deleteLocalGift:()->Void = {}
 
     public init(context: (any AccountContextProtocol), window: @escaping () -> Window, dismiss:@escaping()->Void, toggleName:@escaping()->Void, transfer:@escaping()->Void, copyNftLink:@escaping(StarGift.UniqueGift)->Void, shareNft:@escaping(StarGift.UniqueGift)->Void, sellNft:@escaping(StarGift.UniqueGift, Bool)->Void, toggleWear:@escaping(StarGift.UniqueGift)->Void, togglePin:@escaping()->Void, openPeer:@escaping(EnginePeer, Bool)->Void, openValue:@escaping(StarGift.UniqueGift)->Void, setAsTheme:@escaping(StarGift.UniqueGift)->Void, deleteOriginalInfo:@escaping(StarGift.UniqueGift, NSAttributedString)->Void, makeOffer:@escaping(StarGift.UniqueGift, EnginePeer)->Void, showModels:@escaping(StarGift, StarGift_Builder_Section)->Void, startCrafting:@escaping()->Void, toggleCraftGift:@escaping(ProfileGiftsContext.State.StarGift)->Void, showCraftModels:@escaping(StarGift.UniqueGift, StarGift_Builder_Section)->Void, showCraftMarketplace:@escaping(Int)->Void, showCraftAbout:@escaping()->Void, showBackdropChanceHint:@escaping(String, Int)->Void, showPatternChanceHint:@escaping(String, Int)->Void, openCraftAbout:@escaping(StarGift.UniqueGift)->Void, performCraft:@escaping(@escaping()->Void, @escaping(ProfileGiftsContext.State.StarGift)->Void, @escaping([ProfileGiftsContext.State.StarGift])->Void, @escaping()->Void)->Void, showCraftVariants:@escaping()->Void, craftAnother:@escaping()->Void, showCraftSuccess:@escaping(StarGift.UniqueGift)->Void, okAction:@escaping()->Void) {
         self.context = context
@@ -1830,8 +1840,11 @@ private struct State : Equatable {
     public var myTonBalance: StarsAmount?
     public var tonAddress: String? = nil
     public var savedToProfileOverride: Bool?
+    public var isLocalGift = false
+    public var localPurchase: RGLocalGiftPurchase?
 
-    public var profileVisibility: (reference: StarGiftReference, saved: Bool)? {
+    public var profileVisibility: (reference: StarGiftReference?, saved: Bool)? {
+        if let localPurchase { return (nil, localPurchase.savedToProfile) }
         guard case .quickLook = source, let purpose, case let .starGift(_, _, _, _, _, savedToProfile, _, _, _, _, _, _, reference, _, _, _, _, _, _, _, _, _, _, _) = purpose, let reference else {
             return nil
         }
@@ -1978,6 +1991,7 @@ private struct State : Equatable {
     }
 
     public var canManage: Bool {
+        if isLocalGift { return localPurchase != nil }
         if let purpose {
             switch purpose {
             case let .starGift(_, _, _, _, _, _, _, _, _, _, _, _, reference, _, _, _, _, _, _, _, _, _, _, _):
@@ -2640,7 +2654,12 @@ public struct GiftPinnedInfo : Equatable {
     }
 }
 
-public func StarGift_Nft_Controller(context: (any AccountContextProtocol), gift: StarGift, source: StarGiftNftSource, transaction: StarsContext.State.Transaction? = nil, purpose: Star_TransactionPurpose? = nil, giftsContext: ProfileGiftsContext? = nil, resaleContext: ResaleGiftsContext? = nil, pinnedInfo: GiftPinnedInfo? = nil, toPeerId: PeerId? = nil, onPurchase: ((ProfileGiftsContext.State.StarGift) -> Void)? = nil) -> InputDataModalController {
+public func StarGift_Nft_Controller(context: (any AccountContextProtocol), gift: StarGift, source: StarGiftNftSource, transaction: StarsContext.State.Transaction? = nil, purpose: Star_TransactionPurpose? = nil, giftsContext: ProfileGiftsContext? = nil, resaleContext: ResaleGiftsContext? = nil, pinnedInfo: GiftPinnedInfo? = nil, toPeerId: PeerId? = nil, onPurchase: ((ProfileGiftsContext.State.StarGift) -> Void)? = nil, localUpgradePurchaseId: UUID? = nil, localUpgradeExpectedGift: Data? = nil, localPurchaseId: UUID? = nil) -> InputDataModalController {
+
+    let localMarker = localPurchaseId != nil || (localUpgradePurchaseId == nil && regramIsLocalGift(gift))
+    let localDetails = localMarker ? RegramLocalGiftDetails(context: context, purchaseId: localPurchaseId ?? regramLocalGiftPurchaseId(context: context, gift: gift)) : nil
+    if localMarker && localDetails == nil { return regramUnavailableLocalGiftController(context: context) }
+    var beganLocally = regramLocalGiftsEnabled(context: context)
 
     
     
@@ -2653,6 +2672,7 @@ public func StarGift_Nft_Controller(context: (any AccountContextProtocol), gift:
     let craftContextDisposables = DisposableSet()
 
     let actionsDisposable = DisposableSet()
+    actionsDisposable.add(regramLocalGiftsState(context: context).start(next: { if $0.enabled { beganLocally = true } }))
     let wearAction = GiftWearAction()
     let ownerDisposable = MetaDisposable()
     actionsDisposable.add(ownerDisposable)
@@ -2667,7 +2687,9 @@ public func StarGift_Nft_Controller(context: (any AccountContextProtocol), gift:
     }
     
     
-    let initialState = State(source: source, gift: gift, ignoreUpgradeGifts: Set(), transaction: transaction, converted: source.isQuickLook, purpose: purpose, attributes: source.attributes, accountPeerId: context.peerId, pinnedInfo: pinnedInfo)
+    var initialState = State(source: source, gift: gift, ignoreUpgradeGifts: Set(), transaction: transaction, converted: source.isQuickLook, purpose: purpose, attributes: source.attributes, accountPeerId: context.peerId, pinnedInfo: pinnedInfo)
+    initialState.isLocalGift = localMarker
+    initialState.localPurchase = localDetails?.current()?.purchase
     
     var close:(()->Void)? = nil
     
@@ -2679,12 +2701,18 @@ public func StarGift_Nft_Controller(context: (any AccountContextProtocol), gift:
     }
     
     
-    actionsDisposable.add(combineLatest(context.starsContext.state, context.tonContext.state, authorPeer).startStrict(next: { state, tonState, authorPeer in
+    actionsDisposable.add(combineLatest(context.starsContext.state, context.tonContext.state, authorPeer, regramLocalGiftsState(context: context)).startStrict(next: { state, tonState, authorPeer, local in
+        if let localDetails, localDetails.current(state: local) == nil { close?(); return }
         updateState { current in
             var current = current
+            if let localDetails, let value = localDetails.current(state: local) {
+                current.localPurchase = value.purchase
+                current.purpose = regramLocalGiftPurpose(gift: value.gift, purchase: value.purchase)
+                if let peer = context.myPeer { current.owner = regramLocalAppearancePeer(context: context, peer: EnginePeer(peer), localState: local) }
+            }
             current.starsState = state
-            current.myBalance = state?.balance
-            current.myTonBalance = tonState?.balance
+            current.myBalance = local.enabled ? StarsAmount(value: local.balance, nanos: 0) : state?.balance
+            current.myTonBalance = local.enabled ? StarsAmount(value: local.tonBalance, nanos: 0) : tonState?.balance
             current.author = authorPeer
             return current
         }
@@ -2719,7 +2747,7 @@ public func StarGift_Nft_Controller(context: (any AccountContextProtocol), gift:
                 ownerDisposable.set(ownerPeerId.startStandalone(next: { peer in
                     updateState { current in
                         var current = current
-                        current.owner = peer
+                        current.owner = localDetails == nil ? peer : peer.map { regramLocalAppearancePeer(context: context, peer: $0) }
                         current.ownerName = nil
                         current.isTonOwner = false
                         return current
@@ -2729,7 +2757,7 @@ public func StarGift_Nft_Controller(context: (any AccountContextProtocol), gift:
                 ownerDisposable.set(ownerPeerId.startStandalone(next: { peer in
                     updateState { current in
                         var current = current
-                        current.owner = peer
+                        current.owner = localDetails == nil ? peer : peer.map { regramLocalAppearancePeer(context: context, peer: $0) }
                         current.ownerName = name
                         current.isTonOwner = false
                         return current
@@ -2739,7 +2767,7 @@ public func StarGift_Nft_Controller(context: (any AccountContextProtocol), gift:
                 ownerDisposable.set(ownerPeerId.startStandalone(next: { peer in
                     updateState { current in
                         var current = current
-                        current.owner = peer
+                        current.owner = localDetails == nil ? peer : peer.map { regramLocalAppearancePeer(context: context, peer: $0) }
                         current.ownerName = address
                         current.isTonOwner = true
                         return current
@@ -2798,6 +2826,7 @@ public func StarGift_Nft_Controller(context: (any AccountContextProtocol), gift:
     }
     
     actionsDisposable.add(combineLatest(giftsContext.state, nextUpgradeContext.state).startStrict(next: { state, nextState in
+        guard localDetails == nil else { return }
         let unique = state.gifts.first(where: { $0.gift.unique?.slug == gift.unique?.slug })
         
         if let unique = unique?.gift.unique {
@@ -2837,6 +2866,10 @@ public func StarGift_Nft_Controller(context: (any AccountContextProtocol), gift:
     
     let buyResellGift:(StarGift.UniqueGift, EnginePeer, BotPaymentForm, BotPaymentForm)->Void = { [weak giftsContext, weak resaleContext] gift, peer, starsForm, tonForm in
 
+        if beganLocally || regramLocalGiftsEnabled(context: context) {
+            regramPresentLocalGiftResale(context: context, gift: gift, window: window, completion: { _ in close?() })
+            return
+        }
         var buyForSelected: CurrencyAmount.Currency = gift.resellForTonOnly ? .ton : .stars
         var modifyData:((ModalAlertData)->Void)? = nil
         
@@ -2876,6 +2909,10 @@ public func StarGift_Nft_Controller(context: (any AccountContextProtocol), gift:
 
         var payStep: ((Updated_ChatTextInputState?, Bool) -> Void)? = nil
         payStep = { message, isMessagePublic in
+            if beganLocally || regramLocalGiftsEnabled(context: context) {
+                regramPresentLocalGiftResale(context: context, gift: gift, window: window, completion: { _ in close?() })
+                return
+            }
             let messageText = message?.inputText.string ?? ""
             let text: String? = messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : messageText
             var entities: [MessageTextEntity]? = text != nil ? message?.textInputState().messageTextEntities() : nil
@@ -2923,6 +2960,10 @@ public func StarGift_Nft_Controller(context: (any AccountContextProtocol), gift:
                 let source: BotPaymentInvoiceSource = .starGiftResale(slug: gift.slug, toPeerId: toPeerId, ton: buyForSelected == .ton, hideName: hideName, text: text, entities: entities)
 
                 let performPayment: (Int64, Int64) -> Void = { formId, paidAmount in
+                    if beganLocally || regramLocalGiftsEnabled(context: context) {
+                        regramPresentLocalGiftResale(context: context, gift: gift, window: window, completion: { _ in close?() })
+                        return
+                    }
                     let resellAmount = CurrencyAmount(amount: StarsAmount.init(value: paidAmount, nanos: 0), currency: buyForSelected).fullyFormatted
                     _ = showModalProgress(signal: context.engine.payments.sendStarsPaymentForm(formId: formId, source: source), for: window).startStandalone(next: { result in
                         switch result {
@@ -3047,6 +3088,7 @@ public func StarGift_Nft_Controller(context: (any AccountContextProtocol), gift:
             return current
         }
     }, transfer: {
+        if let localDetails { localDetails.unavailable(window: window); return }
         
         let state = stateValue.with { $0 }
         
@@ -3100,11 +3142,14 @@ public func StarGift_Nft_Controller(context: (any AccountContextProtocol), gift:
             close?()
         })
     }, copyNftLink: { gift in
+        if let localDetails { localDetails.unavailable(window: window); return }
         copyToClipboard(gift.link(context))
         showModalText(for: window, text: strings().contextAlertCopied)
     }, shareNft: { gift in
+        if let localDetails { localDetails.unavailable(window: window); return }
         StarsHooks.shared.shareLink(context, gift.link(context), window)
     }, sellNft: { gift, updatePrice in
+        if let localDetails { localDetails.unavailable(window: window); return }
         
         let state = stateValue.with { $0 }
         
@@ -3167,6 +3212,7 @@ public func StarGift_Nft_Controller(context: (any AccountContextProtocol), gift:
         }
         
     }, toggleWear: { gift in
+        if let localDetails, localDetails.current() == nil { localDetails.unavailable(window: window); return }
         wearAction.reset()
         
         let weared = stateValue.with { $0.weared }
@@ -3174,6 +3220,7 @@ public func StarGift_Nft_Controller(context: (any AccountContextProtocol), gift:
         
 
         if weared, let owner, let file = gift.file {
+            if let localDetails { _ = localDetails.wear(false, window: window); return }
             context.reactions.setStatus(file, peer: owner._asPeer(), timestamp: context.timestamp, timeout: nil, fromRect: nil, starGift: gift)
         } else if let owner {
             updateState { current in
@@ -3195,6 +3242,7 @@ public func StarGift_Nft_Controller(context: (any AccountContextProtocol), gift:
             }
         }
     }, togglePin: { [weak giftsContext] in
+        if let localDetails { localDetails.togglePin(window: window, profileGifts: giftsContext); return }
         let pinnedInfo = stateValue.with { $0.pinnedInfo }
         if let pinnedInfo {
             giftsContext?.updateStarGiftPinnedToTop(reference: pinnedInfo.reference, pinnedToTop: !pinnedInfo.pinnedInfo)
@@ -3213,6 +3261,7 @@ public func StarGift_Nft_Controller(context: (any AccountContextProtocol), gift:
             StarsHooks.shared.openPeerInfo(context, peer.id)
         }
     }, openValue: { uniqueGift in
+        if let localDetails { localDetails.unavailable(window: window); return }
         let morphSource = ModalMorphContextSource.current
         let signal = context.engine.payments.cachedStarGifts() |> take(1)
         let valueSignal = context.engine.payments.getUniqueStarGiftValueInfo(slug: uniqueGift.slug)
@@ -3223,6 +3272,7 @@ public func StarGift_Nft_Controller(context: (any AccountContextProtocol), gift:
             }
         })
     }, setAsTheme: { gift in
+        if let localDetails { localDetails.useNameColor(window: window); return }
         _ = StarsHooks.shared.selectContact(context, window, strings().selectPeersTitleSelectChat, { peerIds in
             if gift.themePeerId == peerIds.first {
                 return .single(true)
@@ -3253,6 +3303,7 @@ public func StarGift_Nft_Controller(context: (any AccountContextProtocol), gift:
             }
         })
     }, deleteOriginalInfo: { gift, string in
+        if let localDetails { localDetails.unavailable(window: window); return }
         
         let price = stateValue.with { $0.dropDetailsStars}
         let reference = stateValue.with { $0.purpose?.reference }
@@ -3295,6 +3346,7 @@ public func StarGift_Nft_Controller(context: (any AccountContextProtocol), gift:
         
         
     }, makeOffer: { gift, peer in
+        if let localDetails { localDetails.unavailable(window: window); return }
         showModal(with: StarNftOfferController(context: context, peer: peer, defaultCurrency: .stars, gift: gift, callback: { amount, duration, stars in
             _ = showModalProgress(signal: context.engine.payments.sendStarGiftOffer(peerId: peer.id, slug: gift.slug, amount: amount, duration: duration, allowPaidStars: stars?.value), for: window).startStandalone()
         }), for: window)
@@ -3307,6 +3359,7 @@ public func StarGift_Nft_Controller(context: (any AccountContextProtocol), gift:
         showModal(with: StarGift_ModelBuilderController(context: context, gift: gift, giftId: gift.giftId, defaultMode: defaultSection, onlyCraftedModels: onlyCraftedModels), for: window)
         
     }, startCrafting: {
+        if let localDetails { localDetails.unavailable(window: window); return }
         updateState { current in
             var current = current
             if let gift = current.source.craftGift {
@@ -3356,6 +3409,7 @@ public func StarGift_Nft_Controller(context: (any AccountContextProtocol), gift:
     }, showPatternChanceHint: { name, percent in
         showModalText(for: window, text: strings().starGiftCraftPatternChanceHint("\(percent)%", name))
     }, openCraftAbout: { gift in
+        if let localDetails { localDetails.unavailable(window: window); return }
         if gift.giftAddress != nil {
             alert(for: window, header: strings().starGiftNftCantChooseFirst, info: strings().starGiftNftCantChooseFirstInfo)
             return
@@ -3427,6 +3481,7 @@ public func StarGift_Nft_Controller(context: (any AccountContextProtocol), gift:
             }
         }
     }, performCraft: { [weak giftsContext] startAnimation, onSuccess, onFailure, onError in
+        if let localDetails { localDetails.unavailable(window: window); onError(); return }
         guard let craftCtx = craftGiftsContext else { return }
         let state = stateValue.with { $0 }
         let selectedGifts = state.craftSelectedGifts
@@ -3513,12 +3568,14 @@ public func StarGift_Nft_Controller(context: (any AccountContextProtocol), gift:
         _ = getController?()?.returnKeyAction()
     })
 
+    arguments.deleteLocalGift = { localDetails?.remove(window: window, completion: { close?() }) }
     arguments.toggleProfileVisibility = {
-        guard let visibility = stateValue.with({ $0.profileVisibility }) else {
+        if let localDetails { localDetails.toggleVisibility(window: window); return }
+        guard let visibility = stateValue.with({ $0.profileVisibility }), let reference = visibility.reference else {
             return
         }
         let added = !visibility.saved
-        giftsContext.updateStarGiftAddedToProfile(reference: visibility.reference, added: added)
+        giftsContext.updateStarGiftAddedToProfile(reference: reference, added: added)
         updateState { current in
             var current = current
             current.savedToProfileOverride = added
@@ -3551,10 +3608,17 @@ public func StarGift_Nft_Controller(context: (any AccountContextProtocol), gift:
         return controller
     }
 
-    controller.willDisappear = { _ in wearAction.setActive(false) }
-    controller.willAppear = { _ in wearAction.setActive(true) }
+    controller.willDisappear = { _ in
+        localDetails?.setActive(false)
+        wearAction.setActive(false)
+    }
+    controller.willAppear = { _ in
+        localDetails?.setActive(true)
+        wearAction.setActive(true)
+    }
 
     controller.onDeinit = {
+        localDetails?.setActive(false)
         wearAction.setActive(false)
         actionsDisposable.dispose()
         craftContextDisposables.dispose()
@@ -3564,8 +3628,32 @@ public func StarGift_Nft_Controller(context: (any AccountContextProtocol), gift:
         guard let controller, wearAction.isActive else { return .none }
         let morphSource = ModalMorphContextSource.current
         let state = stateValue.with { $0 }
+        if let localDetails {
+            guard localDetails.current() != nil else { localDetails.unavailable(window: window); return .none }
+            if case let .previewWear(peer, gift) = state.source {
+                if localDetails.wear(true, window: window) {
+                    updateState { current in
+                        var current = current
+                        current.source = .quickLook(peer, gift)
+                        current.converted = true
+                        return current
+                    }
+                    PlayConfetti(for: window)
+                }
+            } else {
+                close?()
+            }
+            return .none
+        }
         _ = stateValue.with { $0.closeOnOk }
-        
+        if let id = localUpgradePurchaseId {
+            guard case let .preview(_, preview) = state.source, let generic = state.gift.generic, let price = regramLocalGiftUpgradePrice(gift: generic, preview: preview, at: context.timestamp) else { return .none }
+            switch regramUpgradeLocalGift(context: context, id: id, preview: preview, price: price, expectedGift: localUpgradeExpectedGift) {
+            case .success: close?()
+            case let .failure(error): alert(for: window, info: regramGiftError(error))
+            }
+            return .none
+        }
         switch state.source {
         case .preview:
             close?()
@@ -3617,6 +3705,10 @@ public func StarGift_Nft_Controller(context: (any AccountContextProtocol), gift:
                     close?()
                 }
             } else if let _ = gift.resell {
+                if beganLocally || regramLocalGiftsEnabled(context: context) {
+                    regramPresentLocalGiftResale(context: context, gift: gift, window: window, completion: { _ in close?() })
+                    return .none
+                }
                 let signal = context.engine.data.get(TelegramEngine.EngineData.Item.Peer.Peer(id: toPeerId)) |> deliverOnMainQueue
 
 

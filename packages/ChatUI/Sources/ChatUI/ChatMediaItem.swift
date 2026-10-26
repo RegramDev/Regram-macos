@@ -1,5 +1,6 @@
 import CoreMedia
 import Cocoa
+import RegramCore
 import TelegramCore
 import InAppSettings
 import Postbox
@@ -405,7 +406,13 @@ public class ChatMediaItem: ChatRowItem {
     }
     
     public override func makeContentSize(_ width: CGFloat) -> NSSize {
-        let size = ChatLayoutUtils.contentSize(for: media, with: width, hasText: message?.text.isEmpty == false || (isBubbled && (commentsBubbleData != nil || message?.isImported == true)))
+        var size = ChatLayoutUtils.contentSize(for: media, with: width, hasText: message?.text.isEmpty == false || (isBubbled && (commentsBubbleData != nil || message?.isImported == true)))
+        if let file = media as? TelegramMediaFile, file.isStaticSticker || file.isAnimatedSticker || file.isVideoSticker,
+           !file.isCustomEmoji, !file.isEmojiAnimatedSticker {
+            let scale = CGFloat(RGMediaPolicy.stickerScale(settings: RegramPreferences.shared.settings(accountId: context.peerId.toInt64())))
+            size = NSSize(width: size.width * scale, height: size.height * scale)
+            if size.width > width { size = size.aspectFitted(NSSize(width: width, height: size.height)) }
+        }
         return size
     }
     

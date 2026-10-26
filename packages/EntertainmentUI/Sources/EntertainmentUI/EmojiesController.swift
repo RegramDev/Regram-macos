@@ -21,6 +21,8 @@ import ChatModeTypes
 import Cocoa
 import InlineStickerLayer
 import ObjcUtils
+import RegramCore
+import RegramSignals
 
 
 // https://getemoji.com/ to get the latest list
@@ -411,6 +413,26 @@ private func emojiesRowSelection(_ selected: [EmojiesSectionRowItem.SelectedItem
         case let .builtin(emoji):
             return keys.contains(emoji)
         }
+    }
+}
+
+private func regramOrderEmojiEntries(_ original: [InputDataEntry], staticIds: Set<InputDataIdentifier>, recentIds: Set<InputDataIdentifier>, bottomId: InputDataIdentifier, putFirst: Bool, hasPremium: Bool) -> [InputDataEntry] {
+    guard putFirst || hasPremium else { return original }
+    let builtin = original.filter { $0.stableId.identifier.map(staticIds.contains) == true }
+    guard !builtin.isEmpty else { return original }
+    var entries = original.filter { $0.stableId.identifier.map(staticIds.contains) != true }
+    let insertion: Int
+    if putFirst {
+        insertion = entries.lastIndex(where: { $0.stableId.identifier.map(recentIds.contains) == true }).map { $0 + 1 } ?? min(1, entries.count)
+    } else {
+        insertion = entries.firstIndex(where: { $0.stableId.identifier == bottomId }) ?? entries.count
+    }
+    entries.insert(contentsOf: builtin, at: insertion)
+    return entries.enumerated().map { index, entry in
+        if case let .custom(sectionId, _, value, identifier, equatable, comparable, item) = entry {
+            return .custom(sectionId: sectionId, index: Int32(index), value: value, identifier: identifier, equatable: equatable, comparable: comparable, item: item)
+        }
+        return entry
     }
 }
 
@@ -2363,7 +2385,7 @@ public final class EmojiesController<Context: AccountContextProtocol> : Telegram
             return .single(.init(values: [], isLoading: true)) |> then(results)
         }
 
-        let combined = statePromise.get()
+        let combined = combineLatest(statePromise.get(), regramPreferenceChanges(accountId: context.peerId.toInt64()))
         
         let presentation = self.presentation
         
@@ -2371,10 +2393,18 @@ public final class EmojiesController<Context: AccountContextProtocol> : Telegram
             return presentation ?? theme
         }
         
-        let signal:Signal<(sections: InputDataSignalValue, packs: InputDataSignalValue, state: State), NoError> = combined |> deliverOnPrepareQueue |> map { state in
-            let sections = InputDataSignalValue(entries: entries(state, arguments: arguments))
-            let packs = InputDataSignalValue(entries: packEntries(state, arguments: arguments, presentation: takePresentation()))
-            return (sections: sections, packs: packs, state: state)
+        let signal:Signal<(sections: InputDataSignalValue, packs: InputDataSignalValue, state: State), NoError> = combined |> deliverOnPrepareQueue |> map { state, preferences in
+            var content = entries(state, arguments: arguments)
+            var panel = packEntries(state, arguments: arguments, presentation: takePresentation())
+            if state.search == nil, arguments.mode == .emoji || arguments.mode == .stories {
+                let staticIds = Set(EmojiSegment.all.flatMap { [_id_emoji_segment($0.rawValue), _id_emoji_block($0.rawValue)] })
+                let recentIds: Set<InputDataIdentifier> = [_id_emoji_segment(EmojiSegment.Recent.rawValue), _id_emoji_block(EmojiSegment.Recent.rawValue), _id_emoji_block(EmojiSegment.RecentAnimated.rawValue)]
+                let first = preferences["defaultEmojisFirst"].bool
+                let premium = state.peer?.peer.isPremium == true || arguments.ignorePremium
+                content = regramOrderEmojiEntries(content, staticIds: staticIds, recentIds: recentIds, bottomId: .init("bottom_section"), putFirst: first, hasPremium: premium)
+                panel = regramOrderEmojiEntries(panel, staticIds: [_id_segments_pack], recentIds: [_id_recent_pack], bottomId: .init("right"), putFirst: first, hasPremium: premium)
+            }
+            return (sections: InputDataSignalValue(entries: content), packs: InputDataSignalValue(entries: panel), state: state)
         }
         
         

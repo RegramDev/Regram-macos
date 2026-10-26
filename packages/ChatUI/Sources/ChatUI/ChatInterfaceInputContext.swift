@@ -5,6 +5,9 @@ import Postbox
 import FoundationUtils
 import TelegramUtils
 import InputView
+import RegramCore
+import ChatHistoryModel
+import ChatModeTypes
 
 public struct PossibleContextQueryTypes: OptionSet {
     public var rawValue: Int32
@@ -245,6 +248,13 @@ public func textInputStateContextQueryRangeAndType(_ inputState: ChatTextInputSt
 
 public func inputContextQueryForChatPresentationIntefaceState(_ chatPresentationInterfaceState: ChatPresentationInterfaceState, includeContext: Bool) -> ChatPresentationInputQuery {
     let inputState = chatPresentationInterfaceState.effectiveInput
+    if includeContext, chatPresentationInterfaceState.state == .normal,
+       let accountId = chatPresentationInterfaceState.accountPeer?.id.toInt64(),
+       chatPresentationInterfaceState.chatLocation.peerId.namespace != Namespaces.Peer.SecretChat,
+       RGAutomaticInlineBotDismissals.shared.permits(inputState.inputText, accountId: accountId, peerId: chatPresentationInterfaceState.chatLocation.peerId.toInt64(), threadId: chatPresentationInterfaceState.chatLocation.threadId),
+       let match = RegramLinkMetadata.shared.inlineQuery(inputState.inputText, enabled: RegramPreferences.shared.settings(accountId: accountId)["features.autoInlineBotEnabled"].bool) {
+        return .contextRequest(addressName: match.username, query: match.query)
+    }
     if let (possibleQueryRange, possibleTypes, additionalStringRange) = textInputStateContextQueryRangeAndType(inputState, includeContext: includeContext) {
         
         if chatPresentationInterfaceState.state == .editing && (possibleTypes != [.contextRequest] && possibleTypes != [.mention] && possibleTypes != [.emoji]) {

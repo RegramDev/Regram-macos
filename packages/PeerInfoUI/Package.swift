@@ -23,6 +23,7 @@ let deps: [(String, String)] = [
     ("CurrencyFormat", "../CurrencyFormat"),
     ("MessageUtils", "../MessageUtils"),
     ("MessageTextUtils", "../MessageTextUtils"),
+    ("PhoneNumberUtils", "../PhoneNumberUtils"),
     ("CaptureExclusion", "../CaptureExclusion"),
     ("SceneEffects", "../SceneEffects"),
     ("FilePanels", "../FilePanels"),
@@ -75,6 +76,7 @@ let package = Package(
         .library(name: "PeerInfoUI", targets: ["PeerInfoUI"]),
     ],
     dependencies: [
+        .package(name: "RegramCore", path: "../RegramCore"),
         .package(name: "SSignalKit", path: "../../submodules/telegram-ios/submodules/SSignalKit"),
         .package(name: "TelegramCore", path: "../../submodules/telegram-ios/submodules/TelegramCore"),
         .package(name: "Postbox", path: "../../submodules/telegram-ios/submodules/Postbox"),
@@ -85,6 +87,8 @@ let package = Package(
         .target(
             name: "PeerInfoUI",
             dependencies: [
+                .product(name: "RegramCore", package: "RegramCore"),
+                .product(name: "RegramSignals", package: "RegramCore"),
                 .product(name: "SwiftSignalKit", package: "SSignalKit", condition: nil),
                 .product(name: "TelegramCore", package: "TelegramCore", condition: nil),
                 .product(name: "Postbox", package: "Postbox", condition: nil),
