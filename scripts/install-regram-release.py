@@ -50,6 +50,68 @@ def signing_identity(requested):
     return identity
 
 
+def is_mach_o(path):
+    with path.open("rb") as source:
+        return source.read(4) in {
+            b"\xfe\xed\xfa\xce", b"\xce\xfa\xed\xfe",
+            b"\xfe\xed\xfa\xcf", b"\xcf\xfa\xed\xfe",
+            b"\xca\xfe\xba\xbe", b"\xbe\xba\xfe\xca",
+            b"\xca\xfe\xba\xbf", b"\xbf\xba\xfe\xca",
+        }
+
+
+def code_bundle_executable(bundle):
+    for info_path in [bundle / "Contents/Info.plist", bundle / "Resources/Info.plist", bundle / "Info.plist"]:
+        if not info_path.is_file():
+            continue
+        info = plistlib.loads(info_path.read_bytes())
+        name = info.get("CFBundleExecutable")
+        if not name:
+            return None
+        if not isinstance(name, str) or Path(name).name != name:
+            raise ValueError(f"Invalid code bundle executable: {bundle}")
+        for candidate in [bundle / "Contents/MacOS" / name, bundle / name]:
+            if candidate.is_file():
+                executable = candidate.resolve()
+                if not executable.is_relative_to(bundle.resolve()):
+                    raise ValueError(f"Code bundle executable is outside its bundle: {bundle}")
+                return executable
+        raise ValueError(f"Missing code bundle executable: {bundle}")
+    return None
+
+
+def signing_targets(app):
+    validate_release_bundle(app)
+    app = app.resolve()
+    bundles = set()
+    executables = set()
+    bundle_executables = set()
+    for directory, directories, filenames in os.walk(app, followlinks=False):
+        directory = Path(directory)
+        directories[:] = [name for name in directories if not (directory / name).is_symlink()]
+        if directory == app or directory.suffix in {".app", ".appex", ".framework", ".xpc", ".bundle"}:
+            executable = code_bundle_executable(directory)
+            if executable is not None:
+                bundle_executables.add(executable)
+                if directory != app:
+                    bundles.add(directory)
+        for name in filenames:
+            path = directory / name
+            if not path.is_symlink() and path.is_file() and is_mach_o(path):
+                executables.add(path)
+    nested = bundles | (executables - bundle_executables)
+    return sorted(nested, key=lambda path: (-len(path.parts), str(path))) + [app]
+
+
+def sign_application(app, identity):
+    targets = signing_targets(app)
+    for target in targets:
+        subprocess.run([
+            "codesign", "--force", "--sign", identity, "--timestamp=none",
+            "--preserve-metadata=entitlements,flags,runtime", str(target)
+        ], check=True)
+
+
 def stop_running_regram():
     processes = subprocess.check_output(["ps", "-axo", "pid=,comm="], text=True)
     running = []
@@ -138,7 +200,7 @@ def main():
     validate_release_bundle(app)
     subprocess.run(["xcrun", "strip", "-S", "-x", str(app / "Contents/MacOS/Regram")], check=True)
     subprocess.run(["python3", str(ROOT / "buildbox/verify-no-labs.py"), str(app)], check=True)
-    subprocess.run(["codesign", "--force", "--deep", "--sign", identity, "--timestamp=none", str(app)], check=True)
+    sign_application(app, identity)
     verify_signed_bundle(app)
     stop_running_regram()
     install_application(app)
