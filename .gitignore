@@ -32,3 +32,4 @@ core-xprojects/tlottie/build
 Telegram-Mac/ApiCredentials.local.xcconfig
 Telegram-Mac/Signing.local.json
 /docs/regram-macos-port/
+/build/

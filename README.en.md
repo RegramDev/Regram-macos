@@ -6,7 +6,7 @@
     <a href="README.md">简体中文</a> · <strong>English</strong>
   </p>
   <p>
-    <a href="https://github.com/RegramDev/Regram-macos/releases">Download</a> ·
+    <a href="https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283368/Regram-13.1.0-283368-universal.dmg">Download</a> ·
     <a href="CHANGELOG.en.md">Changelog</a> ·
     <a href="INSTALL.md">Build instructions</a> ·
     <a href="https://github.com/RegramDev/Regram-macos/issues">Report an issue</a>
@@ -29,7 +29,11 @@ Regram is an unofficial client based on [Telegram for macOS](https://github.com/
 
 ## Downloads and updates
 
-Release builds will be published through this repository's [GitHub Releases](https://github.com/RegramDev/Regram-macos/releases). The first public Regram release has not been published yet. See the [changelog](CHANGELOG.en.md) for upcoming additions and fixes.
+Download the [Regram 13.1.0 (283368) Universal DMG](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283368/Regram-13.1.0-283368-universal.dmg) for Intel and Apple Silicon Macs running macOS 12.0 or later. See the [changelog](CHANGELOG.en.md) for additions and fixes.
+
+This release is signed with an Apple/Mac Development certificate and has not been notarized by Apple. Open the downloaded DMG, drag Regram to Applications, and launch it from that folder.
+
+If Gatekeeper blocks the first launch, first confirm that the download came from this repository's GitHub Releases and that you trust its source. Then use System Settings → Privacy & Security → Open Anyway and confirm opening the app. See [Apple's official instructions](https://support.apple.com/en-us/102445).
 
 Regram uses its own application identifier and local data directory, so it can be installed alongside Telegram. To update, download a new build and replace the application manually. Normal updates retain your existing accounts and local data.
 
@@ -49,7 +53,7 @@ Enter your own `REGRAM_API_ID` and `REGRAM_API_HASH` in the local configuration 
 python3 scripts/install-regram-release.py --identity YOUR_CERTIFICATE_SHA1
 ```
 
-The installer passes `STABLE` to Swift packages, validates the build, and installs it to `/Applications/Regram.app`. For subsequent updates, omit `--identity` to keep using the same certificate. API credentials and local signing configuration are ignored by Git.
+By default, the installer builds only for the current Mac’s architecture. It passes `STABLE` to Swift packages, validates the build, and installs it to `/Applications/Regram.app`. See the [Universal build example](INSTALL.md#universal-build). For subsequent updates, omit `--identity` to keep using the same certificate. API credentials and local signing configuration are ignored by Git.
 
 ## Report an issue
 

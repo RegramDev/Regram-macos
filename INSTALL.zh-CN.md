@@ -6,6 +6,14 @@
 中预先构建的原生库，以及 `packages/` 和 `submodules/telegram-ios/submodules/`
 中的本地 Swift 包。项目没有远程 Swift 包依赖，因此检出全部子模块后即可离线构建。
 
+## 安装发布包
+
+下载 [Regram 13.1.0 (283368) Universal DMG](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283368/Regram-13.1.0-283368-universal.dmg)。此版本支持 Intel 与 Apple Silicon Mac，要求 macOS 12.0 或更高版本。
+
+此版本使用 Apple/Mac Development 开发证书签名，尚未经 Apple 公证。打开下载的 DMG，将 Regram 拖到 Applications（应用程序）文件夹，再从该文件夹启动。
+
+首次打开若被 Gatekeeper 阻止，请先确认下载来自本仓库的 GitHub Releases 且来源可信，再进入“系统设置 → 隐私与安全性 → 仍要打开”，按提示确认打开。详见 [Apple 官方说明](https://support.apple.com/zh-cn/102445)。
+
 ## 环境要求
 
 - 运行 macOS 的 Apple Silicon 或 Intel Mac。Apple Silicon 需要安装 Rosetta 2：
@@ -154,11 +162,34 @@ xcframework 不纳入版本管理，每台机器自行构建。
 
 ```
 xcodebuild -workspace Telegram-Mac.xcworkspace -scheme Release -configuration Release \
+  MACOSX_DEPLOYMENT_TARGET=12.0 \
   'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) STABLE' build
 ```
 
-主应用的部署目标为 macOS 11.0，分享扩展为 macOS 10.13。
+v13.1.0-283368 发布版的部署目标为 macOS 12.0 或更高版本。
 Swift 包从工作区中的本地路径解析，不需要访问网络。
+
+<a id="universal-build"></a>
+
+### 通用架构构建
+
+如需同时构建两种架构，请使用与发布版相同的部署目标：
+
+```
+xcodebuild -workspace Telegram-Mac.xcworkspace -scheme Release -configuration Release \
+  -destination 'generic/platform=macOS' -derivedDataPath build/RegramUniversal \
+  ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO MACOSX_DEPLOYMENT_TARGET=12.0 \
+  CODE_SIGNING_ALLOWED=NO ENABLE_DEBUG_DYLIB=NO \
+  'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) STABLE' build
+
+python3 scripts/install-regram-release.py --skip-build \
+  --derived-data build/RegramUniversal --identity YOUR_CERTIFICATE_SHA1
+```
+
+`ARCHS='arm64 x86_64'` 与 `ONLY_ACTIVE_ARCH=NO` 保留两种架构。
+安装程序默认会按当前机器的架构重新构建；使用 `--skip-build`，并指定同一个
+`--derived-data` 目录，才能直接为已有 Universal 应用签名和安装，避免重建为单一架构。
+保存过签名身份后，可以省略 `--identity`，继续使用该证书。
 
 ### 生成 TelegramApi 源码
 
@@ -198,7 +229,7 @@ Xcode 检查会使用一份干净的 TelegramApi 副本构建临时命令行应�
 ### 本地 Regram 测试与更新
 
 本地 Regram 测试使用 Release 配置，并安装、启动固定路径 `/Applications/Regram.app`。
-安装程序针对当前 Mac 构建，向 Swift 包传入 `STABLE`，检查调试功能已排除，
+安装程序默认只为当前 Mac 的架构构建，向 Swift 包传入 `STABLE`，检查调试功能已排除，
 并使用固定证书签名。替换验证通过后才删除旧应用及临时构建的应用包，
 编译缓存与应用数据会保留。
 

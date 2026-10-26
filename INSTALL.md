@@ -7,6 +7,14 @@ libraries built once from `core-xprojects/` and a collection of local Swift pack
 from `packages/` and `submodules/telegram-ios/submodules/`. There are no remote Swift
 package dependencies, so once the submodules are checked out the build is offline.
 
+## Install a release build
+
+Download the [Regram 13.1.0 (283368) Universal DMG](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283368/Regram-13.1.0-283368-universal.dmg). This release supports Intel and Apple Silicon Macs and requires macOS 12.0 or later.
+
+This release is signed with an Apple/Mac Development certificate and has not been notarized by Apple. Open the downloaded DMG, drag Regram to Applications, and launch it from that folder.
+
+If Gatekeeper blocks the first launch, first confirm that the download came from this repository's GitHub Releases and that you trust its source. Then use System Settings → Privacy & Security → Open Anyway and confirm opening the app. See [Apple's official instructions](https://support.apple.com/en-us/102445).
+
 ## Requirements
 
 - macOS on Apple Silicon or Intel. On Apple Silicon, Rosetta 2 is needed: the `tde2e`
@@ -162,11 +170,33 @@ From the command line:
 
 ```
 xcodebuild -workspace Telegram-Mac.xcworkspace -scheme Release -configuration Release \
+  MACOSX_DEPLOYMENT_TARGET=12.0 \
   'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) STABLE' build
 ```
 
-The main app targets macOS 11.0 and the share extension macOS 10.13. Swift packages are
-resolved from the local paths in the workspace; no network access is needed.
+The v13.1.0-283368 release targets macOS 12.0 or later. Swift packages are resolved
+from the local paths in the workspace; no network access is needed.
+
+### Universal build
+
+To build both architectures, use the same deployment target as the published release:
+
+```
+xcodebuild -workspace Telegram-Mac.xcworkspace -scheme Release -configuration Release \
+  -destination 'generic/platform=macOS' -derivedDataPath build/RegramUniversal \
+  ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO MACOSX_DEPLOYMENT_TARGET=12.0 \
+  CODE_SIGNING_ALLOWED=NO ENABLE_DEBUG_DYLIB=NO \
+  'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) STABLE' build
+
+python3 scripts/install-regram-release.py --skip-build \
+  --derived-data build/RegramUniversal --identity YOUR_CERTIFICATE_SHA1
+```
+
+`ARCHS='arm64 x86_64'` and `ONLY_ACTIVE_ARCH=NO` keep both architecture slices.
+The installer defaults to a build for the host architecture. Use `--skip-build` with
+the same `--derived-data` directory to sign and install the existing Universal app
+without rebuilding it as a single-architecture app. Once an identity is saved, omit
+`--identity` to reuse that certificate.
 
 ### Generated TelegramApi sources
 
@@ -210,7 +240,8 @@ It prints the temporary directory containing its build logs.
 ### Local Regram testing and updates
 
 Use the Release configuration for local Regram testing. Install and launch the fixed
-`/Applications/Regram.app` path. The installer builds for the current Mac, passes
+`/Applications/Regram.app` path. By default, the installer builds only for the current
+Mac’s architecture, passes
 `STABLE` to Swift packages, checks that debug features are excluded, and signs with a
 fixed certificate. It verifies the replacement before removing the old app and the
 temporary build app bundles. Compilation caches and application data are retained.

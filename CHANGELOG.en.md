@@ -2,7 +2,7 @@
 
 [简体中文](CHANGELOG.md) · **English**
 
-## Unreleased
+## 13.1.0 (283368) — 2026-10-26
 
 ### Added
 
@@ -29,6 +29,8 @@
 - Simplify bottom bar settings to contact and call visibility and manual width adjustment.
 - Standardize send-key labels as “Return” and support Command + Enter for line breaks.
 - Store Regram data and Keychain items separately, and retain logins across updates signed with the same identity.
+
+- Improve update signing by signing the app and embedded components individually with the same certificate, preserving each target's existing entitlements, signing flags, and runtime settings.
 
 ### Fixed
 
