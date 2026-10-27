@@ -2384,7 +2384,6 @@ private enum ChatPlayEffectTarget {
 }
 
 open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewController<ChatControllerView, Context>, Notifable, TableViewDelegate, ChatControllerKind, ChatInterfaceController {
-    private lazy var regramMediaLoading = RegramChatMediaLoadingCoordinator(context: context)
     private enum WallpaperResult : Equatable {
         case result(Wallpaper?)
         case loading 
@@ -3012,7 +3011,6 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
     }
     
     private func updateVisibleRange(_ range: NSRange) -> Void {
-        regramMediaLoading.update(table: genericView.tableView)
         var lowerBound: MessageIndex?
         var upperBound: MessageIndex?
         for i in range.lowerBound ..< range.upperBound {
@@ -4056,7 +4054,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
 
         let previousHistoryViewUpdateId = Atomic<Int?>(value: nil)
         let historyViewTransition = combineLatest(queue: queue,
-                                                  combineLatest(historyViewUpdate, combineLatest(regramPreferenceChanges(accountId: context.peerId.toInt64()), regramQuickTranslationChanges(accountId: context.peerId.toInt64()))) |> map { update, _ in update },
+                                                  combineLatest(historyViewUpdate, combineLatest(regramContentPreferenceChanges(accountId: context.peerId.toInt64()), regramQuickTranslationChanges(accountId: context.peerId.toInt64()))) |> map { update, _ in update },
                                                   appearanceSignal,
                                                   maxReadIndex.get(),
                                                   searchState.get(),
@@ -9866,7 +9864,6 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         chatInteraction.mediaSendFlight?.tableDidUpdate()
         self.lastFloatingCollectKey = nil
         collectFloatingPhotos(animated: animated && transition.state.isNone, currentAnimationRows: currentAnimationRows)
-        regramMediaLoading.update(table: genericView.tableView)
 
         
         self.genericView.tableView.notifyScrollHandlers()
@@ -10647,7 +10644,6 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
     private var didCleanup: Bool = false
 
     private func cleanup() {
-        regramMediaLoading.setActive(false)
         if didCleanup {
             return
         }
@@ -10749,7 +10745,6 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
 
 
     public override func viewWillDisappear(_ animated: Bool) {
-        regramMediaLoading.setActive(false)
         chatInteraction.invalidateDeferredSendActions()
         super.viewWillDisappear(animated)
         self.cancelMessageFocus()
@@ -10831,8 +10826,6 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
     
     public override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        regramMediaLoading.setActive(true)
-        regramMediaLoading.update(table: genericView.tableView)
 
         isPushedGlobalBackground = true
         updateBubblesBackButton()

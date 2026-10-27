@@ -71,7 +71,7 @@ public struct RegramSetting: Equatable {
         .init("disableChatSwipeOptions", .appearance, .bool(false)),
         .init("hideTabBar", .appearance, .bool(false)),
         .init("rememberLastFolder", .appearance, .bool(false)),
-        .init("showTabNames", .appearance, .bool(true)),
+        .init("showTabNames", .appearance, .bool(false)),
         .init("tabBarWidthPercent", .appearance, .integer(0)),
         .init("native.enableVoipTcp", .network, .bool(false)),
         .init("messageDoubleTapActionOutgoing", .messages, .string("default")),
@@ -83,7 +83,7 @@ public struct RegramSetting: Equatable {
         .init("features.groupProfileSettingItems", .appearance, .string("")),
         .init("native.showCallsTab", .appearance, .bool(true)),
         .init("native.showContactsTab", .appearance, .bool(true)),
-        .init("bottomBarLayout", .appearance, .dictionary(["automaticWidth": "true", "visible": "true", "items": "contacts,calls,chats,settings", "external": "", "hidden": "search", "topSearch": "true", "labels": "true", "width": "full", "slots": "visibleOnly", "fill": "100", "alignment": "overallCenter", "search": "hidden"])),
+        .init("bottomBarLayout", .appearance, .dictionary(RegramBottomBarSettings().storedValues)),
         .init("contextShowEditHistory", .messages, .bool(true)),
         .init("contextShowJson", .messages, .bool(false)),
         .init("contextShowMessageReplies", .messages, .bool(true)),
@@ -113,7 +113,6 @@ public struct RegramSetting: Equatable {
         .init("disableGalleryCamera", .media, .bool(false)),
         .init("hideChannelBottomButton", .messages, .bool(false)),
         .init("forceBuiltInMic", .media, .bool(false)),
-        .init("disableDeleteChatSwipeOption", .messages, .bool(false)),
         .init("features.chatListStartupFolderMode", .messages, .string("telegram"), choices: [.string("telegram"), .string("last"), .string("specific")]),
         .init("allChatsTitleLengthOverride", .messages, .string("none"), choices: [.string("none"), .string("short"), .string("long")]),
         .init("compactFolderNames", .messages, .bool(false)),
@@ -231,7 +230,6 @@ public struct RegramSetting: Equatable {
         .init("enableVoipTcp", .network, .bool(false)),
         .init("uploadSpeedBoost", .network, .bool(false)),
         .init("downloadSpeedBoost", .network, .string("none"), choices: ["none", "medium"].map(RegramValue.string)),
-        .init("mediaLoadingExperiment", .media, .bool(false)),
     ]
 
     public static let availableKeys: Set<String> = [
@@ -275,7 +273,6 @@ public struct RegramSetting: Equatable {
         "defaultVideoQuality",
         "disableAllAds",
         "disableBackupAddresses",
-        "disableDeleteChatSwipeOption",
         "disableGalleryCamera",
         "disableLinkPreview",
         "disableSendAsButton",
@@ -326,7 +323,6 @@ public struct RegramSetting: Equatable {
         "localDNSForProxyHost",
         "localPremium",
         "localPremiumEmojiStatus",
-        "mediaLoadingExperiment",
         "mentionAsUserIdLink",
         "messageBookmarksEnabled",
         "messageDoubleTapAction",
@@ -400,6 +396,7 @@ public struct RegramAccountSettings: Codable, Equatable {
 
     public subscript(_ key: String) -> RegramValue {
         get {
+            if key == "mediaLoadingExperiment" { return .bool(false) }
             if key == "native.enableVoipTcp" || key == "enableVoipTcp" { return values["enableVoipTcp"] ?? values["native.enableVoipTcp"] ?? .bool(false) }
             return values[key] ?? RegramSetting.byKey[key]?.defaultValue ?? .string("")
         }
@@ -439,6 +436,7 @@ public struct RegramAccountSettings: Codable, Equatable {
 public final class RegramPreferences {
     public static let shared = RegramPreferences(defaults: regramSharedDefaults())
     public static let didChange = Notification.Name("Regram.Preferences.DidChange")
+    public static let changedKeysUserInfoKey = "changedKeys"
     private let defaults: UserDefaults
     private let lock = NSLock()
     private var cache: [Int64: RegramAccountSettings] = [:]
@@ -446,6 +444,11 @@ public final class RegramPreferences {
     private var revisions: [Int64: Int64] = [:]
 
     public init(defaults: UserDefaults = .standard) { self.defaults = defaults }
+
+    public static func isContentChange(_ notification: Notification) -> Bool {
+        guard let keys = notification.userInfo?[changedKeysUserInfoKey] as? Set<String> else { return true }
+        return !keys.isSubset(of: RegramBottomBarSettings.preferenceKeys)
+    }
 
     public func revision(accountId: Int64) -> Int64 {
         lock.lock()
@@ -487,12 +490,15 @@ public final class RegramPreferences {
         transform(&updated)
         updated.values = updated.values.filter { RegramSetting.byKey[$0.key]?.accepts($0.value) == true }
         guard updated != old, let data = try? JSONEncoder().encode(updated) else { lock.unlock(); return }
+        let changedKeys = Set(old.values.keys).union(updated.values.keys).filter { old.values[$0] != updated.values[$0] }
         defaults.set(data, forKey: key(accountId))
         cache[accountId] = updated
-        revisions[accountId] = (revisions[accountId] ?? 0) &+ 1
-        filters.removeValue(forKey: accountId)
+        if !changedKeys.isSubset(of: RegramBottomBarSettings.preferenceKeys) {
+            revisions[accountId] = (revisions[accountId] ?? 0) &+ 1
+            filters.removeValue(forKey: accountId)
+        }
         lock.unlock()
-        DispatchQueue.main.async { NotificationCenter.default.post(name: Self.didChange, object: accountId) }
+        DispatchQueue.main.async { NotificationCenter.default.post(name: Self.didChange, object: accountId, userInfo: [Self.changedKeysUserInfoKey: changedKeys]) }
     }
 
     public func reset(accountId: Int64, category: RegramCategory? = nil) {

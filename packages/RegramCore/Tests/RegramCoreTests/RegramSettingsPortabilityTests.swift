@@ -25,6 +25,10 @@ final class RegramSettingsPortabilityTests: XCTestCase {
         XCTAssertEqual(RegramSettingsRoute(page: "pro.appearance", item: "appIcon")?.destination, "settings.appearance/appIcon")
         XCTAssertEqual(RegramSettingsRoute(page: "pro.notifications", item: "hideTabBarPermissionWarnings")?.destination, "settings.appearance/hideTabBarPermissionWarnings")
         XCTAssertNil(RegramSettingsRoute(page: "bottomBar", item: "search"))
+        XCTAssertNil(RegramSettingsRoute(page: "settings.chatList", item: "disableDeleteChatSwipeOption"))
+        XCTAssertEqual(RegramSettingsRoute(page: "bottomBar", item: "width")?.destination, "bottomBar/width")
+        XCTAssertEqual(RegramSettingsRoute(page: "bottomBar", item: "labels")?.destination, "bottomBar/labels")
+        XCTAssertEqual(RegramSettingsRoute(page: "bottomBar", item: "calls")?.destination, "bottomBar/calls")
         XCTAssertTrue(RegramSettingsCatalog.results(query: "mentionAsUserIdLink", language: "en").contains { $0.destination == "pro.input/mentionAsUserIdLink" })
     }
 
@@ -62,13 +66,53 @@ final class RegramSettingsPortabilityTests: XCTestCase {
         let restoredLayout = RegramBottomBarSettings(settings: restored)
         XCTAssertTrue(restoredLayout.showLabels)
         XCTAssertTrue(restoredLayout.isBottomBarVisible)
-        XCTAssertFalse(restoredLayout.automaticWidth)
+        XCTAssertTrue(restoredLayout.automaticWidth)
         XCTAssertFalse(restoredLayout.isVisible(.calls))
         XCTAssertEqual(restored["features.chatListStartupFolderMode"], .string("last"))
         XCTAssertTrue(restored["enableVoipTcp"].bool)
         let reset = RegramSettingsBackup(values: [:]).applying(to: restored, categories: [], resetCategories: [.media])
         XCTAssertFalse(reset["enableVoipTcp"].bool)
         XCTAssertEqual(reset["features.chatListStartupFolderMode"], .string("last"))
+    }
+
+    func testBackupPreservesNativeCallPanelIndependentlyOfContactLayout() throws {
+        for calls in [false, true] {
+            var settings = RegramAccountSettings()
+            var layout = RegramBottomBarSettings()
+            layout.hide(.contacts)
+            layout.apply(to: &settings)
+            settings["native.showCallsTab"] = .bool(calls)
+            let backup = try RegramSettingsBackup.decode(RegramSettingsBackup(settings: settings).encoded())
+            XCTAssertEqual(backup.values["native.showCallsTab"], .bool(calls))
+            let restored = backup.applying(to: RegramAccountSettings())
+            XCTAssertEqual(restored["native.showCallsTab"], .bool(calls))
+            XCTAssertEqual(RegramBottomBarSettings(settings: restored).visibleNavigationItems, [.chats, .settings])
+        }
+    }
+
+    func testRetiredDeleteSwipeOptionDoesNotOverrideTheUnifiedSwipePolicy() throws {
+        XCTAssertNil(RegramSetting.byKey["disableDeleteChatSwipeOption"])
+        XCTAssertFalse(RegramSetting.availableKeys.contains("disableDeleteChatSwipeOption"))
+        XCTAssertFalse(RegramSettingsCatalog.sourceEntries.contains { $0.key == "disableDeleteChatSwipeOption" })
+        let backup = RegramSettingsBackup(values: ["disableDeleteChatSwipeOption": .bool(true), "features.chatListSwipeAction": .string("quick")])
+        let restored = try RegramSettingsBackup.decode(backup.encoded()).applying(to: RegramAccountSettings())
+        XCTAssertNil(restored.values["disableDeleteChatSwipeOption"])
+        XCTAssertEqual(RegramChatListPolicy.swipeAction(settings: restored), .quickActions)
+        let legacy = RegramAccountSettings(values: ["disableDeleteChatSwipeOption": .bool(true), "features.chatListSwipeAction": .string("both")])
+        XCTAssertEqual(RegramChatListPolicy.swipeAction(settings: legacy), .both)
+    }
+
+    func testMediaLoadingExperimentCannotBeEnabledByLegacyMacPreferencesOrBackup() throws {
+        XCTAssertNil(RegramSetting.byKey["mediaLoadingExperiment"])
+        XCTAssertFalse(RegramSetting.availableKeys.contains("mediaLoadingExperiment"))
+        XCTAssertNil(RegramSettingsRoute(page: "settings.media", item: "mediaLoadingExperiment"))
+        XCTAssertFalse(RegramSettingsCatalog.sourceEntries.contains { $0.key == "mediaLoadingExperiment" })
+        let legacy = RegramAccountSettings(values: ["mediaLoadingExperiment": .bool(true)])
+        XCTAssertFalse(legacy["mediaLoadingExperiment"].bool)
+        let backup = RegramSettingsBackup(settings: legacy, categories: [.media])
+        let restored = try RegramSettingsBackup.decode(backup.encoded()).applying(to: RegramAccountSettings())
+        XCTAssertNil(backup.values["mediaLoadingExperiment"])
+        XCTAssertFalse(restored["mediaLoadingExperiment"].bool)
     }
 
     func testBackupRejectsInvalidSourceRangesAndRetainsValidImportedStickerSize() throws {

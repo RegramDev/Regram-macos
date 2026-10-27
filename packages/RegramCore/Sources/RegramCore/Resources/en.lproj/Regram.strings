@@ -717,7 +717,7 @@
 "QrLogin.Text" = "1. Open Telegram on a device where you are already logged in.\n2. Go to Settings → Devices → Link Desktop Device.\n3. Scan this code to log in.";
 "QrLogin.Title" = "Log in by QR Code";
 "QrLogin.TooManyAttempts" = "Too many attempts. Trying again shortly…";
-"RG.BottomBarLayout" = "Bottom Bar Layout";
+"RG.BottomBarLayout" = "Bottom Bar";
 "RG.BottomBarLayout.Alignment" = "Alignment";
 "RG.BottomBarLayout.Alignment.center" = "Center All";
 "RG.BottomBarLayout.Alignment.disabled" = "Not used in full width";
@@ -877,7 +877,7 @@
 "Settings.DownloadsBoost.Notice" = "Increase concurrent downloads and chunk size when enabled.";
 "Settings.DownloadsBoost.none" = "Disabled";
 "Settings.Editor.appBages.Description" = "App badges and styles in screenshots";
-"Settings.Editor.bottomBarLayout.Description" = "Visible items, order, labels and width";
+"Settings.Editor.bottomBarLayout.Description" = "Telegram bottom bar with optional contacts";
 "Settings.Editor.contextMenuOrder.Description" = "Visible actions, drag order and groups";
 "Settings.Editor.diagnostics.Description" = "Datacentre, DNS and transfer diagnostics";
 "Settings.Editor.fonts.Description" = "Latin and CJK fonts, imports and previews";
@@ -979,7 +979,7 @@
 "Settings.Stories.DisableSwipeToRecord" = "Disable Swipe to Record";
 "Settings.Stories.Hide" = "Hide Stories";
 "Settings.Stories.WarnBeforeView" = "Ask Before Viewing";
-"Settings.Tabs.Customize" = "Bottom Bar Layout";
+"Settings.Tabs.Customize" = "Bottom Bar";
 "Settings.Tabs.Header" = "TABS";
 "Settings.Tabs.HideTabBar" = "Hide Tab bar";
 "Settings.Tabs.SearchButton" = "Search Button";

@@ -49,9 +49,6 @@ public func RegramDiagnosticsController(context: any AccountContextProtocol, foc
         page.row("average", title: regramString("Diagnostics.Filter.Average"), type: .context(state.timing.map { String(format: "%.2f ms", $0) } ?? "—"))
         page.text("\(settings.filterRules.count) " + regramString("Diagnostics.Rules"))
         page.text(regramString("Diagnostics.Filter.Notice"))
-        page.section()
-        page.text(regramString(settings["mediaLoadingExperiment"].bool ? "Diagnostics.Media.On" : "Diagnostics.Media.Off"))
-        page.text(regramString("Diagnostics.Media.Notice"))
         return InputDataSignalValue(entries: page.entries)
     }
     let controller = InputDataController(dataSignal: signal, title: regramString("Diagnostics.Title"), afterDisappear: cancel, removeAfterDisappear: false, hasDone: false, identifier: "regram.diagnostics")

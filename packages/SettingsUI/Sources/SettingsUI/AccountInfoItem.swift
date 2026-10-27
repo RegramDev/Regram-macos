@@ -99,7 +99,7 @@ public class AccountInfoItem: GeneralRowItem {
             self?.photos = photos.map { $0.value }
             self?.noteHeightOfRow()
         }))
-        displayDisposable.set((combineLatest(regramLocalGiftsState(context: context), regramPreferenceChanges(accountId: context.peerId.toInt64())) |> deliverOnMainQueue).start(next: { [weak self] _, _ in
+        displayDisposable.set((combineLatest(regramLocalGiftsState(context: context), regramPreferenceChanges(accountId: context.peerId.toInt64(), keys: ["hidePhoneInSettings"])) |> deliverOnMainQueue).start(next: { [weak self] _, _ in
             guard let self else { return }
             let text = regramAccountInfoDisplayText(context: context, peer: self.peer)
             guard !self.textLayout.attributedString.isEqual(to: text) else { return }

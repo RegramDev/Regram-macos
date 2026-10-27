@@ -4,7 +4,7 @@ import RegramSignals
 import SwiftSignalKit
 
 public func regramMessageFilterChanges(accountId: Int64) -> Signal<Void, NoError> {
-    regramPreferenceChanges(accountId: accountId) |> map { _ in () }
+    regramPreferenceChanges(accountId: accountId, keys: ["messageFilterRules", "blockedPeerIds", "messageFilterDisabledPeerIds"]) |> map { _ in () }
 }
 
 public func regramVisibleMessages(_ messages: [Message], accountId: Int64) -> [Message] {

@@ -8,6 +8,7 @@ import SwiftSignalKit
 import ColorPalette
 import InAppSettings
 import ThemeSettings
+import RegramCore
 
 func regramString(_ key: String) -> String { key }
 
@@ -479,6 +480,162 @@ struct NativeUIChecks {
         measurements.append(["kind": "searchNavigation", "appearanceCalls": appearanceCalls, "responderCalls": responderCalls, "transactionCalls": transactionCalls, "query": query.with { $0 }, "returnedCaret": NSStringFromRange(selection), "markedTextPreserved": current.searchView.query == markedText])
     }
 
+    static func nativeThemeRows(output: URL) throws {
+        var root = URL(fileURLWithPath: #filePath)
+        for _ in 0 ..< 4 { root.deleteLastPathComponent() }
+        for name in ["Regram-Paper", "Regram-Graphite"] {
+            let path = root.appendingPathComponent("themes/Regram-Quiet/\(name).palette")
+            let source = try String(contentsOf: path)
+            guard let background = source.components(separatedBy: "\n").first(where: { $0.hasPrefix("background = ") })?.components(separatedBy: " = ").last,
+                  let fixed = importPalette(path.path) else { throw NativeCheckError.failed("missing theme \(name)") }
+            let baselinePath = output.appendingPathComponent("\(name)-flat-baseline.palette")
+            let baselineSource = source.replacingOccurrences(of: "(?m)^listBackground =.*$", with: "listBackground = \(background)", options: .regularExpression)
+            try baselineSource.write(to: baselinePath, atomically: true, encoding: .utf8)
+            guard let baseline = importPalette(baselinePath.path) else { throw NativeCheckError.failed("missing baseline \(name)") }
+            for (suffix, palette, repaired) in [("fixed", fixed, true), ("baseline", baseline, false)] {
+                telegramUpdateTheme(generateTheme(palette: palette, cloudTheme: nil, bubbled: false, fontSize: 13, wallpaper: ThemeWallpaper(), liquidGlass: false), animated: false)
+                let item = GeneralInteractedRowItem(NSSize(width: 600, height: 44), stableId: name + suffix, name: "Native settings row", type: .switchable(false), viewType: .singleItem)
+                let view = makeView(item, width: 600)
+                check(GeneralViewType.singleItem.isPlainMode == !repaired, "\(name)/\(suffix) native theme mode")
+                check(view.borderView.isHidden == repaired, "\(name)/\(suffix) native single row separator")
+                check(GeneralViewType.singleItem.corners.isEmpty == !repaired, "\(name)/\(suffix) native row corners")
+                let mask = view.containerView.layer?.mask as? CAShapeLayer
+                check(mask?.path?.contains(CGPoint(x: 1, y: 1)) == !repaired, "\(name)/\(suffix) real native corner mask")
+                _ = try layerComposite(view, path: output.appendingPathComponent("theme-row-\(name)-\(suffix).png"))
+                measurements.append(["kind": "nativeThemeRow", "theme": name, "repaired": repaired, "plain": GeneralViewType.singleItem.isPlainMode, "separatorHidden": view.borderView.isHidden])
+            }
+        }
+    }
+
+    static func nativeBottomBar(output: URL) throws {
+        final class InsetTrackingController: ViewController {
+            var insetUpdates = 0
+            var appearances = 0
+            var disappearances = 0
+
+            override func updateContainerContentInsets(_ insets: NSEdgeInsets, transition: ContainedViewLayoutTransition) {
+                insetUpdates += 1
+                super.updateContainerContentInsets(insets, transition: transition)
+            }
+
+            override func viewWillAppear(_ animated: Bool) {
+                appearances += 1
+                super.viewWillAppear(animated)
+            }
+
+            override func viewWillDisappear(_ animated: Bool) {
+                disappearances += 1
+                super.viewWillDisappear(animated)
+            }
+        }
+        for (name, palette) in [("light", dayClassicPalette), ("dark", darkPalette)] {
+            telegramUpdateTheme(generateTheme(palette: palette, cloudTheme: nil, bubbled: false, fontSize: 13, wallpaper: ThemeWallpaper(), liquidGlass: false), animated: false)
+            let icons = [("Contacts", theme.icons.tab_contacts, theme.icons.tab_contacts_active), ("Calls", theme.icons.tab_calls, theme.icons.tab_calls_active), ("Chats", theme.icons.tab_chats, theme.icons.tab_chats_active), ("Settings", theme.icons.tab_settings, theme.icons.tab_settings_active)]
+            for width: CGFloat in [320, 600, 1000] {
+                for selectedTitle in ["Chats", "Settings"] {
+                    let controller = TabBarController()
+                    controller.bar = .init(height: 0)
+                    controller._frameRect = NSMakeRect(0, 0, width, 700)
+                    controller.loadViewIfNeeded()
+                    let items = icons.map { title, image, selectedImage -> TabItem in
+                        let child = InsetTrackingController()
+                        child.bar = .init(height: 0)
+                        let item = TabItem(image: image, selectedImage: selectedImage, controller: child)
+                        item.accessibilityTitle = title
+                        return item
+                    }
+                    let selectedItem = items.first { $0.accessibilityTitle == selectedTitle }!
+                    let selectedController = selectedItem.controller as! InsetTrackingController
+                    let identifiers: [RegramBottomBarItemId] = [.contacts, .calls, .chats, .settings]
+                    let tabs = Dictionary(uniqueKeysWithValues: zip(identifiers, items))
+                    for visible in [[items[0], items[2], items[3]], [items[2], items[3]], items, [items[2], items[3]], [items[0], items[2], items[3]]] {
+                        let preservesCurrent = controller.current === selectedController
+                        let previousAppearances = selectedController.appearances
+                        let previousDisappearances = selectedController.disappearances
+                        let visibleIdentifiers = visible.map { item in identifiers[items.firstIndex { $0 === item }!] }
+                        rebuildNativeBottomBar(controller, tabs: tabs, visible: visibleIdentifiers, selected: selectedTitle == "Chats" ? .chats : .settings)
+                        controller.updateFrame(NSMakeRect(0, 0, width, 700), transition: .immediate)
+                        controller.view.layoutSubtreeIfNeeded()
+                        guard let bar = controller.view.subviews.compactMap({ $0 as? TabBarView }).first else { throw NativeCheckError.failed("missing native tab bar") }
+                        let expectedWidth = min(500, width - 40)
+                        check(bar.frame == NSMakeRect(floorToScreenPixels((width - expectedWidth) / 2), 636, expectedWidth, 48), "\(name)/\(width)/\(visible.count) upstream floating frame")
+                        check(controller.contentBottomInset == 64, "\(name)/\(width)/\(visible.count) upstream bottom inset")
+                        check(controller.current === selectedController, "\(name)/\(width)/\(visible.count) visibility keeps \(selectedTitle) selected")
+                        if preservesCurrent {
+                            check(selectedController.appearances == previousAppearances && selectedController.disappearances == previousDisappearances, "\(name)/\(width)/\(visible.count) visibility preserves \(selectedTitle) lifecycle")
+                        }
+                        for (index, item) in visible.enumerated() {
+                            let control = controller.control(for: index)
+                            check(allSubviews(control).allSatisfy { !($0 is NSTextField) }, "\(name)/\(width)/\(index) native icon without custom label")
+                            check(control.accessibilityLabel() == item.accessibilityTitle && controller.tab(at: index).controller === item.controller, "\(name)/\(width)/\(index) native tab target and accessibility")
+                        }
+                        let controls = visible.indices.map { controller.control(for: $0) }
+                        for showsLabels in [true, false] {
+                            for fraction: CGFloat in [0.5, 0.75, 1] {
+                                let previousHeight = bar.frame.height
+                                let previousInsetUpdates = visible.map { ($0.controller as! InsetTrackingController).insetUpdates }
+                                controller.updatePresentation(TabBarPresentation(showsLabels: showsLabels, width: .fraction(fraction)))
+                                controller.view.layoutSubtreeIfNeeded()
+                                let height: CGFloat = showsLabels ? 64 : 48
+                                let requestedWidth = max(min(expectedWidth, CGFloat(visible.count) * 44 + 8), expectedWidth * fraction)
+                                check(bar.frame.height == height && bar.frame.maxY == 684, "\(name)/\(width)/\(visible.count)/\(fraction) label height and native bottom gap")
+                                check(bar.frame.width == requestedWidth && bar.frame.minX == floorToScreenPixels((width - requestedWidth) / 2), "\(name)/\(width)/\(visible.count)/\(fraction) adjustable centered width")
+                                check(controller.contentBottomInset == height + 16, "\(name)/\(width)/\(visible.count)/\(fraction) label content inset")
+                                check(controller.current === selectedController, "\(name)/\(width)/\(visible.count)/\(fraction) presentation preserves selected controller")
+                                for (index, item) in visible.enumerated() {
+                                    let control = controller.control(for: index)
+                                    let expectedInsetUpdates = previousInsetUpdates[index] + (previousHeight == height ? 0 : 1)
+                                    check((item.controller as! InsetTrackingController).insetUpdates == expectedInsetUpdates, "\(name)/\(width)/\(index) width changes avoid content relayout")
+                                    let labels = allSubviews(control).compactMap { $0 as? NSTextField }
+                                    check(control === controls[index], "\(name)/\(width)/\(index) presentation reuses native tab controls")
+                                    check(labels.count == (showsLabels ? 1 : 0) && labels.allSatisfy { $0.stringValue == item.accessibilityTitle }, "\(name)/\(width)/\(index) label toggle and title")
+                                    if let label = labels.first, let icon = control.subviews.first {
+                                        check(label.frame.minY >= icon.frame.maxY && label.frame.maxY <= control.bounds.maxY, "\(name)/\(width)/\(index) label fits below icon")
+                                    }
+                                }
+                                if width == 600 && visible.count == 3 && fraction == 0.75 && selectedTitle == "Settings" {
+                                    try render(bar, path: output.appendingPathComponent("bottom-bar-\(name)-\(showsLabels ? "labels" : "icons").png"))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    static func navigationSwitchFeedback() throws {
+        let controller = InputDataController(dataSignal: .never(), title: "Native navigation switch feedback", hasDone: false)
+        var setupCalls = 0
+        controller.tableView.afterSetupItem = { _, _ in setupCalls += 1 }
+        regramConfigureNavigationSwitches(controller)
+        controller.didLoad(controller, [:])
+        var applies = 0
+        let item = GeneralInteractedRowItem(NSSize(width: 600, height: 50), name: "Show Labels", type: .switchable(false), viewType: .singleItem, action: { applies += 1 })
+        let row = makeView(item, width: 600) as! GeneralInteractedRowView
+        controller.tableView.afterSetupItem?(row, item)
+        guard let toggle = row.switchView else { throw NativeCheckError.failed("missing native navigation switch") }
+        let window = NSWindow(contentRect: row.bounds, styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = row
+        defer { window.contentView = nil; window.close() }
+        check(toggle.commitsOnRelease && setupCalls == 1, "navigation production binding enables immediate release and preserves row setup")
+        row.invokeAction(item)
+        check(toggle.isOn && applies == 1, "navigation label setting applies before its spring finishes")
+        toggle.setIsOn(true, animated: false)
+        if !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            check(allSubviews(toggle).contains { $0.layer?.animation(forKey: "switchPosition") != nil }, "matching settings echo preserves the navigation switch spring")
+        }
+        RunLoop.current.run(until: Date().addingTimeInterval(1.15))
+        check(toggle.isOn && applies == 1, "navigation switch animation completion never applies twice")
+        row.invokeAction(item)
+        check(!toggle.isOn && applies == 2, "navigation label disable also applies immediately")
+        toggle.isEnabled = false
+        RunLoop.current.run(until: Date().addingTimeInterval(1.15))
+        check(!toggle.isOn && applies == 2, "disabled navigation switch does not replay a committed change")
+        check(!window.isVisible && !window.isKeyWindow && !window.isMainWindow, "navigation switch feedback window remains hidden")
+    }
+
     static func main() throws {
         _ = NSApplication.shared
         NSApplication.shared.setActivationPolicy(.prohibited)
@@ -487,6 +644,11 @@ struct NativeUIChecks {
         let output = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
         let searchOnly = CommandLine.arguments.contains("--search-only")
         let searchNavigationOnly = CommandLine.arguments.contains("--search-navigation-only")
+        if !searchOnly && !searchNavigationOnly {
+            try nativeBottomBar(output: output)
+            try navigationSwitchFeedback()
+            try nativeThemeRows(output: output)
+        }
         if searchOnly {
             try searchAppearance(output: output)
         }

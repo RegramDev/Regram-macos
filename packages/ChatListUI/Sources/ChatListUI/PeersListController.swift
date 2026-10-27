@@ -2502,7 +2502,7 @@ open class PeersListController<Context: AccountContextProtocol>: TelegramGeneric
     open override func viewDidLoad() {
         super.viewDidLoad()
         updateContainerContentInsets(containerContentInsets, transition: .immediate)
-        actionsDisposable.add((regramPreferenceChanges(accountId: context.peerId.toInt64()) |> deliverOnMainQueue).start(next: { [weak self] _ in
+        actionsDisposable.add((regramPreferenceChanges(accountId: context.peerId.toInt64(), keys: ["native.foldersAtBottom"]) |> deliverOnMainQueue).start(next: { [weak self] _ in
             guard let self else { return }
             self.genericView.updateLayout(self.genericView.frame.size, transition: .immediate)
             self.genericView.updateScrollerInset(animated: false)

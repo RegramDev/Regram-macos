@@ -82,7 +82,6 @@ private func regramParityRows(_ page: String) -> [RegramParityRow] {
         .header("Settings.ChatList.Header"),
         .toggle("compactChatList", "Settings.CompactChatList", inverted: false),
         .picker("chatListLines", "Settings.ChatList.Lines"),
-        .toggle("disableDeleteChatSwipeOption", "Settings.DeleteChatSwipeOption", inverted: true),
         .toggle("hideChatListSeparators", "Settings.ChatList.HideSeparators", inverted: false),
         .toggle("unlimitedPinnedChats", "Settings.UnlimitedPinnedChats", inverted: false),
         .notice("Settings.UnlimitedPinnedChats.Notice"),
@@ -114,8 +113,6 @@ private func regramParityRows(_ page: String) -> [RegramParityRow] {
     ]
     case "media": return [
         .header("Settings.Section.Playback"),
-        .toggle("mediaLoadingExperiment", "Settings.MediaLoadingExperiment", inverted: false),
-        .notice("Settings.MediaLoadingExperiment.Notice"),
         .picker("defaultVideoQuality", "Settings.DefaultVideoQuality"),
         .toggle("showMediaMetadata", "MediaMetadata.Setting", inverted: false),
         .notice("MediaMetadata.Setting.Notice")
@@ -228,8 +225,7 @@ private func regramMessageMediaEntries(_ state: RegramMessageMediaState, categor
             rows.append(.desc(sectionId: section, index: index, text: .plain(regramParityText(key)), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
         case let .toggle(key, title, inverted):
             let current = state.settings[key].bool
-            let enabled = key != "disableDeleteChatSwipeOption" || ["both", "quick"].contains(state.settings["features.chatListSwipeAction"].string)
-            general(regramParityText(title), .switchable(inverted ? !current : current), enabled: enabled, action: { arguments.set(key, .bool(!current)) })
+            general(regramParityText(title), .switchable(inverted ? !current : current), action: { arguments.set(key, .bool(!current)) })
         case let .picker(key, title):
             if key == "features.chatListStartupFolderMode" {
                 var items = ["telegram", "last"].map { mode in ContextMenuItem(regramParityText("features.ChatListStartupFolder." + mode), handler: { arguments.set(key, .string(mode)) }) }

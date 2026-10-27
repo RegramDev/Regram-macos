@@ -4,7 +4,7 @@
   <h1>Regram for macOS</h1>
   <p>基于 Telegram 原生 macOS 客户端，提供更灵活的消息、翻译与外观设置。</p>
   <p>
-    <a href="https://github.com/RegramDev/Regram-macos/releases/tag/v13.1.0-283374">下载</a> ·
+    <a href="https://github.com/RegramDev/Regram-macos/releases/tag/v13.1.0-283377">下载</a> ·
     <a href="CHANGELOG.md">更新日志</a> ·
     <a href="INSTALL.zh-CN.md">构建说明</a> ·
     <a href="https://github.com/RegramDev/Regram-macos/issues">问题反馈</a>
@@ -27,14 +27,14 @@ Regram 是基于 [Telegram for macOS](https://github.com/TelegramMessenger/teleg
 
 ## 下载与更新
 
-Regram 13.1.0 (283374) 要求 macOS 12.0 或更高版本，按处理器提供独立安装包：
+Regram 13.1.0 (283377) 要求 macOS 12.0 或更高版本，按处理器提供独立安装包：
 
 | Mac | 安装包 |
 | --- | --- |
-| Apple Silicon（M 系列） | [arm64 DMG](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283374/Regram-13.1.0-283374-arm64.dmg) |
-| Intel | [x86_64 DMG](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283374/Regram-13.1.0-283374-x86_64.dmg) |
+| Apple Silicon（M 系列） | [arm64 DMG](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283377/Regram-13.1.0-283377-arm64.dmg) |
+| Intel | [x86_64 DMG](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283377/Regram-13.1.0-283377-x86_64.dmg) |
 
-校验值见 [SHA256SUMS.txt](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283374/SHA256SUMS.txt)，新增功能与修复内容见[更新日志](CHANGELOG.md)。
+校验值见 [SHA256SUMS.txt](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283377/SHA256SUMS.txt)，新增功能与修复内容见[更新日志](CHANGELOG.md)。
 
 此版本使用 Apple/Mac Development 开发证书签名，尚未经 Apple 公证。打开下载的 DMG，将 Regram 拖到 Applications（应用程序）文件夹，再从该文件夹启动。
 

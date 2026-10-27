@@ -163,8 +163,10 @@ public class TabBarController: ViewController, TabViewDelegate {
     }
     
     public func updatePresentation(_ presentation: TabBarPresentation) {
+        let previousBottomInset = contentBottomInset
         genericView.presentation = presentation
         genericView.updateFrame(bounds, transition: .immediate)
+        guard contentBottomInset != previousBottomInset else { return }
         genericView.tabView.enumerateItems { item in
             item.controller.updateContainerContentInsets(self.contentInsetsForTabs, transition: .immediate)
             return false

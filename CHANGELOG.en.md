@@ -2,6 +2,24 @@
 
 [简体中文](CHANGELOG.md) · **English**
 
+## 13.1.0 (283377) — 2026-10-27
+
+### Interface and navigation
+
+- Keep the official native bottom bar and item order, with optional contact visibility. Regram Pro and General settings share the call panel switch.
+- Adjust bottom bar width from 50% to 100% and optionally show labels. Labels increase the bar height; disabling them restores the original height.
+- Apply bottom bar switches when released, without waiting for the animation to finish. Avoid repeated chat and settings refreshes for navigation changes.
+- Correct list backgrounds in the Regram Paper and Graphite palettes to restore rounded settings groups and remove extra separators. Reimport the updated palette to apply the fix to an existing theme.
+- Remove the separate swipe-to-delete setting; chat list swipes use the shared swipe mode.
+- Remove the macOS media loading experiment, restore upstream media fetching and playback, and ignore its legacy backup setting.
+
+### Upstream sync
+
+- Merge nine upstream commits through `e1883098`.
+- Improve chat search result corners, message menu performance, and message search by author.
+- Include author, time, and reply context when copying messages; add password visibility to two-step verification login.
+- Correct wallet gift drop positions and text layering, and unify gift tile corner radii.
+
 ## 13.1.0 (283374) — 2026-10-27
 
 ### Added and improved

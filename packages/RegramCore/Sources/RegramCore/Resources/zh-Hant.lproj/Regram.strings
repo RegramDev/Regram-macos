@@ -717,7 +717,7 @@
 "QrLogin.Text" = "1. 在已登入的裝置上開啟 Telegram。\n2. 前往 設定 → 裝置 → 連結桌面裝置。\n3. 掃描此 QR 碼即可登入。";
 "QrLogin.Title" = "掃碼登入";
 "QrLogin.TooManyAttempts" = "嘗試次數過多，稍後將自動重試…";
-"RG.BottomBarLayout" = "底欄佈局";
+"RG.BottomBarLayout" = "底欄";
 "RG.BottomBarLayout.Alignment" = "對齊";
 "RG.BottomBarLayout.Alignment.center" = "整體置中";
 "RG.BottomBarLayout.Alignment.disabled" = "佔滿時不適用";
@@ -877,7 +877,7 @@
 "Settings.DownloadsBoost.Notice" = "開啟後增加下載並行數與檔案區塊大小。";
 "Settings.DownloadsBoost.none" = "已停用";
 "Settings.Editor.appBages.Description" = "截圖中的應用程式標記與樣式";
-"Settings.Editor.bottomBarLayout.Description" = "顯示項目、順序、標籤與寬度";
+"Settings.Editor.bottomBarLayout.Description" = "Telegram 原生底欄，可隱藏聯絡人";
 "Settings.Editor.contextMenuOrder.Description" = "顯示項目、拖移排序與分組";
 "Settings.Editor.diagnostics.Description" = "資料中心連線、解析與傳輸診斷";
 "Settings.Editor.fonts.Description" = "拉丁與中日韓字體、匯入和預覽";
@@ -979,7 +979,7 @@
 "Settings.Stories.DisableSwipeToRecord" = "停用滑動錄製";
 "Settings.Stories.Hide" = "隱藏限時動態";
 "Settings.Stories.WarnBeforeView" = "瀏覽前確認";
-"Settings.Tabs.Customize" = "底欄佈局";
+"Settings.Tabs.Customize" = "底欄";
 "Settings.Tabs.Header" = "頁籤";
 "Settings.Tabs.HideTabBar" = "隱藏導航列";
 "Settings.Tabs.SearchButton" = "底欄搜尋按鈕";

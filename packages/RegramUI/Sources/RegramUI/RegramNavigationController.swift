@@ -4,77 +4,80 @@ import SwiftSignalKit
 import TelegramContext
 import TelegramTheme
 import InputDataUI
+import GeneralRows
 import InAppSettings
+import Localization
 import RegramCore
 import RegramSignals
 
 public enum RegramNativeNavigation {
     public static func visibility(context: any AccountContextProtocol) -> Signal<(contacts: Bool, calls: Bool), NoError> {
         combineLatest(baseAppSettings(accountManager: context.sharedContext.accountManager), regramPreferenceChanges(accountId: context.peerId.toInt64())) |> map { native, preferences in
-            (preferences["native.showContactsTab"].bool, native.showCallsTab)
+            (RegramBottomBarSettings(settings: preferences).isVisible(.contacts), native.showCallsTab)
         }
     }
 
     public static func update(context: any AccountContextProtocol, contacts: Bool, calls: Bool) -> Signal<Void, NoError> {
-        RegramPreferences.shared.update(accountId: context.peerId.toInt64()) { $0["native.showContactsTab"] = .bool(contacts); $0["native.showCallsTab"] = .bool(calls) }
+        RegramPreferences.shared.update(accountId: context.peerId.toInt64()) { settings in
+            var configuration = RegramBottomBarSettings(settings: settings)
+            configuration.setVisible(.contacts, visible: contacts)
+            configuration.apply(to: &settings)
+        }
         return updateBaseAppSettingsInteractively(accountManager: context.sharedContext.accountManager) { $0.withUpdatedShowCallsTab(calls) }
     }
 }
 
-private struct RegramNavigationState: Equatable {
-    var configuration: RegramBottomBarSettings
-}
-
 public func RegramNavigationController(context: any AccountContextProtocol, focusSetting: String? = nil) -> InputDataController {
     let accountId = context.peerId.toInt64()
-    let actions = DisposableSet()
-    let initial = RegramNavigationState(configuration: RegramBottomBarSettings(settings: RegramPreferences.shared.settings(accountId: accountId)))
-    let value = Atomic(value: initial)
-    let promise = ValuePromise(initial, ignoreRepeated: true)
-    var pendingContacts: Bool?
-    var pendingCalls: Bool?
     func update(_ transform: (inout RegramBottomBarSettings) -> Void) {
-        var configuration = value.with { $0.configuration }
-        transform(&configuration)
-        pendingContacts = configuration.isVisible(.contacts)
-        pendingCalls = configuration.isVisible(.calls)
-        RegramPreferences.shared.update(accountId: accountId) { configuration.apply(to: &$0) }
-        actions.add(RegramNativeNavigation.update(context: context, contacts: configuration.isVisible(.contacts), calls: configuration.isVisible(.calls)).start())
-        _ = value.swap(RegramNavigationState(configuration: configuration))
-        promise.set(RegramNavigationState(configuration: configuration))
+        RegramPreferences.shared.update(accountId: accountId) { settings in
+            var configuration = RegramBottomBarSettings(settings: settings)
+            transform(&configuration)
+            configuration.apply(to: &settings)
+        }
     }
-    actions.add((combineLatest(regramPreferenceChanges(accountId: accountId), baseAppSettings(accountManager: context.sharedContext.accountManager)) |> deliverOnMainQueue).start(next: { preferences, native in
-        var configuration = RegramBottomBarSettings(settings: preferences)
-        let contacts = pendingContacts ?? preferences["native.showContactsTab"].bool
-        let calls = pendingCalls ?? native.showCallsTab
-        if pendingContacts == preferences["native.showContactsTab"].bool { pendingContacts = nil }
-        if pendingCalls == native.showCallsTab { pendingCalls = nil }
-        configuration.setVisible(.contacts, visible: contacts)
-        configuration.setVisible(.calls, visible: calls)
-        let state = RegramNavigationState(configuration: configuration)
-        _ = value.swap(state)
-        promise.set(state)
-    }))
-    let signal = combineLatest(promise.get(), appearanceSignal) |> map { state, _ -> InputDataSignalValue in
-        let configuration = state.configuration
+    let bottomBar = regramPreferenceChanges(accountId: accountId, keys: RegramBottomBarSettings.preferenceKeys) |> map { RegramBottomBarSettings(settings: $0) } |> distinctUntilChanged
+    let calls = baseAppSettings(accountManager: context.sharedContext.accountManager) |> map { $0.showCallsTab } |> distinctUntilChanged
+    let signal = combineLatest(bottomBar, calls, appearanceSignal) |> map { configuration, showCalls, _ -> InputDataSignalValue in
         var page = RegramPageBuilder(page: "bottomBar")
         page.section("RG.BottomBarLayout.Visibility")
-        for id in [RegramBottomBarItemId.contacts, .calls] {
-            page.row(id.rawValue, title: regramString("RG.BottomBarLayout.Item." + id.rawValue), type: .switchable(configuration.isVisible(id)), action: {
-                update { $0.toggleHidden(id) }
-            })
-        }
+        page.row("contacts", title: regramString("RG.BottomBarLayout.Item.contacts"), type: .switchable(configuration.isVisible(.contacts)), action: {
+            update { $0.toggleHidden(.contacts) }
+        })
+        page.row("calls", title: strings().generalSettingsShowCallsTab, type: .switchable(showCalls), action: {
+            _ = updateBaseAppSettingsInteractively(accountManager: context.sharedContext.accountManager) { $0.withUpdatedShowCallsTab(!$0.showCallsTab) }.startStandalone()
+        })
         page.section("RG.BottomBarLayout.Options")
+        page.row("labels", title: regramString("RG.BottomBarLayout.ShowLabels"), type: .switchable(configuration.showLabels), action: {
+            update { $0.showLabels.toggle() }
+        })
+        page.section()
         page.custom("width", equatable: InputDataEquatable(configuration.buttonWidthFillRatio)) { size, id in
             regramSliderRowItem(size, stableId: id, title: regramString("RG.BottomBarLayout.Width"), value: Int(configuration.buttonWidthFillRatio), range: 50...100, changed: { percent in
-                update { $0.automaticWidth = false; $0.buttonWidthFillRatio = Int32(percent); $0.widthMode = percent >= 100 ? .full : .adaptive; $0.slotMode = .visibleOnly }
+                update { $0.automaticWidth = false; $0.buttonWidthFillRatio = Int32(percent) }
             })
         }
-        return InputDataSignalValue(entries: page.entries)
+        return InputDataSignalValue(entries: page.entries, animated: false)
     }
     let controller = InputDataController(dataSignal: signal, title: regramString("RG.BottomBarLayout"), removeAfterDisappear: false, hasDone: false, identifier: "regram.bottomBar")
-    controller.onDeinit = { actions.dispose() }
-    let focus = ["visibility", "bottomSearch", "searchMode"].contains(focusSetting ?? "") ? RegramBottomBarItemId.allCases.first(where: { initial.configuration.canHide($0) })?.rawValue : focusSetting
+    regramConfigureNavigationSwitches(controller)
+    let focus = focusSetting == "visibility" ? "contacts" : focusSetting
     regramFocusSettings(controller, page: "bottomBar", item: focus)
     return controller
+}
+
+private func regramConfigureNavigationSwitches(_ controller: InputDataController) {
+    controller.afterTransaction = { controller in
+        controller.tableView.enumerateViews { view in
+            (view as? GeneralInteractedRowView)?.switchView?.commitsOnRelease = true
+            return true
+        }
+    }
+    controller.didLoad = { controller, _ in
+        let afterSetupItem = controller.tableView.afterSetupItem
+        controller.tableView.afterSetupItem = { view, item in
+            afterSetupItem?(view, item)
+            (view as? GeneralInteractedRowView)?.switchView?.commitsOnRelease = true
+        }
+    }
 }

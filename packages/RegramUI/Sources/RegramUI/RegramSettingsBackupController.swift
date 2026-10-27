@@ -30,7 +30,6 @@ public func RegramSettingsBackupController(context: any AccountContextProtocol, 
             snapshot["native.showCallsTab"] = .bool(native.calls)
             var layout = RegramBottomBarSettings(settings: snapshot)
             layout.setVisible(.contacts, visible: native.contacts)
-            layout.setVisible(.calls, visible: native.calls)
             layout.apply(to: &snapshot)
             let panel = NSSavePanel()
             panel.nameFieldStringValue = RegramSettingsBackup.filename
@@ -68,8 +67,9 @@ public func RegramSettingsBackupController(context: any AccountContextProtocol, 
             let selected = source.selectedValues(categories: categories)
             func completed() { showModalText(for: context.window, text: regramString("Backup.Done"), button: regramString("Common.RestartNow"), callback: { _ in RegramUIHooks.shared.restartApplication() }) }
             if backup == nil && categories.contains(.appearance) || ["bottomBarLayout", "native.showContactsTab", "native.showCallsTab", "hideTabBar", "showTabNames", "tabBarWidthPercent"].contains(where: { selected[$0] != nil }) {
-                let layout = RegramBottomBarSettings(settings: RegramPreferences.shared.settings(accountId: accountId))
-                actions.add((RegramNativeNavigation.update(context: context, contacts: layout.isVisible(.contacts), calls: layout.isVisible(.calls)) |> deliverOnMainQueue).start(completed: completed))
+                let settings = RegramPreferences.shared.settings(accountId: accountId)
+                let layout = RegramBottomBarSettings(settings: settings)
+                actions.add((RegramNativeNavigation.update(context: context, contacts: layout.isVisible(.contacts), calls: settings["native.showCallsTab"].bool) |> deliverOnMainQueue).start(completed: completed))
             } else { completed() }
         })
     }

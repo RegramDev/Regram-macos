@@ -1002,7 +1002,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         let regramRestingNearTop = Atomic(value: true)
         let regramRefreshRevision = Atomic<Int64>(value: 0)
         let regramFilterRevision = Atomic<Int64>(value: 0)
-        let regramFilterChanges = regramPreferenceChanges(accountId: context.peerId.toInt64()) |> map { _ -> Int64 in regramFilterRevision.modify { $0 &+ 1 } }
+        let regramFilterChanges = regramContentPreferenceChanges(accountId: context.peerId.toInt64()) |> map { _ -> Int64 in regramFilterRevision.modify { $0 &+ 1 } }
         let regramArchiveGroup: Signal<EngineChatList.GroupItem?, NoError> = combineLatest(regramPreferenceChanges(accountId: context.peerId.toInt64()), filterSignal) |> map { settings, filter in
             return settings["features.showArchiveInFolders"].bool && !settings["features.hideSavedAndArchivedMessagesInList"].bool && filter.filter != .allChats
         } |> distinctUntilChanged |> mapToSignal { enabled -> Signal<EngineChatList.GroupItem?, NoError> in

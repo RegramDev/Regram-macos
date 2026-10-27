@@ -50,7 +50,7 @@ final class RegramNetworkAppearanceTests: XCTestCase {
         XCTAssertTrue(entries.allSatisfy { $0.stableId >= 0x40000000 })
         XCTAssertFalse(entries.contains { ["messageDoubleTapAction", "messageDoubleTapActionWithoutEditPermission", "tapMessageRowToOpenContextMenu", "allChatsTitleLengthOverride", "chatListFolderTabDisplayMode"].contains($0.key) })
         XCTAssertFalse(entries.contains { $0.key == "contentSettings" })
-        for destination in ["networkPolicy/endpoint", "bottomBar/width", "fonts/chinese", "groupProfile/location", "settings.stories/showRepostToStory"] {
+        for destination in ["networkPolicy/endpoint", "bottomBar/contacts", "fonts/chinese", "groupProfile/location", "settings.stories/showRepostToStory"] {
             XCTAssertTrue(entries.contains(where: { $0.destination == destination }), destination)
         }
         XCTAssertFalse(entries.contains(where: { $0.category == .notifications }))

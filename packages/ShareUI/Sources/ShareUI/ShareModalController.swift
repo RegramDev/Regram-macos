@@ -2353,7 +2353,7 @@ public class ShareModalController: ModalViewController, Notifable, TableViewDele
         
         if share.hasFolders {
             var first: Bool = true
-            let filterView = combineLatest(chatListFilterPreferences(engine: context.engine), regramPreferenceChanges(accountId: context.peerId.toInt64())) |> deliverOnMainQueue
+            let filterView = combineLatest(chatListFilterPreferences(engine: context.engine), regramContentPreferenceChanges(accountId: context.peerId.toInt64())) |> deliverOnMainQueue
             filterDisposable.set(filterView.start(next: { filters, settings in
                 updateFilter( { current in
                     var current = current
@@ -2391,7 +2391,7 @@ public class ShareModalController: ModalViewController, Notifable, TableViewDele
         }
         
         
-        let list:Signal<TableUpdateTransition, NoError> = combineLatest(queue: prepareQueue, search.get() |> distinctUntilChanged, destinationPeerId.get(), multipleSelection.get(), chatList, regramPreferenceChanges(accountId: context.peerId.toInt64())) |> mapToSignal { query, destinationPeerId, multipleSelection, chatList, _ -> Signal<TableUpdateTransition, NoError> in
+        let list:Signal<TableUpdateTransition, NoError> = combineLatest(queue: prepareQueue, search.get() |> distinctUntilChanged, destinationPeerId.get(), multipleSelection.get(), chatList, regramContentPreferenceChanges(accountId: context.peerId.toInt64())) |> mapToSignal { query, destinationPeerId, multipleSelection, chatList, _ -> Signal<TableUpdateTransition, NoError> in
             
             if query.request.isEmpty {
                 if !multipleSelection && query.state == .Focus && destinationPeerId == nil {

@@ -2726,7 +2726,7 @@ public class ChatListRowView: TableRowView, RevealTableView {
                 revealRightView.addSubview(pin)
             }
 
-            if !regramSettings["disableDeleteChatSwipeOption"].bool, (item.isTopic && item.canDeleteTopic) || !item.isTopic {
+            if (item.isTopic && item.canDeleteTopic) || !item.isTopic {
                 revealRightView.addSubview(delete)
             }
             

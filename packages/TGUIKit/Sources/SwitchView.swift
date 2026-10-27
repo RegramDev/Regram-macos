@@ -103,6 +103,7 @@ public class SwitchView: Control {
     public static let preferredSize = CGSize(width: 36, height: 20)
 
     public var autoswitch = true
+    public var commitsOnRelease = false
     public var presentation: SwitchViewAppearance = switchViewAppearance {
         didSet {
             if !updatingDefaultAppearance {
@@ -209,6 +210,9 @@ public class SwitchView: Control {
     }
 
     public func setIsOn(_ isOn: Bool, animated: Bool = true) {
+        if commitsOnRelease, self.isOn == isOn, let pendingChange, !pendingChange.notify, pendingChange.target == isOn {
+            return
+        }
         invalidateInteraction()
         let changed = self.isOn != isOn
         self.isOn = isOn
@@ -307,12 +311,21 @@ public class SwitchView: Control {
     }
 
     private func settle(to target: Bool) {
-        pendingChange = PendingChange(target: target, notify: target != isOn, autoswitch: autoswitch, action: stateChanged)
+        let change = PendingChange(target: target, notify: target != isOn, autoswitch: autoswitch, action: stateChanged)
+        let commitsOnRelease = self.commitsOnRelease
+        pendingChange = commitsOnRelease ? PendingChange(target: target, notify: false, autoswitch: autoswitch, action: nil) : change
+        if commitsOnRelease, change.notify, change.autoswitch {
+            isOn = target
+            NSAccessibility.post(element: self, notification: .valueChanged)
+        }
         visualPosition = (autoswitch ? target : isOn) ? 1 : 0
         lifted = false
         dragOffset = 0
         installEscapeMonitor()
         render(animated: !reduceMotion() && window != nil)
+        if commitsOnRelease, change.notify {
+            change.action?()
+        }
     }
 
     private func finishPendingChange() {

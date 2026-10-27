@@ -717,7 +717,7 @@
 "QrLogin.Text" = "1. 在已登录的设备上打开 Telegram。\n2. 进入 设置 → 设备 → 关联桌面设备。\n3. 扫描此二维码即可登录。";
 "QrLogin.Title" = "扫码登录";
 "QrLogin.TooManyAttempts" = "尝试次数过多，稍后将自动重试…";
-"RG.BottomBarLayout" = "底栏布局";
+"RG.BottomBarLayout" = "底栏";
 "RG.BottomBarLayout.Alignment" = "对齐";
 "RG.BottomBarLayout.Alignment.center" = "整体居中";
 "RG.BottomBarLayout.Alignment.disabled" = "占满时不适用";
@@ -877,7 +877,7 @@
 "Settings.DownloadsBoost.Notice" = "开启后增加下载并行数和文件块大小。";
 "Settings.DownloadsBoost.none" = "停用";
 "Settings.Editor.appBages.Description" = "截图中的应用标记与样式";
-"Settings.Editor.bottomBarLayout.Description" = "显示项目、顺序、标签与宽度";
+"Settings.Editor.bottomBarLayout.Description" = "Telegram 原生底栏，可隐藏联系人";
 "Settings.Editor.contextMenuOrder.Description" = "显示项目、拖动排序与分组";
 "Settings.Editor.diagnostics.Description" = "数据中心连接、解析与传输诊断";
 "Settings.Editor.fonts.Description" = "拉丁与中日韩字体、导入和预览";
@@ -979,7 +979,7 @@
 "Settings.Stories.DisableSwipeToRecord" = "禁用侧滑拍摄";
 "Settings.Stories.Hide" = "隐藏动态";
 "Settings.Stories.WarnBeforeView" = "查看前询问";
-"Settings.Tabs.Customize" = "底栏布局";
+"Settings.Tabs.Customize" = "底栏";
 "Settings.Tabs.Header" = "标签";
 "Settings.Tabs.HideTabBar" = "隐藏底部导航栏";
 "Settings.Tabs.SearchButton" = "底栏搜索按钮";

@@ -450,9 +450,6 @@ public class ChatInteractiveContentView: ChatMediaContentView {
     
     private let mediaPlayerStatusDisposable = MetaDisposable()
     private var autoplayVideoView: ChatVideoAutoplayView?
-    private let regramInlinePlaybackId = Int64.random(in: Int64.min...Int64.max)
-    private let regramStreamingPriority = MetaDisposable()
-    private var regramStreamingResourceId: String?
     
     private var livePhotoBadge: ImageView?
     private var livePhotoFile: TelegramMediaFile?
@@ -581,10 +578,8 @@ public class ChatInteractiveContentView: ChatMediaContentView {
             self.livePhotoStatusDisposable.dispose()
             self.livePhotoFetchDisposable.dispose()
             self.livePhotoPlayerStatusDisposable.dispose()
-            self.regramStreamingPriority.dispose()
         }
         deInit()
-        RegramInlinePlaybackAdmission.shared.remove(id: regramInlinePlaybackId)
     }
     
     private var lite: Bool {
@@ -595,9 +590,6 @@ public class ChatInteractiveContentView: ChatMediaContentView {
     @objc public func updatePlayerIfNeeded() {
         
         guard autoplayVideoView != nil || livePhotoView != nil else {
-            regramStreamingResourceId = nil
-            regramStreamingPriority.set(nil)
-            RegramInlinePlaybackAdmission.shared.remove(id: regramInlinePlaybackId)
             return
         }
         
@@ -606,23 +598,6 @@ public class ChatInteractiveContentView: ChatMediaContentView {
         if lite {
             accept = accept && mouseInside()
         }
-        if let context, RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["mediaLoadingExperiment"].bool {
-            let area = max(1, bounds.width * bounds.height)
-            let fraction = Double(max(0, visibleRect.width * visibleRect.height) / area)
-            let center = convert(NSPoint(x: bounds.midX, y: bounds.midY), to: nil)
-            let distance = Double(abs(center.y - (window?.contentView?.bounds.midY ?? center.y)))
-            let sound = (autoplayVideoView?.status?.volume ?? 0) > 0
-            accept = RegramInlinePlaybackAdmission.shared.isAdmitted(view: self, accountId: context.peerId.toInt64(), candidate: RegramInlineVideoCandidate(id: regramInlinePlaybackId, stableId: Int64(parent?.stableId ?? 0), eligible: accept, visibleFraction: fraction, distanceFromCenter: distance, userInitiated: sound, hasSound: sound, alreadyAdmitted: false))
-        } else { RegramInlinePlaybackAdmission.shared.remove(id: regramInlinePlaybackId) }
-        let resourceId: String?
-        if accept, let file = media as? TelegramMediaFile, file.isStreamable { resourceId = file.resource.id.stringRepresentation }
-        else if accept, let image = media as? TelegramMediaImage, let file = image.video, file.isStreamable { resourceId = file.resource.id.stringRepresentation }
-        else { resourceId = nil }
-        if resourceId != regramStreamingResourceId {
-            regramStreamingResourceId = resourceId
-            regramStreamingPriority.set(resourceId.flatMap { context?.fetchManager.acquireRegramStreamingPriority(resourceId: $0) })
-        }
-                        
         if let autoplayView = autoplayVideoView {
             if accept {
                 autoplayView.mediaPlayer.play()
@@ -1533,11 +1508,7 @@ public class ChatInteractiveContentView: ChatMediaContentView {
                     fetchDisposable.set(freeMediaFileInteractiveFetched(context: context, fileReference: FileMediaReference.standalone(media: media)).start())
                 }
             }  else if let media = media as? TelegramMediaImage, !media.isLocalResource {
-                if let parent, RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["mediaLoadingExperiment"].bool {
-                    fetchDisposable.set(regramMessagePhotoInteractiveFetched(context: context, message: parent, image: media, userInitiated: userInitiated).start())
-                } else {
-                    fetchDisposable.set(chatMessagePhotoInteractiveFetched(account: context.account, imageReference: parent != nil ? ImageMediaReference.message(message: MessageReference(parent!), media: media) : ImageMediaReference.standalone(media: media)).start())
-                }
+                fetchDisposable.set(chatMessagePhotoInteractiveFetched(account: context.account, imageReference: parent != nil ? ImageMediaReference.message(message: MessageReference(parent!), media: media) : ImageMediaReference.standalone(media: media)).start())
                 if let video = media.video, let parent = parent, !parent.containsSecretMedia {
                     livePhotoFetchDisposable.set(messageMediaFileInteractiveFetched(context: context, messageId: parent.id, messageReference: .init(parent), file: video, userInitiated: userInitiated).start())
                 } else {

@@ -733,7 +733,6 @@ public final class FetchManagerImpl: FetchManager {
     
     private var categoryContexts: [FetchManagerCategory: FetchManagerCategoryContext] = [:]
     private var regramPriorityState = RegramMediaPriorityState()
-    private var regramSettingsObserver: NSObjectProtocol?
 
     
     private let hasUserInitiatedEntriesValue = ValuePromise<Bool>(false, ignoreRepeated: true)
@@ -749,14 +748,6 @@ public final class FetchManagerImpl: FetchManager {
     public init(postbox: Postbox, storeManager: DownloadedMediaStoreManager?) {
         self.postbox = postbox
         self.storeManager = storeManager
-        regramSettingsObserver = NotificationCenter.default.addObserver(forName: RegramPreferences.didChange, object: nil, queue: .main) { [weak self] notification in
-            guard let self, let accountId = RegramAccountScope.shared.accountId(for: self.postbox), notification.object as? Int64 == accountId else { return }
-            self.queue.async { [weak self] in self?.regramRefreshMediaPriorities() }
-        }
-    }
-
-    deinit {
-        if let observer = regramSettingsObserver { NotificationCenter.default.removeObserver(observer) }
     }
 
     public func setRegramChatMediaPriority(owner: Int64, visibleResourceIds: [String], preloadResourceIds: [String]) {

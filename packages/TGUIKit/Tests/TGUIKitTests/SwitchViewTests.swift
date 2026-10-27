@@ -62,6 +62,62 @@ final class SwitchViewTests: XCTestCase {
         XCTAssertEqual(calls, 1)
     }
 
+    func testImmediateSwitchCommitsOnReleaseWhileTheSpringContinues() throws {
+        let view = makeSwitch(motion: true)
+        view.commitsOnRelease = true
+        var values: [Bool] = []
+        view.stateChanged = { values.append(view.isOn) }
+        view.beginInteraction(at: CGPoint(x: 6, y: 10))
+        XCTAssertFalse(view.isOn)
+        XCTAssertTrue(values.isEmpty)
+        view.endInteraction(at: CGPoint(x: 6, y: 10))
+        XCTAssertTrue(view.isOn)
+        XCTAssertEqual(values, [true])
+        XCTAssertTrue(view.isSettling)
+        let spring = try XCTUnwrap(view.positionAnimation)
+        view.setIsOn(true, animated: false)
+        XCTAssertTrue(view.isSettling)
+        XCTAssertTrue(view.positionAnimation?.isEqual(spring) == true)
+        waitUntilRest(view)
+        XCTAssertEqual(values, [true])
+        view.performToggle()
+        XCTAssertFalse(view.isOn)
+        XCTAssertEqual(values, [true, false])
+        view.cancelInteraction()
+        XCTAssertFalse(view.isOn)
+        XCTAssertEqual(values, [true, false])
+    }
+
+    func testImmediateSwitchCancellationBeforeReleaseDoesNotCommit() {
+        let view = makeSwitch(motion: true)
+        view.commitsOnRelease = true
+        var calls = 0
+        view.stateChanged = { calls += 1 }
+        view.beginInteraction(at: CGPoint(x: 18, y: 10))
+        view.dragInteraction(to: CGPoint(x: 34, y: 10))
+        view.cancelInteraction()
+        view.endInteraction(at: CGPoint(x: 34, y: 10))
+        XCTAssertFalse(view.isOn)
+        XCTAssertEqual(calls, 0)
+    }
+
+    func testImmediateOwnerControlledSwitchRequestsExactlyOnce() {
+        let view = makeSwitch(motion: true)
+        view.commitsOnRelease = true
+        view.autoswitch = false
+        var calls = 0
+        view.stateChanged = { calls += 1 }
+        view.performToggle()
+        XCTAssertFalse(view.isOn)
+        XCTAssertEqual(calls, 1)
+        waitUntilRest(view)
+        XCTAssertFalse(view.isOn)
+        XCTAssertEqual(calls, 1)
+        view.setIsOn(true, animated: false)
+        XCTAssertTrue(view.isOn)
+        XCTAssertEqual(calls, 1)
+    }
+
     func testPointerJitterIsAClick() {
         let view = makeSwitch()
         var calls = 0

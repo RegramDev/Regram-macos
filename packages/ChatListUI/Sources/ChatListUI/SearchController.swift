@@ -1856,7 +1856,7 @@ public class SearchController<Context: AccountContextProtocol>: GenericViewContr
         
         
         let refreshRevision = Atomic<Int64>(value: Int64.min)
-        let appearanceAndRegram = combineLatest(appearanceSignal, regramPreferenceChanges(accountId: context.peerId.toInt64()), regramRemarkChanges(accountId: context.peerId.toInt64())) |> map { appearance, _, _ in appearance }
+        let appearanceAndRegram = combineLatest(appearanceSignal, regramContentPreferenceChanges(accountId: context.peerId.toInt64()), regramRemarkChanges(accountId: context.peerId.toInt64())) |> map { appearance, _, _ in appearance }
         let transition = combineLatest(queue: prepareQueue, searchItems, appearanceAndRegram, context.globalPeerHandler.get() |> distinctUntilChanged, pinnedPromise.get()) |> map { value, appearance, location, pinnedItems in
             var seenPeers = Set<PeerId>()
             var visible = value.0.filter { entry in

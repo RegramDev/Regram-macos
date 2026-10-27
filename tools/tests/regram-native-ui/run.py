@@ -50,6 +50,11 @@ def main():
     assets.write_text(generated_assets.read_text().replace("Foundation.Bundle.module", "Foundation.Bundle.main"))
     account_source = (ROOT / "packages/SettingsUI/Sources/SettingsUI/AccountViewController.swift").read_text()
     factory = declaration(account_source, "private func accountMessageSettingsIcon(")
+    navigation_source = ROOT / "Telegram-Mac/app/MainViewController.swift"
+    navigation = declaration(navigation_source.read_text(), "private func rebuildNavigationTabs()")
+    navigation = navigation.split("rebuildingNavigation = true", 1)[1].split("previousIndex = target", 1)[0].replace("regramVisibleTabs = visible", "")
+    navigation_controller_source = ROOT / "packages/RegramUI/Sources/RegramUI/RegramNavigationController.swift"
+    navigation_switches = declaration(navigation_controller_source.read_text(), "private func regramConfigureNavigationSwitches(").replace("private func", "func", 1)
     glyphs = re.findall(r"icon: accountMessageSettingsIcon\((.*?)\), type:", account_source)
     if len(glyphs) != 2:
         raise RuntimeError("Review the two account icon call sites")
@@ -60,6 +65,9 @@ def main():
     reset = declaration(bookmarks, "clearSearch = { [weak controller] in")
     unflipped = glyphs[0].replace(", flipVertical: true", "").replace("flipVertical: true", "")
     extracted.write_text("import Cocoa\nimport TGUIKit\nimport GeneralRows\nimport InputDataUI\nimport SwiftSignalKit\nimport TelegramTheme\n" + factory + "\n" + image_hook + "\nfunc savedSettingsIcon() -> CGImage? { accountMessageSettingsIcon(" + glyphs[0] + ") }\nfunc bookmarkSettingsIcon() -> CGImage? { accountMessageSettingsIcon(" + glyphs[1] + ") }\nfunc previousSavedSettingsIcon() -> CGImage? { accountMessageSettingsIcon(" + unflipped + ") }\nfunc nativeThemeImage(_ image: TelegramThemeImage) -> NSImage { themeHookImage(image) }\nprivate let bookmarkSearchId = InputDataIdentifier(\"bookmarks_search\")\nfunc resetBookmarkSearch(_ controller: InputDataController) { let clearSearch: () -> Void\n" + reset + "\nclearSearch() }\n")
+    with extracted.open("a") as source:
+        source.write("import RegramCore\nfunc rebuildNativeBottomBar(_ tabController: TabBarController, tabs regramTabs: [RegramBottomBarItemId: TabItem], visible: [RegramBottomBarItemId], selected: RegramBottomBarItemId) {\n" + navigation + "\n}\n")
+        source.write(navigation_switches + "\n")
     sdk = subprocess.check_output(["xcrun", "--sdk", "macosx", "--show-sdk-path"], text=True).strip()
     args = ["xcrun", "swiftc", "-module-name", "RegramNativeUIChecks", "-parse-as-library", "-D", "SWIFT_PACKAGE", "-D", "STABLE", "-target", "arm64-apple-macos12.0", "-sdk", sdk, "-F", str(products), "-I", str(products), "-I", str(products / "include")]
     for module_map in sorted((intermediates / "GeneratedModuleMaps").glob("*.modulemap")):
@@ -82,7 +90,7 @@ def main():
     for framework in ["AppKit", "Foundation", "Security", "Speech", "AuthenticationServices", "CodeSyntax", "SceneKit", "CoreMediaIO", "Carbon", "WebKit", "MetalKit", "Metal", "CoreSpotlight", "RLottie", "CoreMedia", "Sparkle", "Contacts", "QuartzCore", "VideoToolbox", "Accelerate", "EventKit", "LocalAuthentication", "CoreServices", "CoreVideo", "OpenGL", "IOKit", "QuickLook", "JavaScriptCore", "MapKit", "Quartz", "AVFoundation", "MediaPlayer"]:
         args += ["-framework", framework]
     args += ["-o", str(executable)]
-    source_files = [options.page_builder, ROOT / "packages/RegramUI/Sources/RegramUI/RegramSelectionRows.swift", ROOT / "packages/SettingsUI/Sources/SettingsUI/AccountViewController.swift", ROOT / "packages/RegramUI/Sources/RegramUI/RegramBookmarksController.swift"]
+    source_files = [options.page_builder, ROOT / "packages/RegramUI/Sources/RegramUI/RegramSelectionRows.swift", ROOT / "packages/SettingsUI/Sources/SettingsUI/AccountViewController.swift", ROOT / "packages/RegramUI/Sources/RegramUI/RegramBookmarksController.swift", navigation_source, navigation_controller_source]
     manifest = {"productionSources": {str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in source_files}, "accountIconExpressions": glyphs, "cachedObjects": len(objects), "applicationObjectsLinked": False, "shareExtensionObjectsLinked": False, "imageResources": "installed Assets.car", "target": "arm64-apple-macos12.0"}
     (output / "manifest.json").write_text(json.dumps(manifest, indent=2))
     (output / "compile-command.txt").write_text(shlex.join(args))

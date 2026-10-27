@@ -51,7 +51,7 @@ public enum RegramBottomBarSearchMode: String {
 }
 
 public struct RegramBottomBarSettings: Equatable {
-    public static let defaultBottomItems: [RegramBottomBarItemId] = [.contacts, .calls, .chats, .settings]
+    public static let defaultBottomItems: [RegramBottomBarItemId] = [.contacts, .chats, .settings]
     public static let minimumVisibleNonSearchBottomItems = 2
 
     public var automaticWidth: Bool
@@ -72,9 +72,9 @@ public struct RegramBottomBarSettings: Equatable {
         isBottomBarVisible: Bool = true,
         bottomItems: [RegramBottomBarItemId] = RegramBottomBarSettings.defaultBottomItems,
         externalItem: RegramBottomBarItemId? = nil,
-        hiddenItems: Set<RegramBottomBarItemId> = [],
+        hiddenItems: Set<RegramBottomBarItemId> = [.calls, .search],
         topSearchVisible: Bool = true,
-        showLabels: Bool = true,
+        showLabels: Bool = false,
         widthMode: RegramBottomBarWidthMode = .full,
         slotMode: RegramBottomBarSlotMode = .visibleOnly,
         buttonWidthFillRatio: Int32 = 100,
@@ -275,6 +275,7 @@ public struct RegramBottomBarSettings: Equatable {
 
 public extension RegramBottomBarSettings {
     static let storageKey = "bottomBarLayout"
+    static let preferenceKeys: Set<String> = [storageKey, "native.showContactsTab", "native.showCallsTab", "sidebarOrder", "sidebarHiddenTabs", "hideTabBar", "showTabNames", "tabBarWidthPercent"]
 
     init(storedValues values: [String: String]) {
         self.init(
@@ -284,7 +285,7 @@ public extension RegramBottomBarSettings {
             externalItem: values["external"].flatMap(RegramBottomBarItemId.init(rawValue:)),
             hiddenItems: Set((values["hidden"] ?? "").split(separator: ",").compactMap { RegramBottomBarItemId(rawValue: String($0)) }),
             topSearchVisible: values["topSearch"] != "false",
-            showLabels: values["labels"] != "false",
+            showLabels: values["labels"] == "true",
             widthMode: values["width"].flatMap(RegramBottomBarWidthMode.init(rawValue:)) ?? .full,
             slotMode: values["slots"].flatMap(RegramBottomBarSlotMode.init(rawValue:)) ?? .visibleOnly,
             buttonWidthFillRatio: values["fill"].flatMap(Int32.init) ?? 100,
@@ -317,14 +318,19 @@ public extension RegramBottomBarSettings {
             let hidden = Set(settings["sidebarHiddenTabs"].strings.compactMap(RegramBottomBarItemId.init(rawValue:)))
             self.init(bottomItems: order.isEmpty ? Self.defaultBottomItems : order, hiddenItems: hidden)
         } else if settings.values["hideTabBar"] != nil || settings.values["showTabNames"] != nil || settings.values["tabBarWidthPercent"] != nil {
-            self.init(isBottomBarVisible: !settings["hideTabBar"].bool, showLabels: settings.values["showTabNames"]?.bool ?? true, buttonWidthFillRatio: Int32(clamping: settings.values["tabBarWidthPercent"]?.integer ?? 100))
+            let width = settings["tabBarWidthPercent"].integer
+            self.init(automaticWidth: width <= 0, isBottomBarVisible: !settings["hideTabBar"].bool, showLabels: settings["showTabNames"].bool, buttonWidthFillRatio: Int32(clamping: width > 0 ? width : 100))
         } else {
             self.init()
         }
-        self = RegramBottomBarSettings(automaticWidth: false, bottomItems: Self.defaultBottomItems, hiddenItems: hiddenItems.union([.search]), buttonWidthFillRatio: max(50, buttonWidthFillRatio), searchMode: .hidden)
+        let showsContacts = settings.values["native.showContactsTab"]?.bool ?? !hiddenItems.contains(.contacts)
+        self = RegramBottomBarSettings(automaticWidth: automaticWidth, hiddenItems: showsContacts ? [.calls, .search] : [.contacts, .calls, .search], showLabels: showLabels, buttonWidthFillRatio: automaticWidth ? 100 : max(50, min(100, buttonWidthFillRatio)))
     }
 
     func apply(to settings: inout RegramAccountSettings) {
         settings[Self.storageKey] = .dictionary(storedValues)
+        settings["native.showContactsTab"] = .bool(isVisible(.contacts))
+        settings["showTabNames"] = .bool(showLabels)
+        settings["tabBarWidthPercent"] = .integer(automaticWidth ? 0 : Int64(buttonWidthFillRatio))
     }
 }
