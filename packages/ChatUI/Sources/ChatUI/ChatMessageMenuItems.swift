@@ -351,9 +351,17 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
         return .complete()
     }
 
-    return chatMenuItemsData(for: message, textLayout: textLayout, entry: entry, chatInteraction: chatInteraction, source: source) |> mapToSignal { data in
-        regramFilterImportData(for: data) |> map { (data, $0) }
-    } |> deliverOnMainQueue |> map { [chatInteraction] data, filterImportData in
+    let selectedIds = chatInteraction.presentation.selectionState?.selectedIds ?? []
+    let selectedMessages: Signal<[Message], NoError>
+    if selectedIds.count > 1, selectedIds.contains(message.id) {
+        selectedMessages = chatInteraction.getMessages(Array(selectedIds), false) |> take(1)
+    } else {
+        selectedMessages = .single([])
+    }
+
+    return combineLatest(chatMenuItemsData(for: message, textLayout: textLayout, entry: entry, chatInteraction: chatInteraction, source: source), selectedMessages) |> mapToSignal { data, selectedMessages in
+        regramFilterImportData(for: data) |> map { (data, selectedMessages, $0) }
+    } |> deliverOnMainQueue |> map { [chatInteraction] data, selectedMessages, filterImportData in
         
         let peer = data.message.peers[data.message.id.peerId]
         let isNotFailed = !message.flags.contains(.Failed) && !message.flags.contains(.Unsent) && !data.message.flags.contains(.Sending)
@@ -1314,6 +1322,15 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
         
      
         
+        let photoMessages = selectedMessages.isEmpty ? data.groupped ?? [] : selectedMessages
+        let photos = ChatPhotoSaveAction.items(from: photoMessages, cachedData: data.cachedData)
+        if photos.count > 1 {
+            let title = selectedMessages.isEmpty ? strings().chatContextSaveAllPhotos : strings().chatContextSaveSelectedPhotos
+            thirdBlock.append(ContextMenuItem(title, handler: {
+                ChatPhotoSaveAction.save(photos.map { $0.message }, chatInteraction: chatInteraction)
+            }, itemImage: MenuAnimation.menu_save_as.value).regramAction(.saveMedia))
+        }
+
         if let resourceData = data.resourceData, !protected {
             if let file = data.file {
                 if file.isVideo && file.isAnimated {

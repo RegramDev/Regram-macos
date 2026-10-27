@@ -1057,8 +1057,17 @@ public class ChatRowItem: TableRowItem {
         return false
     }
     
+    private var reactionPermissionPeer: Peer? {
+        guard let message = firstMessage else { return nil }
+        return chatInteraction.peer.flatMap { $0.id == message.id.peerId ? $0 : nil } ?? message.peers[message.id.peerId]
+    }
+
     public var canReact: Bool {
         if let message = firstMessage {
+
+            guard let peer = reactionPermissionPeer, canSendReactionsToPeer(EnginePeer(peer)) else {
+                return false
+            }
 
             if message.activeEphemeralReplacementMessage != nil {
                 return false
@@ -1810,7 +1819,9 @@ public class ChatRowItem: TableRowItem {
             let context = self.context
             let chatInteraction = self.chatInteraction
             if let reactions = reactions, !reactions.reactions.isEmpty, let available = context.reactions.available {
-                let layout = ChatReactionsLayout(context: chatInteraction.interactionContext, message: message, available: available, peerAllowed: chatInteraction.presentation.allowedReactions, savedMessageTags: entry.additionalData.savedMessageTags, engine: chatInteraction.interactionContext.reactions, theme: presentation, renderType: renderType, currentTag: currentTag, isIncoming: isIncoming, isOutOfBounds: isBubbleFullFilled && (self.captionLayouts.isEmpty || invertMedia) && (commentsBubbleData == nil || !invertMedia), hasWallpaper: presentation.hasWallpaper, stateOverlayTextColor: isStateOverlayLayout ? stateOverlayTextColor : (!hasBubble ? presentation.colors.grayText : presentation.chat.grayText(isIncoming, entry.renderType == .bubble)), openInfo: { peerId in
+                let layout = ChatReactionsLayout(context: chatInteraction.interactionContext, message: message, available: available, peerAllowed: chatInteraction.presentation.allowedReactions, savedMessageTags: entry.additionalData.savedMessageTags, engine: chatInteraction.interactionContext.reactions, theme: presentation, renderType: renderType, currentTag: currentTag, isIncoming: isIncoming, isOutOfBounds: isBubbleFullFilled && (self.captionLayouts.isEmpty || invertMedia) && (commentsBubbleData == nil || !invertMedia), hasWallpaper: presentation.hasWallpaper, stateOverlayTextColor: isStateOverlayLayout ? stateOverlayTextColor : (!hasBubble ? presentation.colors.grayText : presentation.chat.grayText(isIncoming, entry.renderType == .bubble)), reactionPeer: { [weak self] in
+                    self?.reactionPermissionPeer
+                }, openInfo: { peerId in
                     ChatHistoryUIHooks.shared.pushReactionPeerInfoObserved(context.bindings.rootNavigation(), context, peerId, message.id)
                 }, runEffect: { [weak chatInteraction] value, isLarge in
                     chatInteraction?.runReactionEffect(value, message.id, isLarge)
@@ -1820,7 +1831,8 @@ public class ChatRowItem: TableRowItem {
                     } else {
                         chatInteraction?.setLocationTag(.customTag(ReactionsMessageAttribute.messageTag(reaction: reaction), nil))
                     }
-                }, starReact: {
+                }, starReact: { [weak self] in
+                    guard self?.canReact == true else { return }
                     showModal(with: Star_ReactionsController(context: context, source: .message(.init(message))), for: context.window)
                 })
                 
@@ -4071,6 +4083,8 @@ public class ChatRowItem: TableRowItem {
             let signal = combineLatest(queue: .mainQueue(), builtin, peerAllowed, orderedReactions, maximumReactionsLimit, starsAllowed)
             |> take(1)
 
+            let canApplyReaction: () -> Bool = { [weak self] in self?.canReact == true }
+
             return (signal) |> map { builtin, peerAllowed, reactions, maximumReactionsLimit, starsAllowed in
                 let enabled = builtin?.enabled ?? []
 
@@ -4264,6 +4278,7 @@ public class ChatRowItem: TableRowItem {
                 if accessToAll {
                     reveal = { view in
                         let react: (StickerPackItem, NSRect?, Bool) -> Void = { sticker, fromRect, isLarge in
+                            guard isTags || canApplyReaction() else { return }
                             let parsedFile = sticker.file._parse()
                             let value: UpdateMessageReaction
                             if let bundle = parsedFile.stickerText {
@@ -4313,6 +4328,7 @@ public class ChatRowItem: TableRowItem {
                 
                 
                 let view = ContextAddReactionsListView(frame: rect, context: context, list: available, add: { value, checkPrem, fromRect in
+                    guard isTags || canApplyReaction() else { return }
                     if isTags, !context.isPremium {
                         openSavedTagsPremium()
                     } else {
@@ -4323,6 +4339,7 @@ public class ChatRowItem: TableRowItem {
                         }
                     }
                 }, addLarge: isTags ? nil : { value, fromRect in
+                    guard isTags || canApplyReaction() else { return }
                     context.reactions.react(message.id, values: ChatHistoryUIHooks.shared.messageNewReactions(message, value.toUpdate(), isTags), fromRect: fromRect, storeAsRecentlyUsed: true, isLarge: true)
                 }, radiusLayer: nil, revealReactions: reveal, aboveText: aboveLayout, message: message)
                 

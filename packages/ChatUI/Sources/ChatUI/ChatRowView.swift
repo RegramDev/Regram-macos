@@ -2276,7 +2276,12 @@ public class ChatRowView: TableRowView, Notifable, MultipleSelectable, ChatTextS
     public override func rightMouseDown(with event: NSEvent) {
         if let item = self.item as? ChatRowItem {
             if item.chatInteraction.presentation.state == .selecting {
-                return
+                let selectedIds = item.chatInteraction.presentation.selectionState?.selectedIds ?? []
+                guard selectedIds.count > 1, item.messages.contains(where: { message in
+                    selectedIds.contains(message.id) && message.media.contains(where: { $0 is TelegramMediaImage })
+                }) else {
+                    return
+                }
             }
         }
         super.rightMouseDown(with: event)

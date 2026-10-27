@@ -2487,6 +2487,10 @@ public class PreviewSenderController: ModalViewController, Notifable {
         
         self.runEditor = { [weak self] url, paint in
             guard let self, !self.pendingActions.isClosed, !self.sent else { return }
+            guard !self.isRenderingEdit else {
+                NSSound.beep()
+                return
+            }
             
             let editedData = stateValue.with { $0.editedData }
 
@@ -2739,7 +2743,12 @@ public class PreviewSenderController: ModalViewController, Notifable {
     }
     
     fileprivate func editVideoCover(for url: URL, media: TelegramMediaFile) {
-        guard !pendingActions.isClosed, !sent, let edit = attachmentEdits.begin(for: url, urls: urls) else { return }
+        guard !pendingActions.isClosed, !sent else { return }
+        guard !isRenderingEdit else {
+            NSSound.beep()
+            return
+        }
+        guard let edit = attachmentEdits.begin(for: url, urls: urls) else { return }
         editorDisposable.set(nil)
         let selectionAction = capturePendingAction()
         let context = self.context
@@ -2785,7 +2794,12 @@ public class PreviewSenderController: ModalViewController, Notifable {
     }
 
     fileprivate func removeVideoCover(for url: URL) {
-        guard !pendingActions.isClosed, !sent, let edit = attachmentEdits.begin(for: url, urls: urls), edit.apply() else { return }
+        guard !pendingActions.isClosed, !sent else { return }
+        guard !isRenderingEdit else {
+            NSSound.beep()
+            return
+        }
+        guard let edit = attachmentEdits.begin(for: url, urls: urls), edit.apply() else { return }
         editorDisposable.set(nil)
         let previous = previews[url.path]
         updateCustomPreview(url.path, nil)
