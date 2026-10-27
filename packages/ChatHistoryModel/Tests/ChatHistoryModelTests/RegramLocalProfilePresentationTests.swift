@@ -8,6 +8,17 @@ final class RegramLocalProfilePresentationTests: XCTestCase {
     private let accountId = PeerId(namespace: Namespaces.Peer.CloudUser, id: ._internalFromInt64Value(1))
     private let otherId = PeerId(namespace: Namespaces.Peer.CloudUser, id: ._internalFromInt64Value(2))
 
+    func testGiftTabCountIncludesOwnerPurchasesAndRestoresServerCountWhenDisabled() {
+        var state = RGLocalGiftsState()
+        state.purchases = [RGLocalGiftPurchase(id: UUID(), date: 1, title: "Gift", price: 1, gift: Data([1]), savedToProfile: false)]
+        XCTAssertEqual(regramLocalProfileGiftCount(accountPeerId: accountId, peerId: accountId, remoteCount: 0, state: state), 0)
+        state.enabled = true
+        XCTAssertEqual(regramLocalProfileGiftCount(accountPeerId: accountId, peerId: accountId, remoteCount: 0, state: state), 1)
+        XCTAssertEqual(regramLocalProfileGiftCount(accountPeerId: accountId, peerId: accountId, remoteCount: 4, state: state), 5)
+        XCTAssertEqual(regramLocalProfileGiftCount(accountPeerId: accountId, peerId: otherId, remoteCount: 4, state: state), 4)
+        XCTAssertEqual(regramLocalProfileGiftCount(accountPeerId: accountId, peerId: accountId, remoteCount: Int32.max, state: state), Int32.max)
+    }
+
     private func serverData() -> CachedUserData {
         let rating = TelegramStarRating(level: 4, currentLevelStars: 4_000, stars: 4_500, nextLevelStars: 5_000)
         return CachedUserData().withUpdatedFlags(.copyProtectionEnabled)

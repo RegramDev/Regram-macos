@@ -1378,7 +1378,10 @@ import RegramSignals
         let pollsTab:Signal<(tag: PeerMediaCollectionMode, exists: Bool, hasLoaded: Bool), NoError>
 
         
-        giftsTab = context.account.postbox.peerView(id: peerId) |> map { view -> (exist: Bool, loaded: Bool) in
+        giftsTab = combineLatest(context.account.postbox.peerView(id: peerId), regramLocalGiftsState(context: context)) |> map { view, local -> (exist: Bool, loaded: Bool) in
+            if regramLocalProfileGiftCount(accountPeerId: context.peerId, peerId: peerId, remoteCount: 0, state: local) > 0 {
+                return (exist: true, loaded: true)
+            }
             if let cachedData = view.cachedData as? CachedUserData {
                 if let starGiftsCount = cachedData.starGiftsCount, starGiftsCount > 0 {
                     return (exist: true, loaded: true)
@@ -1631,7 +1634,7 @@ import RegramSignals
         }
         
         if let starGiftsProfile = self.starGiftsProfile {
-            let icons = starGiftsProfile.state
+            let icons = regramLocalGiftProfileState(context: context, peerId: peerId, profileGifts: starGiftsProfile, canSelect: false)
             |> map { Array($0.gifts.prefix(3)) }
             |> distinctUntilChanged
             |> deliverOnMainQueue
@@ -1880,7 +1883,9 @@ import RegramSignals
         } else {
             archiveStoriesCount = .single(0)
         }
-        let giftsCount: Signal<Int32, NoError> = context.engine.data.subscribe(TelegramEngine.EngineData.Item.Peer.StarGiftsCount(id: peerId)) |> map { $0 ?? 0 }
+        let giftsCount: Signal<Int32, NoError> = combineLatest(context.engine.data.subscribe(TelegramEngine.EngineData.Item.Peer.StarGiftsCount(id: peerId)), regramLocalGiftsState(context: context)) |> map { remote, local in
+            regramLocalProfileGiftCount(accountPeerId: context.peerId, peerId: peerId, remoteCount: remote ?? 0, state: local)
+        }
         
         
         

@@ -3085,11 +3085,7 @@ func userInfoEntries<Context: AccountContextProtocol>(view: PeerView, arguments:
                 
             }
             
-            if FastSettings.canViewPeerId, state.editingState == nil {
-                entries.append(UserInfoEntry<Context>.section(sectionId: sectionId))
-                sectionId += 1
-                entries.append(UserInfoEntry<Context>.peerId(sectionId: sectionId, value: "\(user.id.id._internalGetInt64Value())", viewType: .singleItem))
-            }
+
             
             if mediaTabsData.loaded && !mediaTabsData.collections.isEmpty, let controller = arguments.mediaController() {
                 if state.editingState != nil {

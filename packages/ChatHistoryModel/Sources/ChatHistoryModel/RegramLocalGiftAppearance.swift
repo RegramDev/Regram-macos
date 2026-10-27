@@ -4,6 +4,7 @@ import Postbox
 import TelegramContext
 import SwiftSignalKit
 import RegramCore
+import TelegramTheme
 
 private struct LocalAppearance: Codable {
     let namePreset: Int32?
@@ -38,9 +39,12 @@ public func regramSaveLocalGiftAppearance(context: any AccountContextProtocol, n
 }
 
 public func regramLocalAppearanceState(context: any AccountContextProtocol) -> Signal<RGLocalGiftsState, NoError> {
-    regramLocalGiftsState(context: context) |> mapToSignal { state -> Signal<RGLocalGiftsState, NoError> in
+    regramLocalGiftsState(context: context) |> deliverOnPrepareQueue |> mapToSignal { state -> Signal<RGLocalGiftsState, NoError> in
         guard state.enabled else { return .single(state) }
-        let files: [TelegramMediaFile] = state.purchases.flatMap { purchase -> [TelegramMediaFile] in
+        let appearance = state.appearance.flatMap { try? JSONDecoder().decode(LocalAppearance.self, from: $0) }
+        let hasCustomPattern = [appearance?.replyFileId, appearance?.backgroundFileId].contains { ($0 ?? 0) < 0 }
+        let purchases = state.purchases.filter { hasCustomPattern || $0.id == state.profileGiftId || $0.id == state.nameGiftId }
+        let files: [TelegramMediaFile] = purchases.flatMap { purchase -> [TelegramMediaFile] in
             guard case let .unique(gift) = regramLocalGift(context: context, purchase: purchase) else { return [] }
             return gift.attributes.compactMap { attribute -> TelegramMediaFile? in
                 switch attribute {

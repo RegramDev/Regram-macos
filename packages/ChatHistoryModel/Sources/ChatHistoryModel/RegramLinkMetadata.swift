@@ -60,11 +60,6 @@ public final class RegramLinkMetadata {
         guard var components = URLComponents(string: parsedValue), components.scheme?.lowercased() == "https", let host = components.host?.lowercased() else {
             return value
         }
-        components.query = nil
-        components.fragment = nil
-        guard let sanitizedValue = components.string else {
-            return value
-        }
         self.lock.lock()
         let domains = self.pagePreviewDomains
         self.lock.unlock()
@@ -72,6 +67,11 @@ public final class RegramLinkMetadata {
             return item.domain.lowercased() == host
         }) else {
             return RGLinkPreviewRules.repair(value, enabled: true, xHost: settings["linkPreviewXHost"].string, instagramHost: settings["linkPreviewInstagramHost"].string)
+        }
+        components.query = nil
+        if !domain.rules.contains(where: { $0.regex.contains("#") }) { components.fragment = nil }
+        guard let sanitizedValue = components.string else {
+            return value
         }
         var result = sanitizedValue
         for rule in domain.rules {

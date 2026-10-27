@@ -4,6 +4,7 @@ import TelegramContext
 import TelegramCore
 import Postbox
 import SwiftSignalKit
+import InputDataUI
 
 public struct RegramUIHooks {
     public var selectChats: (any AccountContextProtocol, [PeerId]) -> Signal<[PeerId], NoError> = { _, _ in .complete() }
@@ -14,6 +15,7 @@ public struct RegramUIHooks {
     public var openNativeSettings: (any AccountContextProtocol, String) -> Void = { _, _ in }
     public var eraseAllData: (any AccountContextProtocol) -> Void = { _ in }
     public var restartApplication: () -> Void = {}
+    public var makeUpdateController: () -> InputDataController? = { nil }
 
     public init() {}
     public static var shared = RegramUIHooks()

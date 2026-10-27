@@ -75,29 +75,6 @@ final class RegramWorkflowTests: XCTestCase {
         subscription.dispose()
     }
 
-    func testSummaryRangeBoundsAndUploadByteLimit() throws {
-        let messages = (1...5).map { RegramSummaryMessage(identifier: String($0), timestamp: Int64($0), text: "Message \($0)") }
-        let selected = try RegramSummaryPolicy.prepareRange(messages, from: 2, to: 4).get()
-        XCTAssertEqual(selected.messages.map(\.identifier), ["2", "3", "4"])
-        XCTAssertEqual(selected.byteCount, selected.text.utf8.count)
-        XCTAssertThrowsError(try RegramSummaryPolicy.prepareRange(messages, from: 4, to: 2).get())
-        let oversized = RegramSummaryMessage(identifier: "large", timestamp: 1, text: String(repeating: "文", count: 21334))
-        XCTAssertThrowsError(try RegramSummaryPolicy.prepare([oversized]).get())
-        XCTAssertThrowsError(try RegramSummaryPolicy.prepare(Array(repeating: messages[0], count: 101)).get())
-        XCTAssertThrowsError(try RegramSummaryPolicy.prepare(Array(repeating: messages[0], count: 5001), permitsTimeRange: true).get())
-    }
-
-    func testSummaryRejectsSecretProtectedAndAttachmentInputsBeforeUpload() {
-        let candidates = [
-            RegramSummaryMessage(identifier: "secret", timestamp: 1, text: "text", isSecret: true),
-            RegramSummaryMessage(identifier: "protected", timestamp: 1, text: "text", isCopyProtected: true),
-            RegramSummaryMessage(identifier: "once", timestamp: 1, text: "text", isOneTime: true),
-            RegramSummaryMessage(identifier: "file", timestamp: 1, text: "caption", hasAttachment: true)
-        ]
-        for candidate in candidates { XCTAssertThrowsError(try RegramSummaryPolicy.prepare([candidate]).get()) }
-        XCTAssertThrowsError(try RegramSummaryPolicy.prepare([RegramSummaryMessage(identifier: "1", timestamp: 1, text: "text")], enabled: false).get())
-    }
-
     func testContextStaysWithinChatTopicPrivacyAndCharacterLimits() {
         let long = String(repeating: "👨‍👩‍👧‍👦", count: 900)
         var messages = (0..<8).map { RegramLLMContextMessage(peerId: 1, topicId: 3, text: String($0)) }

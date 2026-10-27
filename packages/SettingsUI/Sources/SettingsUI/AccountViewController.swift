@@ -144,6 +144,20 @@ private struct AccountStarsBalance: Equatable {
     let isLocal: Bool
 }
 
+private func accountMessageSettingsIcon(_ glyph: CGImage) -> CGImage? {
+    var image: CGImage?
+    _ = generateEmptyPhoto(NSMakeSize(24, 24), type: .icon(colors: (top: theme.colors.accent, bottom: theme.colors.accent), icon: glyph, iconSize: glyph.backingSize.aspectFitted(NSMakeSize(16, 16)), cornerRadius: 5), bubble: false).start(next: { image = $0 })
+    return image
+}
+
+private func accountRegramSettingsRowId(_ identifier: String) -> AccountInfoEntryId? {
+    guard identifier.hasPrefix("regram.") else { return nil }
+    if identifier == "regram.bookmarks" || identifier.hasPrefix("regram.bookmarks.") {
+        return .index(-102)
+    }
+    return .index(-100)
+}
+
 private enum AccountInfoEntry<Context: AccountContextProtocol> : TableItemListNodeEntry {
     case info(index:Int, viewType: GeneralViewType, PeerEquatable, EngineStorySubscriptions.Item?, regramRevision: Int64)
     case setStatus(index:Int, viewType: GeneralViewType, PeerEquatable)
@@ -156,6 +170,8 @@ private enum AccountInfoEntry<Context: AccountContextProtocol> : TableItemListNo
     case stories(index: Int, viewType: GeneralViewType)
     case attach(index: Int, AttachMenuBot, viewType: GeneralViewType)
     case regram(index: Int, viewType: GeneralViewType)
+    case savedMessages(index: Int, viewType: GeneralViewType)
+    case bookmarks(index: Int, viewType: GeneralViewType)
     case general(index: Int, viewType: GeneralViewType)
     case stickers(index: Int, viewType: GeneralViewType)
     case notifications(index: Int, viewType: GeneralViewType, status: NotificationAuthorizationStatus, hidePermissionWarning: Bool)
@@ -199,6 +215,10 @@ private enum AccountInfoEntry<Context: AccountContextProtocol> : TableItemListNo
             return .index(6)
         case .regram:
             return .index(-100)
+        case .savedMessages:
+            return .index(-101)
+        case .bookmarks:
+            return .index(-102)
         case .general:
             return .index(7)
         case .proxy:
@@ -269,6 +289,8 @@ private enum AccountInfoEntry<Context: AccountContextProtocol> : TableItemListNo
         case let .attach(index, _, _):
             return index
         case let .regram(index, _):
+            return index
+        case let .savedMessages(index, _), let .bookmarks(index, _):
             return index
         case let  .general(index, _):
             return index
@@ -376,6 +398,17 @@ private enum AccountInfoEntry<Context: AccountContextProtocol> : TableItemListNo
         case let .regram(_, viewType):
             return GeneralInteractedRowItem(initialSize, stableId: stableId, name: "Regram Pro", icon: FeatureNavigationHooks.shared.regramSettingsIcon() ?? theme.icons.settingsGeneral, type: .next, viewType: viewType, action: {
                 if let controller = FeatureNavigationHooks.shared.makeRegramController(arguments.context, nil) {
+                    arguments.presentController(controller, true)
+                }
+            }, inset: NSEdgeInsets(left: 12, right: 12), customTheme: .initialize(theme, background: .clear))
+        case let .savedMessages(_, viewType):
+            return GeneralInteractedRowItem(initialSize, stableId: stableId, name: strings().peerSavedMessages, icon: accountMessageSettingsIcon(TelegramThemeHooks.shared.image(.iconSavedMessages).precomposed(flipVertical: true)), type: .next, viewType: viewType, action: {
+                arguments.presentController(SettingsHooks.shared.makeChatController(arguments.context, .peer(arguments.context.peerId)), true)
+            }, inset: NSEdgeInsets(left: 12, right: 12), customTheme: .initialize(theme, background: .clear))
+        case let .bookmarks(_, viewType):
+            return GeneralInteractedRowItem(initialSize, stableId: stableId, name: regramLocalizedString("Bookmarks.Title", languageCode: appCurrentLanguage.primaryLanguage.languageCode), icon: accountMessageSettingsIcon(TelegramThemeHooks.shared.image(.iconSearchSaved).precomposed(.white, flipVertical: true)), type: .next, viewType: viewType, action: {
+                guard RegramPreferences.shared.settings(accountId: arguments.context.peerId.toInt64())["messageBookmarksEnabled"].bool else { return }
+                if let controller = FeatureNavigationHooks.shared.makeRegramController(arguments.context, "bookmarks") {
                     arguments.presentController(controller, true)
                 }
             }, inset: NSEdgeInsets(left: 12, right: 12), customTheme: .initialize(theme, background: .clear))
@@ -669,6 +702,15 @@ private func accountInfoEntries<Context: AccountContextProtocol>(peerView:PeerVi
     entries.append(.whiteSpace(index: index, height: 10))
     index += 1
     
+    let messageBookmarksEnabled = RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["messageBookmarksEnabled"].bool
+    entries.append(.savedMessages(index: index, viewType: .singleItem))
+    index += 1
+    if messageBookmarksEnabled {
+        entries.append(.bookmarks(index: index, viewType: .singleItem))
+        index += 1
+    }
+    entries.append(.whiteSpace(index: index, height: 10))
+    index += 1
     entries.append(.regram(index: index, viewType: .singleItem))
     index += 1
     entries.append(.general(index: index, viewType: .singleItem))
@@ -1236,6 +1278,7 @@ open class AccountViewController<Context: AccountContextProtocol> : TelegramGene
         
         disposable.set(apply.start(next: { [weak self] transition in
             self?.tableView.merge(with: transition)
+            self?.navigationWillChangeController()
             self?.readyOnce()
         }))
        
@@ -1253,15 +1296,17 @@ open class AccountViewController<Context: AccountContextProtocol> : TelegramGene
     
     open override func navigationWillChangeController() {
         if let navigation = navigation as? MajorNavigationController {
-            var isRegram = false
+            var regramRowId: AccountInfoEntryId?
             navigation.enumerateControllers { controller, _ in
-                guard let controller = controller as? InputDataController, controller.identifier.hasPrefix("regram.") else { return false }
-                isRegram = true
+                guard let controller = controller as? InputDataController, let rowId = accountRegramSettingsRowId(controller.identifier) else { return false }
+                regramRowId = rowId
                 return true
             }
-            if isRegram {
-                if let item = tableView.item(stableId: AnyHashable(AccountInfoEntryId.index(-100))) {
+            if let regramRowId {
+                if let item = tableView.item(stableId: AnyHashable(regramRowId)) {
                     _ = tableView.select(item: item)
+                } else {
+                    tableView.cancelSelection()
                 }
             } else if (navigation.controller as? SettingsSectionController)?.settingsSection == .dataAndStorage {
                 if let item = tableView.item(stableId: AnyHashable(AccountInfoEntryId.index(10))) {
@@ -1303,7 +1348,11 @@ open class AccountViewController<Context: AccountContextProtocol> : TelegramGene
                         _ = tableView.select(item: item)
                     }
                 default:
-                    break
+                    if controller.chatLocation.peerId == context.peerId, let item = tableView.item(stableId: AccountInfoEntryId.index(-101)) {
+                        _ = tableView.select(item: item)
+                    } else {
+                        tableView.cancelSelection()
+                    }
                 }
             } else if let controller = navigation.controller as? InputDataController {
                 switch true {

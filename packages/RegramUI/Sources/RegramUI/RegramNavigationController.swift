@@ -66,7 +66,7 @@ public func RegramNavigationController(context: any AccountContextProtocol, focu
         }
         page.section("RG.BottomBarLayout.Options")
         page.custom("width", equatable: InputDataEquatable(configuration.buttonWidthFillRatio)) { size, id in
-            RegramSliderRowItem(size, stableId: id, title: regramString("RG.BottomBarLayout.Width"), value: Int(configuration.buttonWidthFillRatio), range: 50...100, changed: { percent in
+            regramSliderRowItem(size, stableId: id, title: regramString("RG.BottomBarLayout.Width"), value: Int(configuration.buttonWidthFillRatio), range: 50...100, changed: { percent in
                 update { $0.automaticWidth = false; $0.buttonWidthFillRatio = Int32(percent); $0.widthMode = percent >= 100 ? .full : .adaptive; $0.slotMode = .visibleOnly }
             })
         }

@@ -1,0 +1,7 @@
+Run `python3 tools/tests/regram-settings-actions/run.py` after building RegramCore Release and SwiftSignalKit for the current architecture. Alternate object directories can be selected with `--core-products` and `--signal-products`.
+
+The runner compiles the current production RegramSettingsBackupController against the action-independent row-reuse fixture from `regram-network-policy/NetworkEditorChecks.swift`. It reads that fixture without modifying it. RegramCore backup encoding, decoding, category application and preference persistence are real. Preferences use a unique suite that is removed afterward.
+
+Save/open panels, alerts, restart and native-navigation boundaries are substitutes. Backup bytes remain in memory behind memory:// URLs. The generated test source substitutes only the controller's file read/write boundaries, so no backup files or real account preferences are accessed. A production boundary change fails the runner until the fixture is updated.
+
+Checks retain the original export/reset/restore actions while changing selections. Export and reset also assert that the UI fixture retained the same row object. Coverage includes all-to-messages-to-privacy export, resetting only the latest category while preserving unrelated settings, media alias reset, restore category changes, a new candidate loaded through the production asynchronous import flow, preference reload, empty-category noops, and an old restore action after canceling preview. Confirmation messages never invoke restart callbacks.

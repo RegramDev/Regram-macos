@@ -37,18 +37,6 @@ public enum RegramChatListPolicy {
     }
 
     public static func folderTitle(text: String, icon: String, allChats: Bool, shortAllChats: String, longAllChats: String, settings: RegramAccountSettings) -> String {
-        let title: String
-        if allChats {
-            switch settings["allChatsTitleLengthOverride"].string {
-            case "long": title = longAllChats
-            case "short": title = shortAllChats
-            default: title = text
-            }
-        } else { title = text }
-        switch settings["features.chatListFolderTabDisplayMode"].string {
-        case "icon": return icon
-        case "both": return icon + " " + title
-        default: return title
-        }
+        return text
     }
 }

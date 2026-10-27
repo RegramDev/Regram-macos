@@ -30,6 +30,7 @@ public func RegramFontController(context: any AccountContextProtocol, focusSetti
     let promise = ValuePromise(initial, ignoreRepeated: true)
     let actions = DisposableSet()
     let download = MetaDisposable()
+    let importGeneration = Atomic(value: UUID())
     actions.add(download)
     func update(_ transform: (inout RegramFontState) -> Void) { promise.set(value.modify { state in var state = state; transform(&state); return state }) }
     func set(_ key: String, _ setting: RegramValue) { RegramPreferences.shared.update(accountId: accountId) { $0[key] = setting } }
@@ -48,6 +49,8 @@ public func RegramFontController(context: any AccountContextProtocol, focusSetti
     }
     func importFonts() {
         guard value.with({ !$0.importing && $0.downloading == nil }) else { return }
+        let generation = UUID()
+        _ = importGeneration.swap(generation)
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
@@ -58,6 +61,7 @@ public func RegramFontController(context: any AccountContextProtocol, focusSetti
                 let result = Result { try store.importFonts(url: url, accountId: accountId) }
                 Queue.mainQueue().async {
                     update { $0.importing = false; $0.imported = store.imported; $0.revision &+= 1 }
+                    guard importGeneration.with({ $0 == generation }) else { return }
                     switch result {
                     case let .success(fonts):
                         let chinese = value.with { $0.script == 1 }
@@ -98,11 +102,11 @@ public func RegramFontController(context: any AccountContextProtocol, focusSetti
         page.text(regramString(state.settings["fontApplyToMessages"].bool || state.settings["fontApplyToInterface"].bool ? "Fonts.Areas.Notice" : "Fonts.NoArea"))
         if let downloading = state.downloading {
             page.section("Fonts.Storage.Downloads")
-            page.custom("downloadProgress", equatable: InputDataEquatable(state.progress)) { size, id in RegramProgressRowItem(size, stableId: id, title: downloading, progress: state.progress) }
+            page.custom("downloadProgress", equatable: InputDataEquatable(state.progress)) { size, id in regramProgressRowItem(size, stableId: id, title: downloading, progress: state.progress) }
             page.row("cancel", title: regramString("Fonts.Cancel"), type: .loading, action: { download.set(nil); update { $0.downloading = nil } })
         }
         page.section()
-        page.custom("script", equatable: InputDataEquatable(state.script)) { size, id in RegramSegmentedRowItem(size, stableId: id, labels: [regramString("Fonts.Latin.Title"), regramString("Fonts.Chinese.Title")], selected: state.script, changed: { selected in update { $0.script = selected } }) }
+        page.custom("script", equatable: InputDataEquatable(state.script)) { size, id in regramSegmentedRowItem(size, stableId: id, labels: [regramString("Fonts.Latin.Title"), regramString("Fonts.Chinese.Title")], selected: state.script, changed: { selected in update { $0.script = selected } }) }
         page.input("search", value: state.filter, title: regramString("Fonts.Search"), limit: 256)
         func matches(_ title: String) -> Bool { state.filter.isEmpty || title.localizedCaseInsensitiveContains(state.filter) }
         func groupViewType(_ position: Int, count: Int) -> GeneralViewType {
@@ -180,6 +184,7 @@ public func RegramFontController(context: any AccountContextProtocol, focusSetti
         page.text(regramString("Fonts.Cloud.Notice"))
         page.section()
         page.row("reset", title: regramString("Fonts.Reset"), action: {
+            _ = importGeneration.swap(UUID())
             download.set(nil)
             update { $0.downloading = nil }
             RegramPreferences.shared.update(accountId: accountId) { settings in
@@ -192,7 +197,8 @@ public func RegramFontController(context: any AccountContextProtocol, focusSetti
         if let filter = data[InputDataIdentifier("fonts.search")]?.stringValue { update { $0.filter = filter } }
         return .fail(.none)
     }, removeAfterDisappear: false, hasDone: false, identifier: "regram.fonts")
-    controller.onDeinit = { actions.dispose() }
+    regramConfigureSegmentedRows(controller)
+    controller.onDeinit = { _ = importGeneration.swap(UUID()); actions.dispose() }
     regramFocusSettings(controller, page: "fonts", item: ["latin", "chinese"].contains(focusSetting ?? "") ? "script" : focusSetting)
     return controller
 }

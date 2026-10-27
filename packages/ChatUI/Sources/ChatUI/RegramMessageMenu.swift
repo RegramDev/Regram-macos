@@ -24,8 +24,6 @@ func regramMessageMenu(message: Message, messages: [Message], interaction: ChatI
     let accountId = context.peerId.toInt64()
     let settings = RegramPreferences.shared.settings(accountId: accountId)
     let protected = message.containsSecretMedia || message.isCopyProtected(cachedData: interaction.presentation.cachedData)
-    let bookmarkId = RGBookmarkMessageId(peerId: message.id.peerId.toInt64(), namespace: message.id.namespace, id: message.id.id)
-    let bookmark = RGMessageBookmarks.shared.bookmark(accountId: accountId, messageId: bookmarkId)
     var result: [ContextMenuItem] = []
     if !message.text.isEmpty, !message.containsSecretMedia {
         let speech = RegramMessageSpeech.shared
@@ -34,14 +32,18 @@ func regramMessageMenu(message: Message, messages: [Message], interaction: ChatI
             speech.toggle(text: message.text, accountId: accountId, messageId: message.id)
         }, itemImage: MenuAnimation.menu_show_info.value).regramAction(.speak))
     }
-    if message.id.namespace == Namespaces.Message.Cloud, message.id.peerId.namespace != Namespaces.Peer.SecretChat, !message.containsSecretMedia {
+    if settings["messageBookmarksEnabled"].bool, message.id.namespace == Namespaces.Message.Cloud, message.id.peerId.namespace != Namespaces.Peer.SecretChat, !message.containsSecretMedia {
+        let bookmarkId = RGBookmarkMessageId(peerId: message.id.peerId.toInt64(), namespace: message.id.namespace, id: message.id.id)
+        let bookmark = RGMessageBookmarks.shared.bookmark(accountId: accountId, messageId: bookmarkId)
         result.append(ContextMenuItem(menuTitle(bookmark == nil ? "menu.bookmark" : "menu.editBookmark"), handler: {
+            guard RegramPreferences.shared.settings(accountId: accountId)["messageBookmarksEnabled"].bool else { return }
             let id = InputDataIdentifier("regram_bookmark_tags")
             let rows: [InputDataEntry] = [
                 .sectionId(0, type: .normal),
                 .input(sectionId: 1, index: 0, value: .string(bookmark?.tags.joined(separator: ", ") ?? ""), error: nil, identifier: id, mode: .plain, data: .init(viewType: .singleItem), placeholder: nil, inputPlaceholder: menuTitle("tags"), filter: { $0 }, limit: 1024)
             ]
             let controller = InputDataController(dataSignal: .single(InputDataSignalValue(entries: rows)), title: menuTitle("bookmarks"), validateData: { data in
+                guard RegramPreferences.shared.settings(accountId: accountId)["messageBookmarksEnabled"].bool else { return .fail(.none) }
                 RGMessageBookmarks.shared.save(accountId: accountId, messageId: bookmarkId, threadId: message.threadId, tags: (data[id]?.stringValue ?? "").components(separatedBy: ","))
                 return .success(.navigationBack)
             })
@@ -146,16 +148,6 @@ func regramMessageMenu(message: Message, messages: [Message], interaction: ChatI
             interaction.update { $0.withSelectionState().withUpdatedSelectedMessages(ids) }
         }, itemImage: MenuAnimation.menu_select_messages.value).regramAction(.selectFromUser))
     }
-    if messages.count == 1, regramCanExportMessage(message, interaction: interaction) {
-        let screenshot = ContextMenuItem(menuTitle("menu.messageScreenshot"), handler: {
-            regramExportMessage(message, interaction: interaction, annotate: false)
-        }, itemImage: MenuAnimation.menu_save_as.value).regramAction(.messageScreenshot)
-        let options = ContextMenu()
-        options.addItem(ContextMenuItem(menuTitle("messageExport.save"), handler: { regramExportMessage(message, interaction: interaction, annotate: false) }, itemImage: MenuAnimation.menu_save_as.value))
-        options.addItem(ContextMenuItem(menuTitle("messageExport.annotate"), handler: { regramExportMessage(message, interaction: interaction, annotate: true) }, itemImage: MenuAnimation.menu_edit.value))
-        screenshot.submenu = options
-        result.append(screenshot)
-    }
     if settings["showMediaMetadata"].bool, message.media.contains(where: { $0 is TelegramMediaImage || $0 is TelegramMediaFile }) {
         result.append(ContextMenuItem(menuTitle("mediaDetails.title"), handler: {
             context.bindings.rootNavigation().push(RegramMediaDetailsController(context: context, message: message))
@@ -165,29 +157,6 @@ func regramMessageMenu(message: Message, messages: [Message], interaction: ChatI
         result.append(ContextMenuItem(menuTitle("transcription.tasks"), handler: {
             if let controller = FeatureNavigationHooks.shared.makeRegramController(context, "transcriptionTasks") { context.bindings.rootNavigation().push(controller) }
         }, itemImage: MenuAnimation.menu_show_info.value))
-    }
-    if !protected, settings["messageSummaryEnabled"].bool, message.id.peerId.namespace != Namespaces.Peer.SecretChat {
-        let summary = ContextMenuItem(menuTitle("menu.summarize"), handler: {
-            if let controller = FeatureNavigationHooks.shared.makeRegramSummaryController(context, messages, false) { context.bindings.rootNavigation().push(controller) }
-        }, itemImage: MenuAnimation.menu_collapse.value).regramAction(.summarize)
-        let options = ContextMenu()
-        options.addItem(ContextMenuItem(menuTitle("summary.thisMessage"), handler: {
-            if let controller = FeatureNavigationHooks.shared.makeRegramSummaryController(context, messages, false) { context.bindings.rootNavigation().push(controller) }
-        }, itemImage: MenuAnimation.menu_collapse.value))
-        if let ids = interaction.presentation.selectionState?.selectedIds, !ids.isEmpty {
-            options.addItem(ContextMenuItem(menuTitle("summary.selectedMessages"), handler: {
-                let ids = interaction.presentation.selectionState?.selectedIds ?? []
-                interaction.regramServiceDisposable.set((interaction.getMessages(Array(ids), false) |> take(1) |> deliverOnMainQueue).start(next: { selected in
-                    guard interaction.presentation.selectionState?.selectedIds == ids else { return }
-                    if let controller = FeatureNavigationHooks.shared.makeRegramSummaryController(context, selected, false) { context.bindings.rootNavigation().push(controller) }
-                }))
-            }, itemImage: MenuAnimation.menu_select_messages.value))
-        }
-        options.addItem(ContextMenuItem(menuTitle("summary.timeRange"), handler: {
-            if let controller = FeatureNavigationHooks.shared.makeRegramSummaryRangeController(context, interaction.peerId, interaction.chatLocation.threadId, messages) { context.bindings.rootNavigation().push(controller) }
-        }, itemImage: MenuAnimation.menu_calendar.value))
-        summary.submenu = options
-        result.append(summary)
     }
     if !protected, message.id.peerId.namespace != Namespaces.Peer.SecretChat, let url = regramMessageWebURL(message) {
         result.append(ContextMenuItem(menuTitle("webTranslation.action"), handler: {

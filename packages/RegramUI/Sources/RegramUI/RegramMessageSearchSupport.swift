@@ -11,12 +11,14 @@ import InputDataUI
 import RegramCore
 import Localization
 import ChatHistoryModel
+import GeneralRows
 
 struct RegramSearchMessageRow: Equatable {
     let messageId: MessageId
     let threadId: Int64?
     let groupPeerId: PeerId
     let title: String
+    let peer: PeerEquatable?
     let preview: String
     let date: String
 }
@@ -99,17 +101,27 @@ func regramSearchMessageRow(_ message: Message, group: Peer?, groupPeerId: PeerI
         }
     }
     let preview = RegramMessageSearchPolicy.preview(text, spoilers: spoilers, reveal: reveal).trimmingCharacters(in: .whitespacesAndNewlines)
-    return RegramSearchMessageRow(messageId: message.id, threadId: message.threadId ?? threadId, groupPeerId: groupPeerId, title: regramSearchGroupTitle(group, peerId: groupPeerId, accountId: accountId), preview: preview.isEmpty ? regramString("CommonGroups.Media") : preview, date: dateFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(message.timestamp))))
+    return RegramSearchMessageRow(messageId: message.id, threadId: message.threadId ?? threadId, groupPeerId: groupPeerId, title: regramSearchGroupTitle(group, peerId: groupPeerId, accountId: accountId), peer: group.map { PeerEquatable(peer: $0) }, preview: preview.isEmpty ? regramString("CommonGroups.Media") : preview, date: dateFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(message.timestamp))))
 }
 
-func regramSearchMessageEntries(_ messages: [RegramSearchMessageRow], context: any AccountContextProtocol, sectionId: Int32, index: inout Int32) -> [InputDataEntry] {
+private struct RegramSearchMessagePresentation: Equatable {
+    let message: RegramSearchMessageRow
+    let author: PeerEquatable?
+    let query: String
+    let viewType: GeneralViewType
+}
+
+func regramSearchMessageEntries(_ messages: [RegramSearchMessageRow], context: any AccountContextProtocol, sectionId: Int32, index: inout Int32, author: Peer? = nil, query: String = "") -> [InputDataEntry] {
     var entries: [InputDataEntry] = []
     for (position, message) in messages.enumerated() {
         let id = message.messageId
         let open = { RegramUIHooks.shared.openMessage(context, id, message.threadId) }
-        entries.append(.general(sectionId: sectionId, index: index, value: .none, error: nil, identifier: InputDataIdentifier("search_message_\(id.peerId.toInt64())_\(id.namespace)_\(id.id)"), data: .init(name: message.title + " · " + message.date, color: theme.colors.text, type: .next, viewType: messages.count == 1 ? .singleItem : position == 0 ? .firstItem : position == messages.count - 1 ? .lastItem : .innerItem, description: message.preview, action: open, menuItems: {
-            [ContextMenuItem(regramString("CommonGroups.OpenMessage"), handler: open), ContextMenuItem(regramString("CommonGroups.OpenGroup"), handler: { RegramUIHooks.shared.openPeerInfo(context, message.groupPeerId) })]
-        })))
+        let viewType: GeneralViewType = messages.count == 1 ? .singleItem : position == 0 ? .firstItem : position == messages.count - 1 ? .lastItem : .innerItem
+        entries.append(.custom(sectionId: sectionId, index: index, value: .none, identifier: InputDataIdentifier("search_message_\(id.peerId.toInt64())_\(id.namespace)_\(id.id)"), equatable: InputDataEquatable(RegramSearchMessagePresentation(message: message, author: author.map { PeerEquatable(peer: $0) }, query: query, viewType: viewType)), comparable: nil, item: { size, stableId in
+            regramSearchMessageRowItem(size, stableId: stableId, title: author?.displayTitle ?? message.title, date: message.date, preview: message.preview, query: query, viewType: viewType, action: open, menu: {
+                [ContextMenuItem(regramString("CommonGroups.OpenMessage"), handler: open), ContextMenuItem(regramString("CommonGroups.OpenGroup"), handler: { RegramUIHooks.shared.openPeerInfo(context, message.groupPeerId) })]
+            })
+        }))
         index += 1
     }
     return entries
@@ -117,7 +129,8 @@ func regramSearchMessageEntries(_ messages: [RegramSearchMessageRow], context: a
 
 func regramSearchDateFormatter() -> DateFormatter {
     let formatter = DateFormatter()
-    formatter.locale = Locale(identifier: appCurrentLanguage.primaryLanguage.languageCode)
+    let language = appCurrentLanguage.primaryLanguage.languageCode
+    formatter.locale = Locale(identifier: ["regram-zh-hans", "regram-zh-hans-raw", "zhcncc", "zhcncc-raw"].contains(language.lowercased()) ? "zh-Hans" : language)
     formatter.dateStyle = .short
     formatter.timeStyle = .short
     return formatter

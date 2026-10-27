@@ -25,8 +25,8 @@ func navigateToChatListFilter(_ filter: Int32, context: AccountContext) {
     }
 }
 
-func ChatListFiltersListController(context: AccountContext) -> InputDataController {
-    return SidebarUI.ChatListFiltersListController(context: context, environment: AppSidebarUIEnvironment(context))
+func ChatListFiltersListController(context: AccountContext, focusOnTags: Bool = false) -> InputDataController {
+    return SidebarUI.ChatListFiltersListController(context: context, environment: AppSidebarUIEnvironment(context), focusOnTags: focusOnTags)
 }
 
 func ChatListFilterController(context: AccountContext, filter: ChatListFilter, isNew: Bool = false) -> InputDataController {

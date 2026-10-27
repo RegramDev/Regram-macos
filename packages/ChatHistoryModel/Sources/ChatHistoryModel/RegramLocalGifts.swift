@@ -316,7 +316,7 @@ public func regramLocalGiftProfileState(context: any AccountContextProtocol, pee
             case let .generic(gift):
                 if state.filter.contains(.peerColor), !gift.flags.contains(.peerColorAvailable) { return false }
                 if gift.availability == nil { return state.filter.contains(.unlimited) }
-                return state.filter.contains(.limitedNonUpgradable)
+                return state.filter.contains(item.canUpgrade ? .limitedUpgradable : .limitedNonUpgradable)
             case let .unique(gift):
                 if state.filter.contains(.peerColor), gift.peerColor == nil { return false }
                 return state.filter.contains(.unique)

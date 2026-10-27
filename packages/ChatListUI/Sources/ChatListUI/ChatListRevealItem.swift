@@ -155,6 +155,7 @@ public class ChatListRevealItem: TableStickItem {
 public final class ChatListRevealView : TableStickView {
     private let containerView = View()
     private var animated: Bool = false
+    private var segmentItems: [ScrollableSegmentItem] = []
     public let segmentView: ScrollableSegmentView = ScrollableSegmentView(frame: NSZeroRect)
     public required init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -266,7 +267,8 @@ public final class ChatListRevealView : TableStickView {
         segmentView.fitToWidth = !regramSettings["compactFolderNames"].bool
 
         var index: Int = 0
-        let insets = NSEdgeInsets(left: 10, right: 10)
+        let tabInset: CGFloat = regramSettings["compactFolderNames"].bool ? 6 : 14
+        let insets = NSEdgeInsets(left: tabInset, right: tabInset)
         var items:[ScrollableSegmentItem] = []
         for tab in item.tabs {
             let unreadCount = item.counters.count(for: tab)
@@ -281,8 +283,7 @@ public final class ChatListRevealView : TableStickView {
                 
                 let attr = NSMutableAttributedString()
                 attr.append(string: title, color: selected ? segmentTheme.activeText : segmentTheme.inactiveText, font: segmentTheme.textFont)
-                let prefixLength = regramSettings["features.chatListFolderTabDisplayMode"].string == "both" ? folderIcon.utf16.count + 1 : 0
-                let entities = regramSettings["features.chatListFolderTabDisplayMode"].string == "icon" ? [] : tab.entities.map { MessageTextEntity(range: ($0.range.lowerBound + prefixLength)..<($0.range.upperBound + prefixLength), type: $0.type) }
+                let entities = tab.entities
                 InlineStickerItem.apply(to: attr, associatedMedia: [:], entities: entities, isPremium: context.isPremium, playPolicy: tab.enableAnimations ? nil : .framesCount(1))
 
                 let layout = TextViewLayout(attr)
@@ -303,7 +304,14 @@ public final class ChatListRevealView : TableStickView {
             index += 1
         }
         
-        segmentView.updateItems(items, animated: animated)
+        let previousItems = Dictionary(uniqueKeysWithValues: segmentItems.map { ($0.uniqueId, $0) })
+        segmentItems = items.map { item in
+            if let previous = previousItems[item.uniqueId], previous == item {
+                return previous
+            }
+            return item
+        }
+        segmentView.updateItems(segmentItems, animated: animated)
         guard !items.isEmpty else { segmentView.resortRange = nil; return }
         let range: NSRange
         if context.isPremium {
@@ -376,8 +384,13 @@ public final class ChatListRevealView : TableStickView {
         super.layout()
 
         containerView.frame = bounds
+        let previousSize = segmentView.frame.size
         segmentView.frame = NSMakeRect(0, -10, containerView.bounds.width, containerView.bounds.height
          + 10)
+        if previousSize != segmentView.frame.size {
+            segmentView.layout()
+            segmentView.updateItems(segmentItems, animated: false)
+        }
     }
     
     public required init?(coder: NSCoder) {

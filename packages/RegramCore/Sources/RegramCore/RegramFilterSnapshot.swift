@@ -4,18 +4,27 @@ public struct RegramFilterSnapshot {
     private let rules: [RGMessageFilterRule]
     private let hiddenAuthors: Set<Int64>
     private let ignoredChats: Set<Int64>
+    private let hasEnabledRules: Bool
 
     public init(settings: RegramAccountSettings) {
         rules = settings.filterRules
+        hasEnabledRules = rules.contains { $0.isEnabled && !$0.pattern.isEmpty }
         hiddenAuthors = Set(settings["blockedPeerIds"].strings.compactMap(Int64.init))
         ignoredChats = Set(settings["messageFilterDisabledPeerIds"].strings.compactMap(Int64.init))
     }
 
+    public var isEmpty: Bool { hiddenAuthors.isEmpty && !hasEnabledRules }
+
     public func shouldHide(text: String, peerId: Int64, authorId: Int64?, incoming: Bool) -> Bool {
+        shouldHide(peerId: peerId, authorId: authorId, incoming: incoming, text: { text })
+    }
+
+    public func shouldHide(peerId: Int64, authorId: Int64?, incoming: Bool, text: () -> String) -> Bool {
         guard incoming else { return false }
         if let authorId, hiddenAuthors.contains(authorId) { return true }
         guard !ignoredChats.contains(peerId) else { return false }
-        return RGMessageFilter.shouldHide(text: text, peerId: peerId, rules: rules)
+        guard hasEnabledRules else { return false }
+        return RGMessageFilter.shouldHide(text: text(), peerId: peerId, rules: rules)
     }
 }
 
@@ -28,6 +37,13 @@ public final class RegramTemporaryReveal {
         lock.lock()
         defer { lock.unlock() }
         return (deadlines[key(accountId, peerId)] ?? 0) > ProcessInfo.processInfo.systemUptime
+    }
+
+    public func withUnrevealed<T>(accountId: Int64, peerId: Int64, _ body: () -> T) -> T? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard (deadlines[key(accountId, peerId)] ?? 0) <= ProcessInfo.processInfo.systemUptime else { return nil }
+        return body()
     }
 
     public func setRevealed(_ enabled: Bool, accountId: Int64, peerId: Int64) {

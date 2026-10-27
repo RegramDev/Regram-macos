@@ -47,6 +47,14 @@ public enum RegramClipboardImages {
         Snapshot(urls: urls, containsImage: urls.contains { CGImageSourceCreateWithURL($0 as CFURL, nil) != nil })
     }
 
+    public static func canSendAsPhoto(_ url: URL) -> Bool {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil), CGImageSourceGetCount(source) == 1,
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.doubleValue,
+              let height = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.doubleValue else { return false }
+        return width >= 40 && height >= 40 && width <= height * 10 && height <= width * 10
+    }
+
     public static func preparingPhotos(_ snapshot: Snapshot) throws -> Snapshot {
         var urls: [URL] = []
         for url in snapshot.urls {

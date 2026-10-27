@@ -1377,9 +1377,7 @@ func channelInfoEntries<Context: AccountContextProtocol>(view: PeerView, argumen
             if !usernames.isEmpty {
                 aboutBlock.append(.userName(sectionId: .desc, value: usernames, viewType: .singleItem))
             }
-            if FastSettings.canViewPeerId {
-                aboutBlock.append(.peerId(sectionId: .desc, value: "\(channel.id.id._internalGetInt64Value())", viewType: .singleItem))
-            }
+
             applyBlock(aboutBlock)
             
             if channel.isVerified || (view.cachedData as? CachedChannelData)?.verification != nil {

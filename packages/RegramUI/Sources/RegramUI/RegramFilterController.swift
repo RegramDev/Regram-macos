@@ -24,6 +24,7 @@ public func RegramFilterController(context: any AccountContextProtocol, focusSet
     let promise = ValuePromise(FilterDraft(), ignoreRepeated: true)
     let selection = MetaDisposable()
     let patternId = InputDataIdentifier("messageFilter.input")
+    func currentRules() -> [RGMessageFilterRule] { RegramPreferences.shared.settings(accountId: accountId).filterRules }
     func update(_ transform: (inout FilterDraft) -> Void) { promise.set(draft.modify { current in var value = current; transform(&value); return value }) }
     func edit(_ id: String, transform: (inout RGMessageFilterRule) -> Void) {
         RegramPreferences.shared.update(accountId: accountId) { settings in
@@ -57,9 +58,9 @@ public func RegramFilterController(context: any AccountContextProtocol, focusSet
         ]
         let tools = {
             [
-                ContextMenuItem(regramString("MessageFilter.Export"), handler: { if !settings.filterRules.isEmpty { regramExportRules(context: context) } }),
+                ContextMenuItem(regramString("MessageFilter.Export"), handler: { if !currentRules().isEmpty { regramExportRules(context: context) } }),
                 ContextMenuItem(regramString("MessageFilter.Import"), handler: { regramImportRules(context: context) }),
-                ContextMenuItem(regramString("MessageFilter.Test.Title"), handler: { context.bindings.rootNavigation().push(RegramMessageFilterTestController(context: context, rules: settings.filterRules)) })
+                ContextMenuItem(regramString("MessageFilter.Test.Title"), handler: { context.bindings.rootNavigation().push(RegramMessageFilterTestController(context: context, rules: currentRules())) })
             ]
         }
         rows.append(.desc(sectionId: 2, index: 3, text: .plain(regramString("MessageFilter.Keywords.Title")), data: .init(color: theme.colors.listGrayText, viewType: .textTopItem, rightItem: .init(isLoading: false, text: .initialize(string: "⋯", color: theme.colors.accent, font: .medium(.title)), contextMenu: tools))))
@@ -76,6 +77,7 @@ public func RegramFilterController(context: any AccountContextProtocol, focusSet
                     ContextMenuItem(regramString(rule.isEnabled ? "MessageFilter.Rule.Disable" : "MessageFilter.Rule.Enable"), handler: { edit(rule.id) { $0.isEnabled.toggle() } }),
                     ContextMenuItem(regramString(rule.isException ? "MessageFilter.Rule.Hide" : "MessageFilter.Rule.Keep"), handler: { edit(rule.id) { $0.isException.toggle() } }),
                     ContextMenuItem(regramString("MessageFilter.Rule.LimitToChats"), handler: {
+                        guard let rule = currentRules().first(where: { $0.id == rule.id }) else { return }
                         selection.set((RegramUIHooks.shared.selectChats(context, rule.peerIds.map(PeerId.init)) |> deliverOnMainQueue).start(next: { ids in edit(rule.id) { $0.peerIds = ids.map { $0.toInt64() } } }))
                     }),
                     ContextMenuItem(regramString(rule.isRegex ? "MessageFilter.Rule.MakePlain" : "MessageFilter.Rule.MakeRegex"), handler: { edit(rule.id) { $0.isRegex.toggle() } }),
@@ -83,7 +85,8 @@ public func RegramFilterController(context: any AccountContextProtocol, focusSet
                 ]
             }
             rows.append(.general(sectionId: 2, index: Int32(index + 4), value: .none, error: nil, identifier: InputDataIdentifier("filter_rule_" + rule.id), data: .init(name: rule.pattern, color: rule.isEnabled ? theme.colors.text : theme.colors.grayText, type: value.editing ? .context(regramString("MessageFilter.Rule.Delete")) : .next, viewType: rules.count == 1 ? .singleItem : index == 0 ? .firstItem : index + 1 == rules.count ? .lastItem : .innerItem, description: details.joined(separator: " · "), action: {
-                if value.editing { remove(rule.id) } else { context.bindings.rootNavigation().push(RegramRuleController(context: context, rule: rule)) }
+                if draft.with({ $0.editing }) { remove(rule.id) }
+                else if let rule = currentRules().first(where: { $0.id == rule.id }) { context.bindings.rootNavigation().push(RegramRuleController(context: context, rule: rule)) }
             }, menuItems: menu)))
         }
         rows.append(.desc(sectionId: 2, index: Int32(rules.count + 4), text: .plain(regramString("MessageFilter.Rules.Notice")), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
@@ -139,19 +142,27 @@ public func RegramMessageFilterTestController(context: any AccountContextProtoco
     let state = Atomic(value: FilterTestState())
     let promise = ValuePromise(FilterTestState(), ignoreRepeated: true)
     func update(_ transform: (inout FilterTestState) -> Void) { promise.set(state.modify { current in var value = current; transform(&value); return value }) }
+    func cancel() { update { $0.generation = UUID(); $0.running = false } }
     let signal = combineLatest(promise.get(), appearanceSignal) |> map { value, _ -> InputDataSignalValue in
         var rows: [InputDataEntry] = [
             .sectionId(0, type: .normal),
             .input(sectionId: 1, index: 0, value: .string(value.text), error: nil, identifier: InputDataIdentifier("filter_testText"), mode: .plain, data: .init(viewType: .firstItem), placeholder: nil, inputPlaceholder: "", filter: { $0 }, limit: 64000),
-            .general(sectionId: 1, index: 1, value: .none, error: nil, identifier: InputDataIdentifier("filter_runTest"), data: .init(name: regramString("MessageFilter.Test.Run"), color: theme.colors.accent, type: value.running ? .loading : .none, viewType: .lastItem, enabled: !value.running && !value.text.isEmpty, action: {
-                guard !value.running, !value.text.isEmpty else { return }
+            .general(sectionId: 1, index: 1, value: .none, error: nil, identifier: InputDataIdentifier("filter_runTest"), data: .init(name: regramString(value.running ? "Common.Cancel" : "MessageFilter.Test.Run"), color: theme.colors.accent, type: value.running ? .loading : .none, viewType: .lastItem, enabled: value.running || !value.text.isEmpty, action: {
+                let current = state.with { $0 }
+                if current.running { cancel(); return }
+                guard !context.isFrozen, !current.text.isEmpty else { return }
+                let text = current.text
                 let generation = UUID()
                 update { $0.running = true; $0.generation = generation }
                 DispatchQueue.global(qos: .userInitiated).async {
-                    let results = rules.map { RGMessageFilter.matchResult(rule: $0, text: value.text) }
+                    var results: [RGMessageFilter.MatchResult] = []
+                    for rule in rules {
+                        guard state.with({ $0.generation == generation }) else { return }
+                        results.append(RGMessageFilter.matchResult(rule: rule, text: text))
+                    }
                     DispatchQueue.main.async {
                         guard state.with({ $0.generation == generation }) else { return }
-                        update { if $0.text == value.text { $0.results = results }; $0.running = false }
+                        update { if $0.text == text { $0.results = results }; $0.running = false }
                     }
                 }
             })),
@@ -176,10 +187,11 @@ public func RegramMessageFilterTestController(context: any AccountContextProtoco
         return InputDataSignalValue(entries: rows)
     }
     let controller = InputDataController(dataSignal: signal, title: regramString("MessageFilter.Test.Title"), updateDatas: { data in
-        if let text = data[InputDataIdentifier("filter_testText")]?.stringValue { update { if $0.text != text { $0.text = text; $0.results = [] } } }
+        if let text = data[InputDataIdentifier("filter_testText")]?.stringValue { update { if $0.text != text { $0.text = text; $0.results = []; $0.generation = UUID(); $0.running = false } } }
         return .fail(.none)
     }, hasDone: false, identifier: "regram.messageFilter")
-    controller.onDeinit = { update { $0.generation = UUID() } }
+    controller.willDisappear = { _ in cancel() }
+    controller.onDeinit = cancel
     return controller
 }
 

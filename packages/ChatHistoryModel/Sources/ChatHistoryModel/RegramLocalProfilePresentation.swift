@@ -13,6 +13,11 @@ public func regramLocalGiftsState(context: any AccountContextProtocol) -> Signal
     regramLocalGiftsChanges(account: regramLocalGiftsAccount(context: context))
 }
 
+public func regramLocalProfileGiftCount(accountPeerId: PeerId, peerId: PeerId, remoteCount: Int32, state: RGLocalGiftsState) -> Int32 {
+    guard peerId == accountPeerId, state.enabled else { return remoteCount }
+    return Int32(clamping: Int64(max(0, remoteCount)) + Int64(state.purchases.count))
+}
+
 public func regramLocalProfileCachedData(accountPeerId: PeerId, peerId: PeerId, cachedData: CachedPeerData?, state: RGLocalGiftsState) -> CachedPeerData? {
     guard peerId == accountPeerId, state.ratingEnabled || (state.enabled && state.walletCardEnabled) else { return cachedData }
     var result = (cachedData as? CachedUserData) ?? CachedUserData()

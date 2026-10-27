@@ -704,6 +704,14 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
     
     private let folderUpdatesDisposable = MetaDisposable()
 
+    public override func selectFilter(_ filter: ChatListFilter) {
+        let sameFilter = ChatListUIHooks.shared.chatListFilterId(filterValue.filter) == ChatListUIHooks.shared.chatListFilterId(filter)
+        updateFilter { $0.withUpdatedFilter(filter) }
+        if sameFilter {
+            scrollup(force: true)
+        }
+    }
+
     public func updateFilter(_ f:(FilterData)->FilterData) {
         
         let data = f(stateValue.with { $0.filterData })
@@ -780,7 +788,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         
         let initialSize = self.atomicSize
         let context = self.context
-        let regramPreviewCoordinator = RegramChatListPreviewCoordinator(postbox: context.account.postbox, accountId: context.peerId.toInt64())
+        let regramPreviewCoordinator = RegramChatListPreviewCoordinator(account: context.account, accountId: context.peerId.toInt64())
         self.regramPreviewCoordinator = regramPreviewCoordinator
         let previousChatList = self.previousChatList
         let first = Atomic<(hasEarlier: Bool, hasLater: Bool)>(value: (hasEarlier: false, hasLater: false))
@@ -995,8 +1003,10 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         let regramRefreshRevision = Atomic<Int64>(value: 0)
         let regramFilterRevision = Atomic<Int64>(value: 0)
         let regramFilterChanges = regramPreferenceChanges(accountId: context.peerId.toInt64()) |> map { _ -> Int64 in regramFilterRevision.modify { $0 &+ 1 } }
-        let regramArchiveGroup: Signal<EngineChatList.GroupItem?, NoError> = combineLatest(regramPreferenceChanges(accountId: context.peerId.toInt64()), filterSignal) |> mapToSignal { settings, filter -> Signal<EngineChatList.GroupItem?, NoError> in
-            guard settings["features.showArchiveInFolders"].bool, !settings["features.hideSavedAndArchivedMessagesInList"].bool, filter.filter != .allChats else { return .single(nil) }
+        let regramArchiveGroup: Signal<EngineChatList.GroupItem?, NoError> = combineLatest(regramPreferenceChanges(accountId: context.peerId.toInt64()), filterSignal) |> map { settings, filter in
+            return settings["features.showArchiveInFolders"].bool && !settings["features.hideSavedAndArchivedMessagesInList"].bool && filter.filter != .allChats
+        } |> distinctUntilChanged |> mapToSignal { enabled -> Signal<EngineChatList.GroupItem?, NoError> in
+            guard enabled else { return .single(nil) }
             return chatListViewForLocation(chatListLocation: .chatList(groupId: .root), location: .Initial(1, nil), filter: .allChats, account: context.account) |> map { $0.list.groupItems.first(where: { $0.id == .archive }) }
         }
         let regramAppearance = combineLatest(appearanceSignal, regramFilterChanges, regramRemarkChanges(accountId: context.peerId.toInt64()), regramPreviewCoordinator.changes.get()) |> map { appearance, _, _, _ in
@@ -1194,12 +1204,12 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
             
             mapped.append(.space)
 
-            let entries = mapped.sorted().map { entry -> AppearanceWrapperEntry<UIChatListEntry> in
+            let presentation = regramPreviewCoordinator.update(mapped, filterRevision: regramFilterRevision.with { $0 }, pagingFloor: regramChatListPagingFloor(update.list))
+            let entries = presentation.entries.sorted().map { entry -> AppearanceWrapperEntry<UIChatListEntry> in
                 return AppearanceWrapperEntry(entry: entry, appearance: appearance)
             }
             
             
-            let previews = regramPreviewCoordinator.update(mapped, filterRevision: regramFilterRevision.with { $0 })
             let previousList = previousEntries.swap(entries)
             if regramSettings["features.keepNewChatsVisibleAtTop"].bool, regramRestingNearTop.with({ $0 }), let previousList, !previousList.isEmpty, !update.list.hasLater {
                 let oldIds = Set(previousList.map { $0.entry.stableId })
@@ -1209,7 +1219,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
                 }
                 if hasNewChat, case .none = scroll { scroll = .up(false) }
             }
-            return prepareEntries(from: previousList, to: entries, adIndex: nil, arguments: arguments, initialSize: initialSize.with { $0 }, animated: animated, scrollState: scroll, groupId: groupId, listMode: mode, regramPreviews: previews, layoutPreferences: RegramChatListLayoutPreferences(settings: regramSettings))
+            return prepareEntries(from: previousList, to: entries, adIndex: nil, arguments: arguments, initialSize: initialSize.with { $0 }, animated: animated, scrollState: scroll, groupId: groupId, listMode: mode, regramPreviews: presentation.previews, layoutPreferences: RegramChatListLayoutPreferences(settings: regramSettings))
         }
         
         

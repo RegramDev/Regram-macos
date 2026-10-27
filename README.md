@@ -4,7 +4,7 @@
   <h1>Regram for macOS</h1>
   <p>基于 Telegram 原生 macOS 客户端，提供更灵活的消息、翻译与外观设置。</p>
   <p>
-    <a href="https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283368/Regram-13.1.0-283368-universal.dmg">下载</a> ·
+    <a href="https://github.com/RegramDev/Regram-macos/releases/tag/v13.1.0-283374">下载</a> ·
     <a href="CHANGELOG.md">更新日志</a> ·
     <a href="INSTALL.zh-CN.md">构建说明</a> ·
     <a href="https://github.com/RegramDev/Regram-macos/issues">问题反馈</a>
@@ -16,7 +16,7 @@ Regram 是基于 [Telegram for macOS](https://github.com/TelegramMessenger/teleg
 ## 功能
 
 - **消息与记录**：消息菜单自定义、无引用复读与转发、书签、标签、群备注，以及按作者或共同群组查找消息。
-- **翻译与总结**：选择翻译引擎，提供单条、整聊、发送前及网页翻译；支持自定义 LLM 翻译与总结、语音转写。
+- **翻译与语音**：选择翻译引擎，提供单条、整聊、发送前、网页及图片翻译；支持自定义 LLM 翻译和语音转写。
 - **隐私与过滤**：关键词和正则表达式过滤、隐藏用户、过滤规则导入、本地撤回与编辑记录。
 - **图片与媒体**：原图复制、高画质图片粘贴、媒体信息查看及链接预览设置。
 - **外观与导航**：自定义字体、九款 Regram 图标、紧凑聊天列表，以及底栏项目与宽度调整。
@@ -27,13 +27,20 @@ Regram 是基于 [Telegram for macOS](https://github.com/TelegramMessenger/teleg
 
 ## 下载与更新
 
-下载 [Regram 13.1.0 (283368) Universal DMG](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283368/Regram-13.1.0-283368-universal.dmg)，适用于 Intel 与 Apple Silicon Mac，要求 macOS 12.0 或更高版本。新增功能与修复内容见[更新日志](CHANGELOG.md)。
+Regram 13.1.0 (283374) 要求 macOS 12.0 或更高版本，按处理器提供独立安装包：
+
+| Mac | 安装包 |
+| --- | --- |
+| Apple Silicon（M 系列） | [arm64 DMG](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283374/Regram-13.1.0-283374-arm64.dmg) |
+| Intel | [x86_64 DMG](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283374/Regram-13.1.0-283374-x86_64.dmg) |
+
+校验值见 [SHA256SUMS.txt](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283374/SHA256SUMS.txt)，新增功能与修复内容见[更新日志](CHANGELOG.md)。
 
 此版本使用 Apple/Mac Development 开发证书签名，尚未经 Apple 公证。打开下载的 DMG，将 Regram 拖到 Applications（应用程序）文件夹，再从该文件夹启动。
 
 首次打开若被 Gatekeeper 阻止，请先确认下载来自本仓库的 GitHub Releases 且来源可信，再按系统版本操作：macOS 13 或更高版本进入“系统设置 → 隐私与安全性 → 仍要打开”；macOS 12 进入“系统偏好设置 → 安全性与隐私 → 通用 → 仍要打开”，按提示确认打开。详见 [Apple 官方说明](https://support.apple.com/zh-cn/102445)及 [macOS Monterey 官方指南](https://support.apple.com/en-gb/guide/mac-help/mh40616/12.0/mac/12.0)。
 
-Regram 使用独立的应用标识和本地数据目录，可以与 Telegram 同时安装。更新需要手动下载并替换应用；正常更新保留现有账号与本地数据。
+Regram 使用独立的应用标识和本地数据目录，可以与 Telegram 同时安装。本版提供自动检查、下载和退出时安装更新，可在 Regram Pro 中调整；也可手动下载并替换应用。更新按当前架构选择安装包，检查下载摘要和应用签名，正常更新保留现有账号与本地数据。
 
 ## 从源码构建
 
@@ -51,7 +58,7 @@ cp Telegram-Mac/ApiCredentials.example.xcconfig Telegram-Mac/ApiCredentials.loca
 python3 scripts/install-regram-release.py --identity YOUR_CERTIFICATE_SHA1
 ```
 
-安装脚本默认只构建当前 Mac 的架构，向 Swift 包传入 `STABLE`，校验并安装到 `/Applications/Regram.app`。通用构建示例见[构建指南](INSTALL.zh-CN.md#universal-build)。后续更新省略 `--identity`，继续使用同一证书。API 凭据和本地签名配置由 Git 忽略。
+安装脚本默认只构建当前 Mac 的架构，向 Swift 包传入 `STABLE`，校验并安装到 `/Applications/Regram.app`。后续发布按 Apple Silicon 与 Intel 分别打包，见[构建指南](INSTALL.zh-CN.md#separate-architecture-packages)。后续更新省略 `--identity`，继续使用同一证书。API 凭据和本地签名配置由 Git 忽略。
 
 ## 问题反馈
 

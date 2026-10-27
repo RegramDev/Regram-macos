@@ -23,6 +23,8 @@ import ColorPalette
 import InAppSettings
 import FoundationUtils
 import ObjcUtils
+import RegramCore
+import RegramServices
 
 public final class GalleryRecognition {
     private let item: MGalleryPhotoItem
@@ -31,6 +33,10 @@ public final class GalleryRecognition {
     private let subjectDisposable = MetaDisposable()
     private let loadedDisposable = MetaDisposable()
     private var isFullImageLoaded: Bool = false
+    private var sourceIsVisible = false
+    private var translationGeneration = UUID()
+    private var translationIdentity: String?
+    private var settingsObserver: NSObjectProtocol?
     
     public var openLink: ((String) -> Void)?
     
@@ -54,14 +60,17 @@ public final class GalleryRecognition {
         }
         if #available(macOS 10.15, *) {
             let postbox = item.context.account.postbox
+            let accountId = item.context.peerId.toInt64()
             let mediaId = item.entry.mediaId
             let fullImageLoaded = item.path.get() |> take(1) |> map { _ in Void() }
-            let image: Signal<TextRecognizing.Result?, TextRecognizing.Error> = combineLatest(item.image.get(), item.magnify.get(), item.appearValue, fullImageLoaded) |> castError(TextRecognizing.Error.self) |> mapToSignal { image, magnify, visible, _ in
+            let image: Signal<TextRecognizing.Result?, TextRecognizing.Error> = combineLatest(item.image.get(), item.magnify.get(), item.appearValue, fullImageLoaded) |> castError(TextRecognizing.Error.self) |> deliverOnMainQueue |> mapToSignal { [weak self] image, magnify, visible, _ in
+                self?.sourceIsVisible = magnify == 1 && visible
+                self?.applyResult(nil)
                 if magnify == 1, visible {
                     switch image.value {
                     case let .image(image, _):
-                        if let image = image {
-                            return TextRecognizing.recognize(image._cgImage!, postbox: postbox, stableId: mediaId) |> map(Optional.init)
+                        if let image = image?._cgImage {
+                            return TextRecognizing.recognize(image, postbox: postbox, stableId: mediaId) |> map(Optional.init) |> deliverOnMainQueue
                         } else {
                             return .single(nil)
                         }
@@ -88,6 +97,11 @@ public final class GalleryRecognition {
             selectorView.barcodeMenu = { [weak self] barcode in
                 return self?.menu(for: barcode)
             }
+            settingsObserver = NotificationCenter.default.addObserver(forName: RegramPreferences.didChange, object: nil, queue: .main) { [weak self] notification in
+                guard let self, notification.object as? Int64 == accountId, let identity = self.translationIdentity,
+                      RegramPreferences.shared.settings(accountId: accountId).translationIdentity != identity else { return }
+                self.applyResult(self.result as? TextRecognizing.Result)
+            }
         }
     }
     deinit {
@@ -95,6 +109,7 @@ public final class GalleryRecognition {
         translateDisposable.dispose()
         subjectDisposable.dispose()
         loadedDisposable.dispose()
+        if let settingsObserver { NotificationCenter.default.removeObserver(settingsObserver) }
     }
     
     @available(macOS 10.15, *)
@@ -228,13 +243,14 @@ public final class GalleryRecognition {
     }
     @available(macOS 10.15, *)
     public func canTranslate() -> Bool {
-        guard let result = result as? TextRecognizing.Result else {
+        guard sourceIsVisible, sourcePermitsTranslation, let result = result as? TextRecognizing.Result else {
             return false
         }
         
         switch result {
         case let .finish(_, text, _):
             let text = text.map { $0.text }.joined(separator: "\n")
+            guard RegramImageTranslationBudget.hasText(text) else { return false }
             let fromLang = Translate.detectLanguage(for: text)
             let toLang = item.context.sharedContext.baseSettings.doNotTranslate.union([appAppearance.languageCode])
             
@@ -251,73 +267,93 @@ public final class GalleryRecognition {
     
     @available(macOS 10.15, *)
     public func toggleTranslate(to: String) {
-        
-        if let result = result as? TextRecognizing.Result {
-            guard translation == nil else {
+        guard let result = result as? TextRecognizing.Result else { return }
+        guard translation == nil else { applyResult(result); return }
+        guard sourceIsVisible, sourcePermitsTranslation, case let .finish(image, text, _) = result,
+              text.contains(where: { RegramImageTranslationBudget.hasText($0.text) }) else { return }
+        let toLang = RegramChatLanguagePolicy.targetCode(to)
+        guard !toLang.isEmpty else { return }
+        let context = item.context
+        let accountId = context.peerId.toInt64()
+        let settings = RegramPreferences.shared.settings(accountId: accountId)
+        let identity = settings.translationIdentity
+        let generation = UUID()
+        translationGeneration = generation
+        translationIdentity = identity
+        let holder = MetaDisposable()
+        translateDisposable.set(holder)
+        applyResult(result, translate: .progress(result))
+        let permission: () -> Signal<Bool, NoError> = { [weak self] in
+            self?.translationPermission(generation: generation, identity: identity) ?? .single(false)
+        }
+        let signal = regramTranslateImageRegions(text.map { $0.text }, to: toLang, accountId: accountId, settings: settings, permitsTranslation: permission, telegramTranslate: { text, target in
+            context.engine.messages.translate(text: text, toLang: target)
+            |> mapError { _ in TranslateFetchError.network }
+            |> mapToSignal { value in value.map { .single($0.0) } ?? .fail(.network) }
+        })
+        |> mapToSignal { translated in
+            permission() |> castError(RegramImageTranslationError.self) |> mapToSignal { allowed in allowed ? .single(translated) : .fail(.outdated) }
+        }
+        |> deliverOnMainQueue
+        var receivedResult = false
+        holder.set(signal.startStrict(next: { [weak self] translated in
+            receivedResult = true
+            guard let self, self.translationIsCurrent(generation: generation, identity: identity) else { return }
+            guard translated.count == text.count else {
                 self.applyResult(result)
+                self.showTranslationFailure(.failed)
                 return
             }
-            
-            switch result {
-            case let .finish(image, text, _):
-                var entities: [MessageTextEntity] = []
-                var length = 0
-                var currentText: String = ""
-                let toLang = Translate.normalizeLanguageCode(appAppearance.languageCode)
-                for text in text {
-                    entities.append(.init(range: length ..< length + text.text.length, type: .BlockQuote(isCollapsed: false)))
-                    currentText += text.text
-                    length += text.text.length
-                }
-                
-                let signal:Signal<(result: String, entities: [MessageTextEntity])?, TranslationError>
-                signal = item.context.engine.messages.translate(text: currentText, toLang: toLang, entities: entities) |> mapToSignal { value in
-                    if let value = value {
-                        return .single((result: value.0, entities: value.1.filter { value in
-                            switch value.type {
-                            case .BlockQuote:
-                                return true
-                            default:
-                                return false
-                            }
-                        }))
-                    } else {
-                        return .single(nil)
-                    }
-                } |> deliverOnMainQueue
-                
-                translateDisposable.set(signal.startStrict(next: { [weak self] translated in
-                    var texts: [TextRecognizing.TranslateResult.Value] = []
-                    var toRemove: [Int] = []
-                    var filtered = text
-                    if let result = translated {
-                        for (i, entity) in result.1.enumerated() {
-                            let t = result.0.nsstring.substring(with: NSMakeRange(entity.range.lowerBound, entity.range.upperBound - entity.range.lowerBound))
-                            let onlyText = !text[i].text.trimmingCharacters(in: CharacterSet.decimalDigits).isEmpty
-                            if text[i].text != t, onlyText {
-                                texts.append(.init(text: t, detected: text[i]))
-                            } else {
-                                toRemove.append(i)
-                            }
-                        }
-                    }
-                    for idx in toRemove.reversed() {
-                        filtered.remove(at: idx)
-                    }
-                    if translated == nil || translated?.result.isEmpty == true || translated?.1.isEmpty == true {
-                        self?.applyResult(result, translate: nil)
-                        return
-                    } else {
-                        self?.applyResult(result, translate: .success(translated: texts, original: .finish(image: image, text: filtered, barcodes: [])))
-                    }
-                }, error: { [weak self] _ in
-                    self?.applyResult(result)
-                }))
-            default:
-                break
+            var values: [TextRecognizing.TranslateResult.Value] = []
+            var originals: [TextRecognizing.Result.Detected] = []
+            for (original, translation) in zip(text, translated) where original.text != translation {
+                values.append(.init(text: translation, detected: original))
+                originals.append(original)
             }
-            self.applyResult(result, translate: .progress(result))
+            if values.isEmpty { self.applyResult(result) }
+            else { self.applyResult(result, translate: .success(translated: values, original: .finish(image: image, text: originals, barcodes: []))) }
+        }, error: { [weak self] error in
+            guard let self, self.translationGeneration == generation else { return }
+            let current = self.translationIsCurrent(generation: generation, identity: identity)
+            self.applyResult(result)
+            if current, error != .outdated { self.showTranslationFailure(error) }
+        }, completed: { [weak self] in
+            guard !receivedResult, let self, self.translationGeneration == generation else { return }
+            let current = self.translationIsCurrent(generation: generation, identity: identity)
+            self.applyResult(result)
+            if current { self.showTranslationFailure(.failed) }
+        }))
+    }
+
+    private var sourcePermitsTranslation: Bool {
+        guard !item.entry.isProtected, !item.entry.paidMedia else { return false }
+        if let message = item.entry.message {
+            guard message.id.namespace == Namespaces.Message.Cloud, message.id.peerId.namespace != Namespaces.Peer.SecretChat, !message.containsSecretMedia, !message.isCopyProtected() else { return false }
         }
+        return item.entry.regramCanExport(accountId: item.context.peerId.toInt64())
+    }
+
+    private func translationIsCurrent(generation: UUID, identity: String) -> Bool {
+        translationGeneration == generation && translationIdentity == identity && sourceIsVisible && sourcePermitsTranslation && RegramPreferences.shared.settings(accountId: item.context.peerId.toInt64()).translationIdentity == identity
+    }
+
+    private func translationPermission(generation: UUID, identity: String) -> Signal<Bool, NoError> {
+        Signal { [weak self] subscriber in
+            guard let self, self.translationIsCurrent(generation: generation, identity: identity) else {
+                subscriber.putNext(false)
+                subscriber.putCompletion()
+                return EmptyDisposable
+            }
+            return (regramValidateGalleryExport(context: self.item.context, entry: self.item.entry, permitsProtectedOverride: false) |> take(1) |> deliverOnMainQueue).start(next: { [weak self] allowed in
+                subscriber.putNext(allowed && self?.translationIsCurrent(generation: generation, identity: identity) == true)
+            }, completed: { subscriber.putCompletion() })
+        } |> runOn(.mainQueue())
+    }
+
+    private func showTranslationFailure(_ error: RegramImageTranslationError) {
+        guard let window = view.window as? Window else { return }
+        let text = error == .limitExceeded ? regramLocalizedString("ImageTranslation.TooLarge", languageCode: appAppearance.languageCode) : strings().errorAnError
+        showModalText(for: window, text: text)
     }
     
     public func hasTranslation() -> Bool {
@@ -327,14 +363,16 @@ public final class GalleryRecognition {
     
     @available(macOS 10.15, *)
     private func applyResult(_ result: TextRecognizing.Result?, translate: TextRecognizing.TranslateResult? = nil) {
+        if translate == nil {
+            translationGeneration = UUID()
+            translationIdentity = nil
+            translateDisposable.set(nil)
+        }
         self.result = result as AnyObject?
         self.translation = translate as AnyObject?
         
         self.selectorView.set(result, translate: translate)
         
-        if translate == nil {
-            self.translateDisposable.set(nil)
-        }
     }
     
     @available(macOS 10.15, *)

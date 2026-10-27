@@ -2372,9 +2372,7 @@ func groupInfoEntries<Context: AccountContextProtocol>(view: PeerView, arguments
             if !usernames.isEmpty {
                 aboutBlock.append(GroupInfoEntry<Context>.addressName(section: GroupInfoSection.desc.rawValue, name: usernames, viewType: .singleItem))
             }
-            if FastSettings.canViewPeerId {
-                aboutBlock.append(GroupInfoEntry<Context>.peerId(section: GroupInfoSection.desc.rawValue, value: "\(group.id.id._internalGetInt64Value())", viewType: .singleItem))
-            }
+
 
             applyBlock(aboutBlock)
 

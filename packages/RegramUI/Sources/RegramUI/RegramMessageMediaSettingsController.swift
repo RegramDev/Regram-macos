@@ -48,7 +48,7 @@ private final class RegramMessageMediaArguments {
 }
 
 private func regramParityText(_ key: String) -> String {
-    if key == "Media.ClipboardOriginalImages" || key == "Media.ClipboardOriginalImages.Notice" { return regramString(key) }
+    if ["Media.ClipboardOriginalImages", "Media.ClipboardOriginalImages.Notice", "Bookmarks.Title"].contains(key) { return regramString(key) }
     let text = regramString("ios." + key)
     let argument: String
     switch key {
@@ -66,16 +66,14 @@ private func regramParityRows(_ page: String) -> [RegramParityRow] {
         .action("contextMenuOrder", "Settings.ContextMenu.Customize"),
         .notice("Settings.ContextMenu.Notice"),
         .header("Settings.Category.messageActions"),
+        .toggle("messageBookmarksEnabled", "Bookmarks.Title", inverted: false),
         .toggle("hideChannelBottomButton", "Settings.showChannelBottomButton", inverted: true),
         .toggle("secondsInMessages", "Settings.secondsInMessages", inverted: false),
-        .picker("messageDoubleTapAction", "DoubleTap.Action"),
-        .picker("messageDoubleTapActionWithoutEditPermission", "DoubleTap.WithoutEditPermission"),
         .toggle("showMessageId", "Settings.ShowMessageId", inverted: false),
         .toggle("automaticallyRevealSpoilers", "Settings.AutomaticallyRevealSpoilers", inverted: false),
         .notice("Settings.AutomaticallyRevealSpoilers.Notice"),
         .toggle("showForwardedMessageDate", "Settings.ShowForwardedMessageDate", inverted: false),
         .toggle("hideReactions", "Settings.HideReactions", inverted: false),
-        .toggle("features.tapMessageRowToOpenContextMenu", "features.TapMessageRowToOpenContextMenu", inverted: false),
         .toggle("features.confirmUnpin", "features.ConfirmUnpin", inverted: false),
         .toggle("features.stayAtLatestMessageAfterRefresh", "features.StayAtLatestMessageAfterRefresh", inverted: false),
         .action("inlineBotRules", "features.InlineBots.Title")
@@ -100,15 +98,13 @@ private func regramParityRows(_ page: String) -> [RegramParityRow] {
         .toggle("native.foldersAtBottom", "Settings.Folders.BottomTab", inverted: false),
         .toggle("allChatsHidden", "Settings.Folders.AllChatsHidden", inverted: false),
         .toggle("compactFolderNames", "Settings.Folders.CompactNames", inverted: false),
-        .picker("allChatsTitleLengthOverride", "Settings.Folders.AllChatsTitle"),
         .picker("features.chatListStartupFolderMode", "features.ChatListStartupFolder"),
         .notice("Settings.Folders.RememberLast.Notice"),
         .toggle("chooseFolderAfterJoining", "JoinFolder.Setting", inverted: false),
         .notice("JoinFolder.Setting.Notice"),
         .toggle("features.showFoldersInShareSheet", "features.ShowFoldersInShareSheet", inverted: false),
         .toggle("features.hideFolderUnreadCount", "features.HideFolderUnreadCount", inverted: false),
-        .toggle("features.showArchiveInFolders", "features.ShowArchiveInFolders", inverted: false),
-        .picker("features.chatListFolderTabDisplayMode", "features.ChatListFolderTabDisplayMode")
+        .toggle("features.showArchiveInFolders", "features.ShowArchiveInFolders", inverted: false)
     ]
     case "input": return [
         .header("Settings.Section.Sending"),
@@ -125,19 +121,19 @@ private func regramParityRows(_ page: String) -> [RegramParityRow] {
         .notice("MediaMetadata.Setting.Notice")
     ]
     case "photos": return [
-        .header("Native.Photos"),
         .header("Native.Quality"),
         .slider("outgoingPhotoQuality"),
         .notice("Settings.Photo.Quality.Notice"),
+        .header("Settings.Section.Sending"),
         .toggle("sendLargePhotos", "Settings.Photo.SendLarge", inverted: false),
         .notice("Settings.Photo.SendLarge.Notice"),
         .toggle("clipboardOriginalImages", "Media.ClipboardOriginalImages", inverted: false),
         .notice("Media.ClipboardOriginalImages.Notice")
     ]
     case "stickers": return [
-        .header("Native.Stickers"),
         .header("Settings.Stickers.Size"),
         .slider("stickerSize"),
+        .header("Native.Stickers"),
         .toggle("stickerTimestamp", "Settings.Stickers.Timestamp", inverted: false),
         .picker("recentStickerLimit", "Settings.Stickers.RecentLimit"),
         .toggle("forceEmojiTab", "Settings.ForceEmojiTab", inverted: false),
@@ -156,10 +152,6 @@ private func regramParityRows(_ page: String) -> [RegramParityRow] {
 
 private func regramParitySupplement(_ page: String) -> [RegramParityRow] {
     switch page {
-    case "messages": return [
-        .header("Summary.Title"),
-        .action("summarySettings", "Summary.Title")
-    ]
     case "input": return [
         .header("Settings.Section.Composer"),
         .toggle("mentionAsUserIdLink", "Mention.UserIdLink", inverted: false),
@@ -209,16 +201,10 @@ private func regramMessageMediaEntries(_ state: RegramMessageMediaState, categor
     var index: Int32 = 0
     if !tabs.isEmpty {
         rows.append(.custom(sectionId: section, index: index, value: .none, identifier: InputDataIdentifier("parity_tabs"), equatable: InputDataEquatable(state.tab), comparable: nil, item: { size, stableId in
-            let items: [ScrollableSegmentItem] = tabs.enumerated().map { offset, tab in
-                .init(title: regramParityText("Settings.CategoryTab." + tab), index: offset, uniqueId: Int64(offset), selected: tab == state.tab, insets: NSEdgeInsets(left: 10, right: 10), icon: nil, theme: ScrollableSegmentTheme.standard(theme.colors), equatable: UIEquatable(tab))
-            }
-            return SegmentTypesRowItem(size, stableId: stableId, items: items, viewType: .singleItem, callback: { value in
-                guard tabs.indices.contains(Int(value)) else { return }
-                arguments.tab(tabs[Int(value)])
+            regramSegmentedRowItem(size, stableId: stableId, labels: tabs.map { regramParityText("Settings.CategoryTab." + $0) }, selected: tabs.firstIndex(of: state.tab) ?? 0, changed: { index in
+                arguments.tab(tabs[index])
             })
         }))
-        rows.append(.sectionId(section, type: .normal))
-        section += 1
         index += 1
     }
     let values: [RegramParityRow]
@@ -298,7 +284,6 @@ private func regramMessageMediaController(context: any AccountContextProtocol, c
     }, tab: { tab in update { $0.tab = tab } }, open: { id in
         let controller: ViewController?
         switch id {
-        case "summarySettings": controller = RegramServiceController(context: context, purpose: .summary)
         case "chatPreferences": controller = RegramChatPreferencesController(context: context)
         case "contextMenuOrder": controller = RegramContextMenuController(context: context)
         case "inlineBotRules": controller = RegramInlineRulesController(context: context)
@@ -320,6 +305,7 @@ private func regramMessageMediaController(context: any AccountContextProtocol, c
             return true
         }
     })
+    if category != "input" { regramConfigureSegmentedRows(controller) }
     disposables.add(regramPreferenceChanges(accountId: accountId).start(next: { settings in update { $0.settings = settings } }))
     disposables.add((context.engine.peers.updatedChatListFilters() |> deliverOnMainQueue).start(next: { folders in update { $0.folders = folders } }))
     controller.onDeinit = { disposables.dispose() }

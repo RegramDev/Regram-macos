@@ -3460,7 +3460,7 @@ index 9878c79e3413fc01f84b97625d2f79e74ab12d10..62c03976e0ea294cf72d50fe83dda1a6
              return transaction.getPeer(peerId).flatMap(apiInputPeer)
          }
 diff --git a/submodules/TelegramCore/Sources/TelegramEngine/Messages/TelegramEngineMessages.swift b/submodules/TelegramCore/Sources/TelegramEngine/Messages/TelegramEngineMessages.swift
-index fe15eed4b396fcb0a75ef261012b29a472aec8c9..29620ce2085ef186b5410aa26f43ee89d83dcb0b 100644
+index fe15eed4b3..e2340fd212 100644
 --- a/submodules/TelegramCore/Sources/TelegramEngine/Messages/TelegramEngineMessages.swift
 +++ b/submodules/TelegramCore/Sources/TelegramEngine/Messages/TelegramEngineMessages.swift
 @@ -1,6 +1,9 @@
@@ -3473,6 +3473,22 @@ index fe15eed4b396fcb0a75ef261012b29a472aec8c9..29620ce2085ef186b5410aa26f43ee89
  internal import TelegramApi
  
  public enum EngineOutgoingMessageContent {
+@@ -325,12 +328,12 @@ public extension TelegramEngine {
+-        public func earliestUnseenPersonalMentionMessage(peerId: PeerId, threadId: Int64?) -> Signal<EarliestUnseenPersonalMentionMessageResult, NoError> {
++        public func earliestUnseenPersonalMentionMessage(peerId: PeerId, threadId: Int64?, ignoreMessageIds: Set<MessageId> = []) -> Signal<EarliestUnseenPersonalMentionMessageResult, NoError> {
+             let account = self.account
+-            return _internal_earliestUnseenPersonalMentionMessage(account: self.account, peerId: peerId, threadId: threadId)
++            return _internal_earliestUnseenPersonalMentionMessage(account: self.account, peerId: peerId, threadId: threadId, ignoreMessageIds: ignoreMessageIds)
+             |> mapToSignal { result -> Signal<EarliestUnseenPersonalMentionMessageResult, NoError> in
+                 switch result {
+                 case .loading:
+                     return .single(result)
+                 case let .result(messageId):
+-                    if messageId == nil {
++                    if messageId == nil && ignoreMessageIds.isEmpty {
+                         let _ = clearPeerUnseenPersonalMessagesInteractively(account: account, peerId: peerId, threadId: threadId).start()
+                     }
+                     return .single(result)
 @@ -1684,6 +1687,9 @@ public extension TelegramEngine {
          }
          
@@ -4113,3 +4129,110 @@ index d9cc47c895ea1e79bcb78f21195be34fd0861feb..e9d3ba319d5f294c4e2d0598c9525409
      // A purchased paid post must not fall back to its locked preview.
      func testUnlockedPaidMediaSurvives() {
          let image = TelegramMediaImage(imageId: MediaId(namespace: Namespaces.Media.CloudImage, id: 1), representations: [], immediateThumbnailData: nil, reference: nil, partialReference: nil, flags: [])
+diff --git a/submodules/TelegramCore/Sources/MacOS/RegramMessageHistory.swift b/submodules/TelegramCore/Sources/MacOS/RegramMessageHistory.swift
+new file mode 100644
+index 00000000..1f8a5bf8
+--- /dev/null
++++ b/submodules/TelegramCore/Sources/MacOS/RegramMessageHistory.swift
+@@ -0,0 +1,53 @@
++import Postbox
++import SwiftSignalKit
++internal import TelegramApi
++
++public enum RegramMessageHistoryError {
++    case unavailable
++}
++
++public struct RegramMessageHistoryPage {
++    public let messages: [Message]
++    public let nextOffsetId: Int32?
++}
++
++public func regramMessageHistoryPage(account: Account, peerId: PeerId, threadId: Int64?, offsetId: Int32, offsetDate: Int32, limit: Int32 = 100) -> Signal<RegramMessageHistoryPage, RegramMessageHistoryError> {
++    account.postbox.transaction { transaction -> (Peer, Api.InputPeer, Api.InputPeer?)? in
++        guard peerId.namespace != Namespaces.Peer.SecretChat, let peer = transaction.getPeer(peerId), let inputPeer = apiInputPeer(peer) else { return nil }
++        let savedPeer = threadId.flatMap { transaction.getPeer(PeerId($0)) }.flatMap(apiInputPeer)
++        return (peer, inputPeer, savedPeer)
++    }
++    |> castError(RegramMessageHistoryError.self)
++    |> mapToSignal { value -> Signal<RegramMessageHistoryPage, RegramMessageHistoryError> in
++        guard let (peer, inputPeer, savedPeer) = value else { return .fail(.unavailable) }
++        let request: Signal<Api.messages.Messages, RegramMessageHistoryError>
++        if threadId != nil, peerId == account.peerId || peer.isMonoForum {
++            guard let savedPeer else { return .fail(.unavailable) }
++            request = account.network.request(Api.functions.messages.getSavedHistory(flags: peerId == account.peerId ? 0 : 1, parentPeer: peerId == account.peerId ? nil : inputPeer, peer: savedPeer, offsetId: offsetId, offsetDate: offsetDate, addOffset: 0, limit: limit, maxId: 0, minId: 0, hash: 0), automaticFloodWait: false) |> mapError { _ in .unavailable }
++        } else if let threadId {
++            guard let messageId = Int32(exactly: threadId) else { return .fail(.unavailable) }
++            request = account.network.request(Api.functions.messages.getReplies(peer: inputPeer, msgId: messageId, offsetId: offsetId, offsetDate: offsetDate, addOffset: 0, limit: limit, maxId: 0, minId: 0, hash: 0), automaticFloodWait: false) |> mapError { _ in .unavailable }
++        } else {
++            request = account.network.request(Api.functions.messages.getHistory(peer: inputPeer, offsetId: offsetId, offsetDate: offsetDate, addOffset: 0, limit: limit, maxId: 0, minId: 0, hash: 0), automaticFloodWait: false) |> mapError { _ in .unavailable }
++        }
++        return request |> mapToSignal { result in
++            account.postbox.transaction { transaction -> RegramMessageHistoryPage in
++                let messages: [Api.Message]
++                let chats: [Api.Chat]
++                let users: [Api.User]
++                switch result {
++                case let .messages(data): (messages, chats, users) = (data.messages, data.chats, data.users)
++                case let .messagesSlice(data): (messages, chats, users) = (data.messages, data.chats, data.users)
++                case let .channelMessages(data): (messages, chats, users) = (data.messages, data.chats, data.users)
++                case .messagesNotModified: (messages, chats, users) = ([], [], [])
++                }
++                let peers = AccumulatedPeers(transaction: transaction, chats: chats, users: users)
++                updatePeers(transaction: transaction, accountPeerId: account.peerId, peers: peers)
++                let stored = messages.compactMap { StoreMessage(apiMessage: $0, accountPeerId: account.peerId, peerIsForum: peer.isForumOrMonoForum) }
++                _ = transaction.addMessages(stored, location: .Random)
++                let ids: [MessageId] = stored.compactMap { if case let .Id(id) = $0.id { return id }; return nil }
++                return RegramMessageHistoryPage(messages: ids.compactMap(transaction.getMessage), nextOffsetId: ids.map(\.id).min())
++            } |> castError(RegramMessageHistoryError.self)
++        }
++    }
++}
+diff --git a/submodules/TelegramCore/Sources/TelegramEngine/Messages/EarliestUnseenPersonalMentionMessage.swift b/submodules/TelegramCore/Sources/TelegramEngine/Messages/EarliestUnseenPersonalMentionMessage.swift
+index da4635e46f..16459a5bad 100644
+--- a/submodules/TelegramCore/Sources/TelegramEngine/Messages/EarliestUnseenPersonalMentionMessage.swift
++++ b/submodules/TelegramCore/Sources/TelegramEngine/Messages/EarliestUnseenPersonalMentionMessage.swift
+@@ -12,11 +12,11 @@ public enum EarliestUnseenPersonalMentionMessageResult: Equatable {
+-func _internal_earliestUnseenPersonalMentionMessage(account: Account, peerId: PeerId, threadId: Int64?) -> Signal<EarliestUnseenPersonalMentionMessageResult, NoError> {
+-    return account.viewTracker.aroundMessageHistoryViewForLocation(.peer(peerId: peerId, threadId: threadId), index: .lowerBound, anchorIndex: .lowerBound, count: 4, fixedCombinedReadStates: nil, tag: .tag(.unseenPersonalMessage), additionalData: [.peerChatState(peerId)])
++func _internal_earliestUnseenPersonalMentionMessage(account: Account, peerId: PeerId, threadId: Int64?, ignoreMessageIds: Set<MessageId> = []) -> Signal<EarliestUnseenPersonalMentionMessageResult, NoError> {
++    return account.viewTracker.aroundMessageHistoryViewForLocation(.peer(peerId: peerId, threadId: threadId), ignoreMessageIds: ignoreMessageIds, index: .lowerBound, anchorIndex: .lowerBound, count: 4, fixedCombinedReadStates: nil, tag: .tag(.unseenPersonalMessage), additionalData: [.peerChatState(peerId)])
+     |> mapToSignal { view -> Signal<EarliestUnseenPersonalMentionMessageResult, NoError> in
+         if view.0.isLoading {
+             return .single(.loading)
+         }
+         if case .FillHole = view.1 {
+-            return _internal_earliestUnseenPersonalMentionMessage(account: account, peerId: peerId, threadId: threadId)
++            return _internal_earliestUnseenPersonalMentionMessage(account: account, peerId: peerId, threadId: threadId, ignoreMessageIds: ignoreMessageIds)
+         }
+         if let message = view.0.entries.first?.message {
+             if peerId.namespace == Namespaces.Peer.CloudChannel {
+@@ -51,6 +51,7 @@ func _internal_earliestUnseenPersonalMentionMessage(account: Account, peerId: Pe
+                 return .single(.result(message.id))
+             }
+         } else {
++            if !ignoreMessageIds.isEmpty { return .single(.result(nil)) }
+             return account.postbox.transaction { transaction -> EarliestUnseenPersonalMentionMessageResult in
+                 if let topId = transaction.getTopPeerMessageId(peerId: peerId, namespace: Namespaces.Message.Cloud) {
+                     transaction.replaceMessageTagSummary(peerId: peerId, threadId: threadId, tagMask: .unseenPersonalMessage, namespace: Namespaces.Message.Cloud, customTag: nil, count: 0, maxId: topId.id)
+diff --git a/submodules/TelegramCore/Sources/MacOS/RegramConditionalRead.swift b/submodules/TelegramCore/Sources/MacOS/RegramConditionalRead.swift
+new file mode 100644
+index 0000000000..0c2f3c4a15
+--- /dev/null
++++ b/submodules/TelegramCore/Sources/MacOS/RegramConditionalRead.swift
+@@ -0,0 +1,15 @@
++import Postbox
++import SwiftSignalKit
++
++public func regramApplyMaxReadIndexInteractively(account: Account, index: MessageIndex, when validate: @escaping (Transaction, () -> Void) -> Void) -> Signal<Bool, NoError> {
++    account.postbox.transaction { transaction -> Bool in
++        guard index.id.peerId.namespace != Namespaces.Peer.SecretChat, peerKeepsReadState(transaction.getPeer(index.id.peerId)) else { return false }
++        var applied = false
++        validate(transaction, {
++            guard !applied else { return }
++            applied = true
++            _internal_applyMaxReadIndexInteractively(transaction: transaction, stateManager: account.stateManager, index: index)
++        })
++        return applied
++    }
++}

@@ -1804,7 +1804,6 @@ public class PeerListContainerView : Control {
             let rect = CGRect(origin: NSMakePoint(0, folderY), size: controlSize)
                         
             transition.updateFrame(view: view, frame: rect)
-            view.set(item: foldersItem, animated: transition.isAnimated)
             
             view.updateLayout(size: size, transition: transition)
         }
@@ -2300,6 +2299,15 @@ open class PeersListController<Context: AccountContextProtocol>: TelegramGeneric
     
     open func updateState(_ f:(PeerListState)->PeerListState) -> Void {
         self.stateSignal.set(self.stateValue.modify(f))
+    }
+
+    open func selectFilter(_ filter: ChatListFilter) {
+        updateState { current in
+            var current = current
+            current.filterData = current.filterData.withUpdatedFilter(filter)
+            return current
+        }
+        scrollup(force: true)
     }
         
     open func updateHiddenItemsState(_ f:(PeerListHiddenItems)->PeerListHiddenItems) {
@@ -2894,15 +2902,8 @@ open class PeersListController<Context: AccountContextProtocol>: TelegramGeneric
         }, revealStoriesState: { [weak self] in
             self?.revealStoriesState()
         }, setupFilter: { [weak self] filter in
-            if self?.stateValue.with({ $0.filterData.filter }) != filter {
-            }
             self?.navigationController?.back()
-            self?.updateState { current in
-                var current = current
-                current.filterData = current.filterData.withUpdatedFilter(filter)
-                return current
-            }
-            self?.scrollup(force: true)
+            self?.selectFilter(filter)
         }, openFilterSettings: { filter in
             if case .filter = filter {
                 context.bindings.rootNavigation().push(ChatListUIHooks.shared.makeChatListFilterController(context, filter))
@@ -3013,6 +3014,13 @@ open class PeersListController<Context: AccountContextProtocol>: TelegramGeneric
 
                 for item in items {
                     menu.addItem(item)
+                }
+                if RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["messageBookmarksEnabled"].bool {
+                    menu.addItem(ContextSeparatorItem())
+                    menu.addItem(ContextMenuItem(regramLocalizedString("bookmarks", languageCode: appCurrentLanguage.primaryLanguage.languageCode), handler: {
+                        guard RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["messageBookmarksEnabled"].bool else { return }
+                        if let controller = FeatureNavigationHooks.shared.makeRegramController(context, "bookmarks") { pushController(controller) }
+                    }, itemImage: MenuAnimation.menu_bookmark.value))
                 }
             }
             return menu

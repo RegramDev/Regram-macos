@@ -59,6 +59,6 @@ enum RegramMessageSearchPolicy {
                 }
             }
         }
-        return (preview as String).replacingOccurrences(of: "\n", with: " ")
+        return preview as String
     }
 }

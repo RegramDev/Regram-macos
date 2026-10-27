@@ -6,7 +6,7 @@
     <a href="README.md">简体中文</a> · <strong>English</strong>
   </p>
   <p>
-    <a href="https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283368/Regram-13.1.0-283368-universal.dmg">Download</a> ·
+    <a href="https://github.com/RegramDev/Regram-macos/releases/tag/v13.1.0-283374">Download</a> ·
     <a href="CHANGELOG.en.md">Changelog</a> ·
     <a href="INSTALL.md">Build instructions</a> ·
     <a href="https://github.com/RegramDev/Regram-macos/issues">Report an issue</a>
@@ -18,7 +18,7 @@ Regram is an unofficial client based on [Telegram for macOS](https://github.com/
 ## Features
 
 - **Messages and history**: Customizable message menus, resending and forwarding without attribution, bookmarks, tags, group aliases, and message searches by author or across shared groups.
-- **Translation and summaries**: Choose a translation engine for individual messages, entire chats, outgoing messages, and web pages; use custom LLM translation, summaries, and speech transcription.
+- **Translation and speech**: Choose a translation engine for individual messages, entire chats, outgoing messages, web pages, and images; use custom LLM translation and speech transcription.
 - **Privacy and filtering**: Keyword and regular expression filters, hidden users, filter rule imports, and local records of deleted and edited messages.
 - **Images and media**: Copy original images, paste high-quality images, inspect media information, and configure link previews.
 - **Appearance and navigation**: Custom fonts, nine Regram icons, a compact chat list, and adjustable bottom bar items and width.
@@ -29,13 +29,20 @@ Regram is an unofficial client based on [Telegram for macOS](https://github.com/
 
 ## Downloads and updates
 
-Download the [Regram 13.1.0 (283368) Universal DMG](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283368/Regram-13.1.0-283368-universal.dmg) for Intel and Apple Silicon Macs running macOS 12.0 or later. See the [changelog](CHANGELOG.en.md) for additions and fixes.
+Regram 13.1.0 (283374) requires macOS 12.0 or later and provides separate packages:
+
+| Mac | Package |
+| --- | --- |
+| Apple Silicon (M series) | [arm64 DMG](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283374/Regram-13.1.0-283374-arm64.dmg) |
+| Intel | [x86_64 DMG](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283374/Regram-13.1.0-283374-x86_64.dmg) |
+
+Verify downloads with [SHA256SUMS.txt](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283374/SHA256SUMS.txt). See the [changelog](CHANGELOG.en.md) for additions and fixes.
 
 This release is signed with an Apple/Mac Development certificate and has not been notarized by Apple. Open the downloaded DMG, drag Regram to Applications, and launch it from that folder.
 
 If Gatekeeper blocks the first launch, first confirm that the download came from this repository's GitHub Releases and that you trust its source. On macOS 13 or later, use System Settings → Privacy & Security → Open Anyway. On macOS 12, use System Preferences → Security & Privacy → General → Open Anyway. Confirm opening the app when prompted. See [Apple's official instructions](https://support.apple.com/en-us/102445) and the [macOS Monterey guide](https://support.apple.com/en-gb/guide/mac-help/mh40616/12.0/mac/12.0).
 
-Regram uses its own application identifier and local data directory, so it can be installed alongside Telegram. To update, download a new build and replace the application manually. Normal updates retain your existing accounts and local data.
+Regram uses its own application identifier and local data directory, so it can be installed alongside Telegram. This build supports automatic checks, downloads, and installation on quit, configurable in Regram Pro; manual replacement remains available. Updates choose the matching architecture and verify the download digest and app signature. Normal updates retain your existing accounts and local data.
 
 ## Build from source
 
@@ -53,7 +60,7 @@ Enter your own `REGRAM_API_ID` and `REGRAM_API_HASH` in the local configuration 
 python3 scripts/install-regram-release.py --identity YOUR_CERTIFICATE_SHA1
 ```
 
-By default, the installer builds only for the current Mac’s architecture. It passes `STABLE` to Swift packages, validates the build, and installs it to `/Applications/Regram.app`. See the [Universal build example](INSTALL.md#universal-build). For subsequent updates, omit `--identity` to keep using the same certificate. API credentials and local signing configuration are ignored by Git.
+By default, the installer builds only for the current Mac’s architecture. It passes `STABLE` to Swift packages, validates the build, and installs it to `/Applications/Regram.app`. Future releases use separate Apple Silicon and Intel packages; see [packaging](INSTALL.md#separate-apple-silicon-and-intel-packages). For subsequent updates, omit `--identity` to keep using the same certificate. API credentials and local signing configuration are ignored by Git.
 
 ## Report an issue
 

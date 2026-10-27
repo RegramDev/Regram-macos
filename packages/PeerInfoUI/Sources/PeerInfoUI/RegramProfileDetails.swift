@@ -82,7 +82,7 @@ func regramProfileEntries<Context: AccountContextProtocol>(_ original: [PeerInfo
     if peer is TelegramGroup || peer is TelegramChannel, let remark = RGGroupRemarks.shared.name(accountId: arguments.context.peerId.toInt64(), peerId: peer.id.toInt64()) {
         details.append((6, string("profile.localRemark"), remark))
     }
-    if settings["showProfileId"].bool && !FastSettings.canViewPeerId {
+    if settings["showProfileId"].bool || FastSettings.canViewPeerId {
         let label: String
         if let user = peer as? TelegramUser { label = user.botInfo == nil ? "profile.userId" : "profile.botId" }
         else if let channel = peer as? TelegramChannel, case .broadcast = channel.info { label = "profile.channelId" }
@@ -94,7 +94,7 @@ func regramProfileEntries<Context: AccountContextProtocol>(_ original: [PeerInfo
             let id = resource.datacenterId
             let region: String?
             switch id { case 1, 3: region = "Miami"; case 2, 4: region = "Amsterdam"; case 5: region = "Singapore"; default: region = nil }
-            details.append((2, string("profile.photoDC"), "DC\(id)" + (region.map { " · " + $0 } ?? "")))
+            details.append((2, string("profile.dataCenter"), "DC\(id)" + (region.map { " · " + $0 } ?? "")))
         }
         if let country = (view.cachedData as? CachedUserData)?.peerStatusSettings?.phoneCountry, !country.isEmpty {
             let countryName = Locale(identifier: language).localizedString(forRegionCode: country) ?? country

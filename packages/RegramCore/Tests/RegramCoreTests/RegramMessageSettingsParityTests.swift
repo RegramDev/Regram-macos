@@ -41,8 +41,8 @@ final class RegramMessageSettingsParityTests: XCTestCase {
         XCTAssertEqual(RegramChatListPolicy.startupFolderId(settings: settings, accountId: 1, defaults: defaults), -1)
         XCTAssertNil(RegramChatListPolicy.startupFolderId(settings: settings, accountId: 2, defaults: defaults))
         settings["features.chatListFolderTabDisplayMode"] = .string("both")
-        XCTAssertEqual(RegramChatListPolicy.folderTitle(text: "Native", icon: "X", allChats: true, shortAllChats: "All", longAllChats: "All Chats", settings: settings), "X Native")
+        XCTAssertEqual(RegramChatListPolicy.folderTitle(text: "Native", icon: "X", allChats: true, shortAllChats: "All", longAllChats: "All Chats", settings: settings), "Native")
         settings["allChatsTitleLengthOverride"] = .string("long")
-        XCTAssertEqual(RegramChatListPolicy.folderTitle(text: "unused", icon: "X", allChats: true, shortAllChats: "All", longAllChats: "All Chats", settings: settings), "X All Chats")
+        XCTAssertEqual(RegramChatListPolicy.folderTitle(text: "unused", icon: "X", allChats: true, shortAllChats: "All", longAllChats: "All Chats", settings: settings), "unused")
     }
 }

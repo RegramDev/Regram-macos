@@ -177,6 +177,21 @@ def remove_build_bundles(apps):
             shutil.rmtree(app)
 
 
+def build_release(derived, architecture, jobs=4):
+    if architecture not in {"arm64", "x86_64"}:
+        raise ValueError(f"Unsupported architecture: {architecture}")
+    with tempfile.TemporaryDirectory(prefix="regram-release-build-") as directory:
+        configuration = Path(directory) / "Release.xcconfig"
+        configuration.write_text("MACOSX_DEPLOYMENT_TARGET = 12.0\nCODE_SIGNING_ALLOWED = NO\n")
+        subprocess.run([
+            "xcodebuild", "build", "-workspace", str(ROOT / "Telegram-Mac.xcworkspace"),
+            "-scheme", "Release", "-configuration", "Release", "-destination", f"platform=macOS,arch={architecture}",
+            "-derivedDataPath", str(derived), "-xcconfig", str(configuration), "CODE_SIGNING_ALLOWED=NO",
+            "ENABLE_DEBUG_DYLIB=NO", f"ARCHS={architecture}", "ONLY_ACTIVE_ARCH=YES",
+            "SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) STABLE", "-jobs", str(jobs)
+        ], cwd=ROOT, check=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Build, sign and replace /Applications/Regram.app with Release")
     parser.add_argument("--identity", help="Fixed code-signing certificate SHA-1 fingerprint; saved locally after successful installation")
@@ -187,16 +202,7 @@ def main():
     derived = arguments.derived_data.expanduser().resolve()
     app = derived / "Build/Products/Release/Regram.app"
     if not arguments.skip_build:
-        with tempfile.TemporaryDirectory(prefix="regram-release-build-") as directory:
-            configuration = Path(directory) / "Release.xcconfig"
-            configuration.write_text("MACOSX_DEPLOYMENT_TARGET = 12.0\nCODE_SIGNING_ALLOWED = NO\n")
-            subprocess.run([
-                "xcodebuild", "build", "-workspace", str(ROOT / "Telegram-Mac.xcworkspace"),
-                "-scheme", "Release", "-configuration", "Release", "-destination", f"platform=macOS,arch={os.uname().machine}",
-                "-derivedDataPath", str(derived), "-xcconfig", str(configuration), "CODE_SIGNING_ALLOWED=NO",
-                "ENABLE_DEBUG_DYLIB=NO", f"ARCHS={os.uname().machine}", "ONLY_ACTIVE_ARCH=YES",
-                "SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) STABLE", "-jobs", "8"
-            ], cwd=ROOT, check=True)
+        build_release(derived, os.uname().machine)
     validate_release_bundle(app)
     subprocess.run(["xcrun", "strip", "-S", "-x", str(app / "Contents/MacOS/Regram")], check=True)
     subprocess.run(["python3", str(ROOT / "buildbox/verify-no-labs.py"), str(app)], check=True)

@@ -86,4 +86,14 @@ final class RegramClipboardImagesTests: XCTestCase {
         XCTAssertNil(RegramClipboardImages.imageBytes(Data("not an image".utf8)))
         XCTAssertNil(RegramClipboardImages.imageBytes(Data()))
     }
+
+    func testClipboardPhotosRespectTelegramPhotoDimensions() throws {
+        for (width, height, photo) in [(640, 480, true), (480, 640, true), (3001, 97, false), (32, 32, false)] {
+            let source = try XCTUnwrap(RegramClipboardImages.imageBytes(bytes(image(width: width, height: height), type: "public.png")))
+            let url = try RegramClipboardImages.temporaryFile(source)
+            defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+            XCTAssertEqual(RegramClipboardImages.canSendAsPhoto(url), photo)
+        }
+        XCTAssertFalse(RegramClipboardImages.canSendAsPhoto(URL(fileURLWithPath: "/missing-image.png")))
+    }
 }

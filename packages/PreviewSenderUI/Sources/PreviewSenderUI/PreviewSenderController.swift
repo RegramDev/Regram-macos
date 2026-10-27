@@ -1387,7 +1387,10 @@ public class PreviewSenderController: ModalViewController, Notifable {
         if let cached = senderOptionsCache, cached.key == key {
             return cached.value
         }
-        let value = takeSenderOptions(for: urls)
+        let pastedPhotos = urls.filter { RGMediaPolicy.isPastedPhoto(path: $0.path) && RegramClipboardImages.canSendAsPhoto($0) }
+        let otherURLs = urls.filter { !pastedPhotos.contains($0) }
+        var value = otherURLs.isEmpty && !pastedPhotos.isEmpty ? [] : takeSenderOptions(for: otherURLs)
+        if !pastedPhotos.isEmpty, !value.contains(.media) { value.append(.media) }
         senderOptionsCache = (key: key, value: value)
         return value
     }

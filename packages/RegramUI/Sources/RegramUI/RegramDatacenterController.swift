@@ -96,7 +96,8 @@ public func RegramDatacenterController(context: any AccountContextProtocol, focu
         page.section()
         if state.cancelled { page.text(regramString("Diagnostics.DC.Cancelled")) }
         page.row("copy", title: regramString("Diagnostics.CopyAverages"), enabled: !state.results.values.allSatisfy { $0.samples.isEmpty && !$0.completed }, action: {
-            let report = (1...5).map { dc in "DC\(dc): " + ms(state.results[dc]?.average) }.joined(separator: "\n")
+            let results = value.with { $0.results }
+            let report = (1...5).map { dc in "DC\(dc): " + ms(results[dc]?.average) }.joined(separator: "\n")
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(report, forType: .string)
         })

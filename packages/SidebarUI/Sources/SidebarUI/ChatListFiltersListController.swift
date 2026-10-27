@@ -242,7 +242,7 @@ private func chatListPresetEntries(filtersWithCounts: [(ChatListFilter, Int)], s
     return entries
 }
 
-public func ChatListFiltersListController(context: any AccountContextProtocol, environment: SidebarUIEnvironment) -> InputDataController {
+public func ChatListFiltersListController(context: any AccountContextProtocol, environment: SidebarUIEnvironment, focusOnTags: Bool = false) -> InputDataController {
 
     let arguments = ChatListPresetArguments(context: context, environment: environment, openPreset: { filter, isNew in
         context.bindings.rootNavigation().push(ChatListFilterController(context: context, environment: environment, filter: filter, isNew: isNew))
@@ -326,7 +326,16 @@ public func ChatListFiltersListController(context: any AccountContextProtocol, e
     }
 
 
+    var didFocusTags = false
     controller.afterTransaction = { controller in
+        if focusOnTags, !didFocusTags {
+            controller.tableView.enumerateItems { item in
+                guard let stableId = item.stableId.base as? InputDataEntryId, stableId == .general(_id_show_tags) else { return true }
+                didFocusTags = true
+                controller.tableView.scroll(to: .center(id: item.stableId, innerId: nil, animated: true, focus: .init(focus: true), inset: 0), inset: NSEdgeInsets(), toVisible: true)
+                return false
+            }
+        }
         var range: NSRange = NSMakeRange(NSNotFound, 0)
 
          controller.tableView.enumerateItems(with: { item in

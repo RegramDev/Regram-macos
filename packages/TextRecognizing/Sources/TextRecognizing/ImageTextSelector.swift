@@ -45,6 +45,8 @@ public extension TextRecognizing {
             private var texts: [DrawingTextLayer] = []
             
             private var backgroundImage: SimpleLayer?
+            private var currentTranslation: TranslateResult?
+            private var renderedSize = NSSize.zero
 
             required init(frame frameRect: NSRect) {
                 super.init(frame: frameRect)
@@ -60,25 +62,39 @@ public extension TextRecognizing {
             }
             
             func set(_ translate: TranslateResult) {
-                                
+                currentTranslation = translate
+                renderedSize = bounds.size
+                guard bounds.width > 0, bounds.height > 0 else {
+                    shimmers.forEach { $0.removeFromSuperlayer() }
+                    texts.forEach { $0.removeFromSuperlayer() }
+                    shimmers.removeAll()
+                    texts.removeAll()
+                    backgroundImage?.removeFromSuperlayer()
+                    backgroundImage = nil
+                    return
+                }
+                func validRect(_ rect: CGRect) -> Bool {
+                    rect.minX.isFinite && rect.minY.isFinite && rect.width.isFinite && rect.height.isFinite && rect.width > 0 && rect.height > 0
+                }
                 switch translate {
                 case let .progress(result):
                     
                     if let backgroundImage {
                         performSublayerRemoval(backgroundImage, animated: true)
                     }
+                    backgroundImage = nil
                     
                     for text in texts {
                         performSublayerRemoval(text, animated: true)
                     }
+                    texts.removeAll()
                     
-                    let rects = result.selectableRects(viewSize: bounds.size)
-                    let rotations = result.rotations()
+                    let regions = zip(result.selectableRects(viewSize: bounds.size), result.rotations()).filter { validRect($0.0) && $0.1.isFinite }
                     
-                    while shimmers.count > rects.count {
-                        shimmers[shimmers.count - 1].removeFromSuperlayer()
+                    while shimmers.count > regions.count {
+                        shimmers.removeLast().removeFromSuperlayer()
                     }
-                    while shimmers.count < rects.count {
+                    while shimmers.count < regions.count {
                         let current = ShimmerLayer()
                         shimmers.append(current)
                         self.layer?.addSublayer(current)
@@ -86,8 +102,8 @@ public extension TextRecognizing {
                     }
                     
                     for (i, shimmerView) in shimmers.enumerated() {
-                        let value = rects[i]
-                        let rotation = rotations[i]
+                        let value = regions[i].0
+                        let rotation = regions[i].1
                         shimmerView.cornerRadius = 4
                         shimmerView.masksToBounds = true
                         shimmerView.update(backgroundColor: .blackTransparent, data: nil, size: value.size, imageSize: value.size)
@@ -96,14 +112,22 @@ public extension TextRecognizing {
                         shimmerView.transform = CATransform3DMakeRotation(rotation, 0, 0, 1)
                     }
                     
-                case let .success(translated, result):
+                case let .success(translated, _):
                     for shimmer in shimmers {
                         performSublayerRemoval(shimmer, animated: true)
                     }
-                    
-                    var rects = result.selectableRects(viewSize: bounds.size)
-                    let rotations = result.rotations()
+                    shimmers.removeAll()
+                    let regions = translated.compactMap { value -> (TranslateResult.Value, CGRect, CGFloat)? in
+                        let rect = value.detected.frameRect
+                        let frame = NSMakeRect(rect.minX * bounds.width, rect.minY * bounds.height, rect.width * bounds.width, rect.height * bounds.height)
+                        let rotation = value.detected.rotationAngle
+                        guard validRect(frame), rotation.isFinite else { return nil }
+                        return (value, frame, rotation)
+                    }
+                    var rects = regions.map { $0.1 }
+                    let rotations = regions.map { $0.2 }
 
+                    while texts.count > regions.count { texts.removeLast().removeFromSuperlayer() }
                     while texts.count < rects.count {
                         let current = DrawingTextLayer()
                         texts.append(current)
@@ -113,7 +137,7 @@ public extension TextRecognizing {
                     for (i, text) in texts.enumerated() {
                         let rotation = rotations[i]
                         
-                        rects[i] = text.set(translated: translated[i], rect: rects[i], maxWidth: frame.width)
+                        rects[i] = text.set(translated: regions[i].0, rect: rects[i], maxWidth: frame.width)
                         text.frame = rects[i]
                         text.transform = CATransform3DMakeRotation(rotation, 0, 0, 1)
                     }
@@ -157,6 +181,7 @@ public extension TextRecognizing {
             
             override func layout() {
                 super.layout()
+                if renderedSize != bounds.size, let currentTranslation { set(currentTranslation) }
             }
         }
         

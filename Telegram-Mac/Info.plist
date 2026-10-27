@@ -50,7 +50,7 @@
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>283368</string>
+	<string>283374</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSApplicationCategoryType</key>
@@ -89,9 +89,7 @@
 	<key>SOURCE</key>
 	<string>${SOURCE}</string>
 	<key>SUFeedURL</key>
-	<string></string>
-	<key>SUPublicDSAKeyFile</key>
-	<string>${DSA_PEM_FILE}</string>
+	<string>https://api.github.com/repos/RegramDev/Regram-macos/releases/latest</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>SFCompactRounded-Semibold.otf</string>
@@ -109,10 +107,10 @@
 	<key>CFBundleDisplayName</key>
 	<string>Regram</string>
 	<key>RegramUpdatesDisabled</key>
-	<true/>
+	<false/>
 	<key>SUEnableAutomaticChecks</key>
-	<false/>
+	<true/>
 	<key>SUAutomaticallyUpdate</key>
-	<false/>
+	<true/>
 </dict>
 </plist>

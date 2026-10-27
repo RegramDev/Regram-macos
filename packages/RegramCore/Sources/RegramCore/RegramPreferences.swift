@@ -119,6 +119,7 @@ public struct RegramSetting: Equatable {
         .init("compactFolderNames", .messages, .bool(false)),
         .init("allChatsHidden", .messages, .bool(false)),
         .init("native.foldersAtBottom", .messages, .bool(false)),
+        .init("messageBookmarksEnabled", .messages, .bool(true)),
         .init("showMessageId", .messages, .bool(false)),
         .init("secondsInMessages", .messages, .bool(false)),
         .init("showForwardedMessageDate", .messages, .bool(false)),
@@ -327,6 +328,7 @@ public struct RegramSetting: Equatable {
         "localPremiumEmojiStatus",
         "mediaLoadingExperiment",
         "mentionAsUserIdLink",
+        "messageBookmarksEnabled",
         "messageDoubleTapAction",
         "messageDoubleTapActionWithoutEditPermission",
         "messageFilterDisabledPeerIds",
@@ -458,12 +460,24 @@ public final class RegramPreferences {
     }
 
     public func filter(accountId: Int64) -> RegramFilterSnapshot {
+        captureFilter(accountId: accountId).filter
+    }
+
+    public func captureFilter(accountId: Int64) -> (revision: Int64, filter: RegramFilterSnapshot) {
         lock.lock()
         defer { lock.unlock() }
-        if let cached = filters[accountId] { return cached }
+        let revision = revisions[accountId] ?? 0
+        if let cached = filters[accountId] { return (revision, cached) }
         let snapshot = RegramFilterSnapshot(settings: load(accountId))
         filters[accountId] = snapshot
-        return snapshot
+        return (revision, snapshot)
+    }
+
+    public func withCurrentRevision<T>(accountId: Int64, revision: Int64, _ body: () -> T) -> T? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard (revisions[accountId] ?? 0) == revision else { return nil }
+        return body()
     }
 
     public func update(accountId: Int64, _ transform: (inout RegramAccountSettings) -> Void) {

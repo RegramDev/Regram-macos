@@ -241,7 +241,7 @@ public func RegramRetainedMessagesController(context: any AccountContextProtocol
         var rows: [InputDataEntry] = [
             .sectionId(0, type: .normal),
             .general(sectionId: 1, index: 0, value: .none, error: nil, identifier: InputDataIdentifier("revokedMessages.selectChat"), data: .init(name: state.title.isEmpty ? regramString("ChatPreferences.SelectChat") : state.title, color: theme.colors.text, type: .next, viewType: .firstItem, action: {
-                selection.set((RegramUIHooks.shared.selectChat(context, state.peerId) |> mapToSignal { id in
+                selection.set((RegramUIHooks.shared.selectChat(context, stateValue.with { $0.peerId }) |> mapToSignal { id in
                     context.account.postbox.transaction { $0.getPeer(id) }
                 } |> deliverOnMainQueue).start(next: { peer in
                     guard let peer else { return }

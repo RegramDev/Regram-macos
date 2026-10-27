@@ -62,7 +62,7 @@ public func getGroupCallPanelData(context: any AccountContextProtocol, peerId: P
                                                 }))
                                             }
                                             return disposable
-                                        }
+                                        } |> runOn(.mainQueue())
                                     }
                                 }
                            }

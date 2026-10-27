@@ -61,7 +61,7 @@ public enum RGContextMenuItemId: String, CaseIterable, Hashable {
     case importSettings
 
     public static let standardItems: Set<RGContextMenuItemId> = [
-        .reply, .repeatForward, .repeatCopy, .copy, .translate, .speak, .edit, .editHistory, .bookmark, .summarize, .messageScreenshot,
+        .reply, .repeatForward, .repeatCopy, .copy, .translate, .speak, .edit, .editHistory, .bookmark,
         .pin, .unpin, .copyLink, .forward, .forwardNoQuote, .saveToCloud, .saveMedia,
         .saveToFiles, .favoriteSticker, .saveStickerToCameraRoll, .saveGif, .viewStickerPack,
         .select, .selectFromUser, .delete, .report, .json, .addFilter
@@ -69,7 +69,7 @@ public enum RGContextMenuItemId: String, CaseIterable, Hashable {
 
     public var canBeCustomized: Bool {
         switch self {
-        case .sendMoney, .sendLogs, .activateLink: return false
+        case .sendMoney, .sendLogs, .activateLink, .summarize, .messageScreenshot: return false
         default: return true
         }
     }

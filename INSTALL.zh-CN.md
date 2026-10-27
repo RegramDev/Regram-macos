@@ -8,7 +8,7 @@
 
 ## 安装发布包
 
-下载 [Regram 13.1.0 (283368) Universal DMG](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283368/Regram-13.1.0-283368-universal.dmg)。此版本支持 Intel 与 Apple Silicon Mac，要求 macOS 12.0 或更高版本。
+下载 Regram 13.1.0 (283374) 的 [Apple Silicon 安装包](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283374/Regram-13.1.0-283374-arm64.dmg)或 [Intel 安装包](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283374/Regram-13.1.0-283374-x86_64.dmg)。此版本要求 macOS 12.0 或更高版本，校验值见 [SHA256SUMS.txt](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283374/SHA256SUMS.txt)。
 
 此版本使用 Apple/Mac Development 开发证书签名，尚未经 Apple 公证。打开下载的 DMG，将 Regram 拖到 Applications（应用程序）文件夹，再从该文件夹启动。
 
@@ -166,30 +166,22 @@ xcodebuild -workspace Telegram-Mac.xcworkspace -scheme Release -configuration Re
   'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) STABLE' build
 ```
 
-v13.1.0-283368 发布版的部署目标为 macOS 12.0 或更高版本。
+v13.1.0-283374 发布版的部署目标为 macOS 12.0 或更高版本。
 Swift 包从工作区中的本地路径解析，不需要访问网络。
 
-<a id="universal-build"></a>
+<a id="separate-architecture-packages"></a>
 
-### 通用架构构建
+### Apple Silicon 与 Intel 分别打包
 
-如需同时构建两种架构，请使用与发布版相同的部署目标：
+后续发布构建生成两个 DMG：Apple Silicon 使用 `Regram-<版本>-<构建号>-arm64.dmg`，Intel 使用 `Regram-<版本>-<构建号>-x86_64.dmg`。应用和内部可执行组件均只保留对应架构。
 
-```
-xcodebuild -workspace Telegram-Mac.xcworkspace -scheme Release -configuration Release \
-  -destination 'generic/platform=macOS' -derivedDataPath build/RegramUniversal \
-  ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO MACOSX_DEPLOYMENT_TARGET=12.0 \
-  CODE_SIGNING_ALLOWED=NO ENABLE_DEBUG_DYLIB=NO \
-  'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) STABLE' build
-
-python3 scripts/install-regram-release.py --skip-build \
-  --derived-data build/RegramUniversal --identity YOUR_CERTIFICATE_SHA1
+```sh
+python3 scripts/package-regram-release.py --output ~/Downloads/Regram
 ```
 
-`ARCHS='arm64 x86_64'` 与 `ONLY_ACTIVE_ARCH=NO` 保留两种架构。
-安装程序默认会按当前机器的架构重新构建；使用 `--skip-build`，并指定同一个
-`--derived-data` 目录，才能直接为已有 Universal 应用签名和安装，避免重建为单一架构。
-保存过签名身份后，可以省略 `--identity`，继续使用该证书。
+脚本按顺序构建两个架构，每次使用四个构建任务，保留共用编译缓存。打包时检查 Release／STABLE、内部代码签名和 DMG 完整性，并为每个包生成大小与 SHA-256 报告。签名使用本地安装程序配置的固定证书。两包均成功后才清理临时构建应用，已安装的应用和用户数据不变。
+
+对已有构建单独打包，可使用 `--source-app /path/to/Regram.app --architecture arm64`，Intel 则填写 `x86_64`。操作在副本上进行，不修改源应用。此前 283368 版本仍提供 Universal 下载。
 
 ### 生成 TelegramApi 源码
 
@@ -266,7 +258,9 @@ python3 -m unittest discover -s tools/tests/regram-release-install -p 'test_*.py
 部分脚本仍依赖 `Telegram.app` 名称和 Telegram 发布运行器的配置。
 本地 Regram Release 构建与更新请使用[本地安装程序](#local-regram-testing-and-updates)。
 Regram 安装包通过本仓库的
-[GitHub Releases](https://github.com/RegramDev/Regram-macos/releases) 分发，自动更新继续停用。
+[GitHub Releases](https://github.com/RegramDev/Regram-macos/releases) 分发。Regram 更新器读取最新正式版，
+按当前架构选择安装包，并在安装前校验 GitHub 提供的 SHA-256 摘要和应用签名身份。
+自动检查、下载和退出时安装可在 Regram Pro 中调整。
 
 `Telegram-Mac/common.xcconfig` 保存共享设置。渠道通过 xcconfig 选择，
 该文件定义 `TYPE`（Swift 编译标志）以及 Sparkle 更新源地址：

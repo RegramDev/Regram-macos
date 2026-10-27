@@ -40,6 +40,17 @@ final class RegramServicesTests: XCTestCase {
         XCTAssertEqual(configuration.modelsURL?.absoluteString, "https://example.test/v1/models")
     }
 
+    func testLLMServiceAddressesIncludeVersionOrFullRequestPath() {
+        for base in ["http://127.0.0.1:1111", "http://127.0.0.1:1111/v1", "http://127.0.0.1:1111/v1/", "http://127.0.0.1:1111/v1/chat/completions"] {
+            let configuration = RGLLMTranslationConfiguration(format: .openai, baseURL: base, endpoint: "", apiKey: "", model: "local", prompt: "", temperature: 0.2)
+            XCTAssertEqual(configuration.translationURL?.absoluteString, "http://127.0.0.1:1111/v1/chat/completions")
+            XCTAssertEqual(configuration.modelsURL?.absoluteString, "http://127.0.0.1:1111/v1/models")
+        }
+        let anthropic = RGLLMTranslationConfiguration(format: .anthropic, baseURL: "https://example.test/proxy/v1/messages", endpoint: "", apiKey: "", model: "local", prompt: "", temperature: 0.2)
+        XCTAssertEqual(anthropic.translationURL?.absoluteString, "https://example.test/proxy/v1/messages")
+        XCTAssertEqual(anthropic.modelsURL?.absoluteString, "https://example.test/proxy/v1/models")
+    }
+
     func testLanguageNormalizationAndUnicodeChunking() {
         XCTAssertEqual(getGTranslateLang("zh-Hans"), "zh-CN")
         XCTAssertEqual(getGTranslateLang("zh-Hant"), "zh-TW")

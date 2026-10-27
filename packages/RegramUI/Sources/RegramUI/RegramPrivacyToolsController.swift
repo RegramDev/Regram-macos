@@ -81,7 +81,8 @@ public func RegramRevokedMarkerController(context: any AccountContextProtocol, f
         rows.append(.desc(sectionId: 2, index: 6, text: .attributed(preview), data: .init(color: theme.colors.grayText, viewType: .singleItem)))
         rows.append(.sectionId(2, type: .normal))
         rows.append(.general(sectionId: 3, index: 7, value: .none, error: nil, identifier: InputDataIdentifier("revokedMarker.apply"), data: .init(name: regramString("NetworkPolicy.Apply"), color: theme.colors.accent, type: .none, viewType: .singleItem, enabled: !invalidColor, action: {
-            guard !invalidColor else { return }
+            let marker = state.with { $0 }
+            guard !context.isFrozen, marker.style == .none || marker.color.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || RegramRevokedMarker.rgb(marker.color) != nil else { return }
             RegramPreferences.shared.update(accountId: accountId) { marker.apply(to: &$0) }
             showModalText(for: context.window, text: regramString("RevokedMarker.Saved"))
         })))

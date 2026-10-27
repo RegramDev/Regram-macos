@@ -4,6 +4,22 @@ import SwiftSignalKit
 import TGUIKit
 import RegramCore
 import RegramServices
+import TelegramCore
+import Localization
+
+func applyRegramUILocalization(_ settings: LocalizationSettings) {
+    func component(_ value: LocalizationComponent) -> LocalizationComponent {
+        let strings = RegramLanguagePack.nativeMacOSStrings(languageCode: value.languageCode)
+        guard !strings.isEmpty else { return value }
+        let entries = value.localization.entries.filter { entry in
+            switch entry {
+            case let .string(key, _), let .pluralizedString(key, _, _, _, _, _, _): return strings[key] == nil
+            }
+        } + strings.sorted(by: { $0.key < $1.key }).map { LocalizationEntry.string(key: $0.key, value: $0.value) }
+        return LocalizationComponent(languageCode: value.languageCode, localizedName: value.localizedName, localization: TelegramCore.Localization(version: value.localization.version, entries: entries), customPluralizationCode: value.customPluralizationCode)
+    }
+    applyUILocalization(LocalizationSettings(primaryComponent: component(settings.primaryComponent), secondaryComponent: settings.secondaryComponent.map(component)))
+}
 
 private final class RegramFontAppearanceBinding {
     private static let lock = NSLock()
@@ -37,8 +53,13 @@ private final class RegramFontAppearanceBinding {
 
     private func activate() {
         Self.lock.lock()
+        let changed = Self.active != token
         Self.active = token
         Self.lock.unlock()
+        guard changed else {
+            refresh()
+            return
+        }
         let accountId = accountId
         InterfaceFontProvider.install { size, weight, italic in
             RegramFonts.interfaceFont(size: size, weight: weight, italic: italic, accountId: accountId)

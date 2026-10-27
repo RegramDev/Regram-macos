@@ -12,6 +12,11 @@ import RegramSignals
 import ShortPeerRow
 import GeneralRows
 
+private struct RegramPeerSettingPresentation: Equatable {
+    let peer: EnginePeer
+    let viewType: GeneralViewType
+}
+
 private func recordChanges(_ name: Notification.Name, accountId: Int64) -> Signal<Void, NoError> {
     Signal { subscriber in
         let observer = NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) { notification in
@@ -69,7 +74,7 @@ private func regramPeerSettingListController(context: any AccountContextProtocol
             let peerId = PeerId(record.0)
             let identifier = InputDataIdentifier("peerSetting_\(record.0)")
             if let peer = record.1 {
-                rows.append(.custom(sectionId: 1, index: Int32(index + 1), value: .none, identifier: identifier, equatable: InputDataEquatable(EnginePeer(peer)), comparable: nil, item: { size, stableId in
+                rows.append(.custom(sectionId: 1, index: Int32(index + 1), value: .none, identifier: identifier, equatable: InputDataEquatable(RegramPeerSettingPresentation(peer: EnginePeer(peer), viewType: viewType)), comparable: nil, item: { size, stableId in
                     ShortPeerRowItem(size, peer: peer, account: context.account, context: context, stableId: stableId, interactionType: .deletable(onRemove: remove, deletable: true), viewType: viewType, action: { RegramUIHooks.shared.openPeerInfo(context, peerId) }, contextMenuItems: { .single([ContextMenuItem(regramString("MessageFilter.Rule.Delete"), handler: { remove(peerId) })]) })
                 }))
             } else {

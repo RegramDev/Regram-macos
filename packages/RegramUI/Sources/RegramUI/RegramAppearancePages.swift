@@ -88,6 +88,7 @@ func regramAppearanceSettingsEntries(context: any AccountContextProtocol, settin
             page.text(regramString("Settings.NY.Notice"))
         }
         page.section("Settings.Section.Interface")
+        page.row("folderTags", title: regramString("Settings.FolderTags"), type: .next, action: { RegramUIHooks.shared.openNativeSettings(context, "folderTags") })
         page.row("bottomBarLayout", title: regramString("Settings.Tabs.Customize"), type: .next, action: { context.bindings.rootNavigation().push(RegramNavigationController(context: context)) })
         page.row("appIcon", title: regramString("Appearance.ChangeIcon"), type: .next, action: { RegramUIHooks.shared.openNativeSettings(context, "appIcon") })
         page.row("hideTabBarPermissionWarnings", title: regramString("features.HideTabBarPermissionWarnings"), type: .switchable(settings["features.hideTabBarPermissionWarnings"].bool), action: { RegramPreferences.shared.update(accountId: accountId) { $0["features.hideTabBarPermissionWarnings"] = .bool(!settings["features.hideTabBarPermissionWarnings"].bool) } })

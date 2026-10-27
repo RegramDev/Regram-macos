@@ -10,12 +10,19 @@ import AlertsUI
 import RegramCore
 import RegramServices
 
+public enum RegramServicePurpose: Equatable {
+    case translation, transcription
+
+    var credentialPurpose: RegramCredentialPurpose {
+        self == .translation ? .translation : .transcription
+    }
+}
+
 private struct ServiceDraft: Equatable {
     var fields: [String: String]
     var format: String
     var temperatureTenths: Int64
     var useContext: Bool
-    var summaryEnabled: Bool
     var transcriptionBackend: String
     var models: [String] = []
     var request: String?
@@ -41,19 +48,19 @@ private func regramServiceErrorDescription(_ error: Error) -> String {
     return error.localizedDescription
 }
 
-public func RegramServiceController(context: any AccountContextProtocol, purpose: RegramCredentialPurpose, focusSetting: String? = nil) -> InputDataController {
+public func RegramServiceController(context: any AccountContextProtocol, purpose: RegramServicePurpose, focusSetting: String? = nil) -> InputDataController {
     let accountId = context.peerId.toInt64()
     let settings = RegramPreferences.shared.settings(accountId: accountId)
-    let page = purpose == .summary ? "summary" : purpose == .translation ? "llm" : "stt"
+    let page = purpose == .translation ? "llm" : "stt"
     func fieldIdentifier(_ field: String) -> InputDataIdentifier {
         let names = ["BaseURL": "baseURL", "APIKey": "apiKey", "Endpoint": "endpoint", "Model": "model", "Language": "language", "Prompt": "prompt"]
         return InputDataIdentifier(page + "." + (names[field] ?? field))
     }
-    let prefix = purpose == .summary ? "summaryLLM" : purpose == .translation ? "translationLLM" : "stt"
-    let suffixes = purpose == .transcription ? ["BaseURL", "Endpoint", "Model", "Language", "Prompt"] : ["BaseURL", "Endpoint", "Model", "Prompt"]
+    let prefix = purpose == .translation ? "translationLLM" : "stt"
+    let suffixes = purpose == .transcription ? ["BaseURL", "Endpoint", "Model", "Language", "Prompt"] : ["BaseURL", "Model", "Prompt"]
     var fields = Dictionary(uniqueKeysWithValues: suffixes.map { ($0, settings[prefix + $0].string) })
-    fields["APIKey"] = (try? RegramCredentials.shared.read(accountId: accountId, purpose: purpose)) ?? ""
-    let initial = ServiceDraft(fields: fields, format: settings[prefix + "APIFormat"].string, temperatureTenths: settings[prefix + "TemperatureTenths"].integer, useContext: settings["translationLLMUseContext"].bool, summaryEnabled: settings["messageSummaryEnabled"].bool, transcriptionBackend: settings["transcriptionBackend"].string)
+    fields["APIKey"] = (try? RegramCredentials.shared.read(accountId: accountId, purpose: purpose.credentialPurpose)) ?? ""
+    let initial = ServiceDraft(fields: fields, format: settings[prefix + "APIFormat"].string, temperatureTenths: settings[prefix + "TemperatureTenths"].integer, useContext: settings["translationLLMUseContext"].bool, transcriptionBackend: settings["transcriptionBackend"].string)
     let state = Atomic(value: initial)
     let promise = ValuePromise(initial, ignoreRepeated: true)
     let request = MetaDisposable()
@@ -62,11 +69,23 @@ public func RegramServiceController(context: any AccountContextProtocol, purpose
 
     func update(_ transform: (inout ServiceDraft) -> Void, persist: Bool = false) {
         let before = state.with { $0 }
-        let next = state.modify { current in var value = current; transform(&value); return value }
+        var next = state.modify { current in var value = current; transform(&value); return value }
+        let connectionChanged = before.format != next.format || ["BaseURL", "APIKey"].contains { before.fields[$0] != next.fields[$0] }
+        let configurationChanged = before.fields != next.fields || before.format != next.format || before.temperatureTenths != next.temperatureTenths || before.useContext != next.useContext || before.transcriptionBackend != next.transcriptionBackend
+        if persist, configurationChanged {
+            requestGeneration = UUID()
+            request.set(nil)
+            next = state.modify { current in
+                var current = current
+                current.request = nil
+                if connectionChanged { current.models = [] }
+                return current
+            }
+        }
         if persist {
             if before.fields["APIKey"] != next.fields["APIKey"] {
                 do {
-                    try RegramCredentials.shared.write(next.fields["APIKey"] ?? "", accountId: accountId, purpose: purpose)
+                    try RegramCredentials.shared.write(next.fields["APIKey"] ?? "", accountId: accountId, purpose: purpose.credentialPurpose)
                     credentialSaveFailed = false
                 } catch {
                     if !credentialSaveFailed { alert(for: context.window, header: regramString(purpose == .transcription ? "RG.STTSaveFailed" : "LLMTranslation.Title"), info: purpose == .transcription ? regramServiceErrorDescription(error) : regramString("LLMTranslation.KeySaveFailed")) }
@@ -84,7 +103,6 @@ public func RegramServiceController(context: any AccountContextProtocol, purpose
                     if before.temperatureTenths != next.temperatureTenths { value[prefix + "TemperatureTenths"] = .integer(next.temperatureTenths); configurationChanged = true }
                 }
                 if purpose == .translation, before.useContext != next.useContext { value["translationLLMUseContext"] = .bool(next.useContext); configurationChanged = true }
-                if purpose == .summary, before.summaryEnabled != next.summaryEnabled { value["messageSummaryEnabled"] = .bool(next.summaryEnabled) }
                 if purpose == .transcription, before.transcriptionBackend != next.transcriptionBackend { value["transcriptionBackend"] = .string(next.transcriptionBackend); configurationChanged = true }
                 if configurationChanged || before.fields["APIKey"] != next.fields["APIKey"] { value["serviceConfigurationRevision"] = .integer(value["serviceConfigurationRevision"].integer &+ 1) }
             }
@@ -93,7 +111,7 @@ public func RegramServiceController(context: any AccountContextProtocol, purpose
     }
 
     func configuration(_ draft: ServiceDraft) -> RGLLMTranslationConfiguration {
-        RGLLMTranslationConfiguration(format: RGLLMAPIFormat(rawValue: draft.format) ?? .openai, baseURL: draft.fields["BaseURL"] ?? "", endpoint: draft.fields["Endpoint"] ?? "", apiKey: draft.fields["APIKey"] ?? "", model: draft.fields["Model"] ?? "", prompt: draft.fields["Prompt"] ?? "", temperature: Double(draft.temperatureTenths) / 10.0)
+        RGLLMTranslationConfiguration(format: RGLLMAPIFormat(rawValue: draft.format) ?? .openai, baseURL: draft.fields["BaseURL"] ?? "", endpoint: "", apiKey: draft.fields["APIKey"] ?? "", model: draft.fields["Model"] ?? "", prompt: draft.fields["Prompt"] ?? "", temperature: Double(draft.temperatureTenths) / 10.0)
     }
 
     func cancel() {
@@ -105,8 +123,11 @@ public func RegramServiceController(context: any AccountContextProtocol, purpose
     func saveCredential(_ draft: ServiceDraft) -> Bool {
         guard credentialSaveFailed else { return true }
         do {
-            try RegramCredentials.shared.write(draft.fields["APIKey"] ?? "", accountId: accountId, purpose: purpose)
+            try RegramCredentials.shared.write(draft.fields["APIKey"] ?? "", accountId: accountId, purpose: purpose.credentialPurpose)
             credentialSaveFailed = false
+            RegramPreferences.shared.update(accountId: accountId) { value in
+                value["serviceConfigurationRevision"] = .integer(value["serviceConfigurationRevision"].integer &+ 1)
+            }
             return true
         } catch {
             alert(for: context.window, header: regramString(purpose == .transcription ? "RG.STTSaveFailed" : "LLMTranslation.Title"), info: purpose == .transcription ? regramServiceErrorDescription(error) : regramString("LLMTranslation.KeySaveFailed"))
@@ -136,7 +157,7 @@ public func RegramServiceController(context: any AccountContextProtocol, purpose
         request.set((signal |> deliverOnMainQueue).start(next: { message, succeeded in
             guard requestGeneration == generation else { return }
             update { $0.request = nil }
-            showModalText(for: context.window, text: message, title: regramString(purpose == .transcription ? (succeeded ? "RG.STTTestSucceeded" : "RG.STTTestFailed") : purpose == .summary ? "Summary.Title" : "LLMTranslation.Title"))
+            showModalText(for: context.window, text: message, title: regramString(purpose == .transcription ? (succeeded ? "RG.STTTestSucceeded" : "RG.STTTestFailed") : "LLMTranslation.Title"))
         }, completed: { if requestGeneration == generation { update { $0.request = nil } } }))
     }
 
@@ -182,12 +203,6 @@ public func RegramServiceController(context: any AccountContextProtocol, purpose
             index += 1
         }
 
-        if purpose == .summary {
-            row("service_enabled", title: "Summary.Enabled", type: .switchable(draft.summaryEnabled), viewType: .singleItem, action: { update({ $0.summaryEnabled.toggle() }, persist: true) })
-            notice("Summary.EnabledNotice")
-            nextSection()
-        }
-
         if purpose == .transcription {
             header("RG.STTSettings")
             let backends = ["default", "apple", "openAICompatible"].map { backend in
@@ -205,7 +220,10 @@ public func RegramServiceController(context: any AccountContextProtocol, purpose
             input("Prompt", title: nil, placeholder: regramString("RG.STTPrompt.Placeholder"), viewType: .singleItem)
             notice("RG.STTPrompt.Footer")
             nextSection()
-            row("service_test", title: draft.request == nil ? "RG.STTTest" : "RG.STT.Cancel", type: draft.request == nil ? .none : .loading, viewType: .singleItem, action: { if draft.request == nil { test(draft) } else { cancel() } })
+            row("service_test", title: draft.request == nil ? "RG.STTTest" : "RG.STT.Cancel", type: draft.request == nil ? .none : .loading, viewType: .singleItem, action: {
+                let current = state.with { $0 }
+                if current.request == nil { test(current) } else { cancel() }
+            })
             notice("RG.STTTest.Footer")
         } else {
             let format = RGLLMAPIFormat(rawValue: draft.format) ?? .openai
@@ -217,9 +235,8 @@ public func RegramServiceController(context: any AccountContextProtocol, purpose
             }
             row("service_format", title: "LLMTranslation.Format", type: .contextSelector(format == .openai ? "OpenAI" : "Anthropic", formats), viewType: .firstItem)
             input("BaseURL", title: "LLMTranslation.BaseURL", placeholder: format.defaultBaseURL, viewType: .innerItem)
-            input("Endpoint", title: "LLMTranslation.Endpoint", placeholder: format.defaultTranslationEndpoint, viewType: .innerItem)
             input("APIKey", title: "LLMTranslation.APIKey", viewType: .lastItem)
-            notice(purpose == .summary ? "Summary.ConnectionNotice" : "LLMTranslation.ConnectionNotice")
+            notice("LLMTranslation.ConnectionNotice")
             nextSection()
 
             input("Model", title: "LLMTranslation.Model", viewType: .firstItem)
@@ -230,8 +247,8 @@ public func RegramServiceController(context: any AccountContextProtocol, purpose
                 let models = choices.map { model in ContextMenuItem(model.isEmpty ? regramString("LLMTranslation.SelectModel") : model, handler: { update({ $0.fields["Model"] = model }, persist: true) }, state: current == model ? .on : .off) }
                 row("service_model_picker", title: "LLMTranslation.SelectModel", type: .contextSelector(draft.fields["Model"].flatMap { $0.isEmpty ? nil : $0 } ?? regramString("LLMTranslation.SelectModel"), models), viewType: .innerItem)
             }
-            row("service_models", title: "LLMTranslation.FetchModels", type: draft.request == "models" ? .loading : .none, viewType: .innerItem, enabled: draft.request == nil, action: { fetchModels(draft) })
-            row("service_test", title: "LLMTranslation.TestModel", type: draft.request == "test" ? .loading : .none, viewType: .lastItem, enabled: draft.request == nil && !(draft.fields["Model"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, action: { test(draft) })
+            row("service_models", title: "LLMTranslation.FetchModels", type: draft.request == "models" ? .loading : .none, viewType: .innerItem, enabled: draft.request == nil, action: { fetchModels(state.with { $0 }) })
+            row("service_test", title: "LLMTranslation.TestModel", type: draft.request == "test" ? .loading : .none, viewType: .lastItem, enabled: draft.request == nil && !(draft.fields["Model"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, action: { test(state.with { $0 }) })
             nextSection()
 
             header("LLMTranslation.Prompt")
@@ -244,12 +261,12 @@ public func RegramServiceController(context: any AccountContextProtocol, purpose
                 PrecieSliderRowItem(size, stableId: stableId, current: CGFloat(draft.temperatureTenths) / 10.0, magnit: (0...10).map { CGFloat($0) / 10.0 }, update: { value in update({ $0.temperatureTenths = Int64((value * 10).rounded()) }, persist: true) }, viewType: .lastItem)
             }))
             index += 1
-            notice(purpose == .summary ? "Summary.PromptNotice" : "LLMTranslation.PromptNotice")
+            notice("LLMTranslation.PromptNotice")
         }
         return InputDataSignalValue(entries: rows)
     }
 
-    let title = purpose == .summary ? "Summary.Title" : purpose == .translation ? "LLMTranslation.Title" : "Settings.Category.transcription"
+    let title = purpose == .translation ? "LLMTranslation.Title" : "Settings.Category.transcription"
     let controller = InputDataController(dataSignal: signal, title: regramString(title), updateDatas: { data in
         update({ draft in
             for key in suffixes + ["APIKey"] {

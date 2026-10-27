@@ -517,7 +517,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                 System.legacyMenu = themeSettings.legacyMenu
 
                 if let localization = localization {
-                    applyUILocalization(localization)
+                    applyRegramUILocalization(localization)
                     UNUserNotifications.current?.registerCategories()
                 }
                 
@@ -614,7 +614,9 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         
         window.minSize = NSMakeSize(400, 550)
         
-        let networkDisposable = MetaDisposable()
+        #if !APP_STORE
+        startRegramUpdater()
+        #endif
         
         
        
@@ -668,7 +670,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                 }
                 
                 if let localization = localization {
-                    applyUILocalization(localization)
+                    applyRegramUILocalization(localization)
                     UNUserNotifications.current?.registerCategories()
                 }
                             
@@ -804,7 +806,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                 _ = (accountManager.sharedData(keys: [SharedDataKeys.localizationSettings]) |> deliverOnMainQueue).start(next: { view in
                     if let settings = view.entries[SharedDataKeys.localizationSettings]?.get(LocalizationSettings.self) {
                         if basicLocalization.swap(settings) != settings {
-                            applyUILocalization(settings)
+                            applyRegramUILocalization(settings)
                             UNUserNotifications.current?.registerCategories()
                         }
                     }
@@ -1154,29 +1156,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                                 self.executeUrlAfterLogin = nil
                                 self.processURL(executeUrlAfterLogin)
                             }
-                            #if !APP_STORE
-                            networkDisposable.set((context.context.account.postbox.preferencesView(keys: [PreferencesKeys.networkSettings]) |> delay(5.0, queue: Queue.mainQueue()) |> deliverOnMainQueue).start(next: { settings in
-                                let settings = settings.values[PreferencesKeys.networkSettings]?.get(NetworkSettings.self)
-                                
-                                let applicationUpdateUrlPrefix: String?
-                                if let prefix = settings?.applicationUpdateUrlPrefix {
-                                    if prefix.range(of: "://") == nil {
-                                        applicationUpdateUrlPrefix = "https://" + prefix
-                                    } else {
-                                        applicationUpdateUrlPrefix = prefix
-                                    }
-                                } else {
-                                    applicationUpdateUrlPrefix = nil
-                                }
-                                setAppUpdaterBaseDomain(applicationUpdateUrlPrefix)
-                                #if STABLE || BETA || DEBUG
-                                updater_resetWithUpdaterSource(.internal(context: context.context))
-                                #else
-                                updater_resetWithUpdaterSource(.external(context: context.context))
-                                #endif
-                                
-                            }))
-                            #endif
+
                             
                             if let url = AppDelegate.eventProcessed {
                                 self.processURL(url)
@@ -1220,33 +1200,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                                     window.makeKeyAndOrderFront(nil)
                                     showModal(with: context.modal, for: window, animated: presentAuthAnimated)
                                     
-                                    #if !APP_STORE
-                                    networkDisposable.set((context.account.postbox.preferencesView(keys: [PreferencesKeys.networkSettings]) |> delay(5.0, queue: Queue.mainQueue()) |> deliverOnMainQueue).start(next: { settings in
-                                        let settings = settings.values[PreferencesKeys.networkSettings]?.get(NetworkSettings.self)
-                                        
-                                        let applicationUpdateUrlPrefix: String?
-                                        if let prefix = settings?.applicationUpdateUrlPrefix {
-                                            if prefix.range(of: "://") == nil {
-                                                applicationUpdateUrlPrefix = "https://" + prefix
-                                            } else {
-                                                applicationUpdateUrlPrefix = prefix
-                                            }
-                                        } else {
-                                            applicationUpdateUrlPrefix = nil
-                                        }
-                                        setAppUpdaterBaseDomain(applicationUpdateUrlPrefix)
-                                        #if STABLE
-                                        if let context = self.contextValue?.context {
-                                            updater_resetWithUpdaterSource(.internal(context: context))
-                                        } else {
-                                            updater_resetWithUpdaterSource(.external(context: nil))
-                                        }
-                                        #else
-                                        updater_resetWithUpdaterSource(.external(context: self.contextValue?.context))
-                                        #endif
-                                        
-                                    }))
-                                    #endif
+
                                     
                                     
                                 }))
@@ -1332,15 +1286,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         guard Bundle.main.object(forInfoDictionaryKey: "RegramUpdatesDisabled") as? Bool != true else { return }
         #if !APP_STORE
             showModal(with: InputDataModalController(AppUpdateViewController()), for: window)
-            #if STABLE
-                if let context = self.contextValue?.context {
-                    updater_resetWithUpdaterSource(.internal(context: context))
-                } else {
-                    updater_resetWithUpdaterSource(.external(context: nil))
-                }
-            #else
-                updater_resetWithUpdaterSource(.external(context: self.contextValue?.context))
-            #endif
+            regramCheckForUpdates()
         #endif
     }
     

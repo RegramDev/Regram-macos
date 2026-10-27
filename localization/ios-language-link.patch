@@ -1,0 +1,33 @@
+diff --git a/Regram/RGStrings/Sources/LocalizationManager.swift b/Regram/RGStrings/Sources/LocalizationManager.swift
+index 0726e1ffe3..4466f55ff9 100644
+--- a/Regram/RGStrings/Sources/LocalizationManager.swift
++++ b/Regram/RGStrings/Sources/LocalizationManager.swift
+@@ -100,6 +100,7 @@ public class RGLocalizationManager {
+     private func sanitizeLocale(_ locale: String) -> String {
+         var value = locale.lowercased().replacingOccurrences(of: "_", with: "-")
+         if value.hasSuffix("-raw") { value = String(value.dropLast(4)) }
++        if value == "regram-zh-hans" || value == "zhcncc" { return "zh-hans" }
+         if value == "zh" || value.hasPrefix("zh-cn") || value.hasPrefix("zh-sg") || value.hasPrefix("zh-hans") { return "zh-hans" }
+         if value.hasPrefix("zh-tw") || value.hasPrefix("zh-hk") || value.hasPrefix("zh-mo") || value.hasPrefix("zh-hant") { return "zh-hant" }
+         if value == "nb" { return "no" }
+diff --git a/Regram/RGStrings/Tests/LocalizationManagerTests.swift b/Regram/RGStrings/Tests/LocalizationManagerTests.swift
+index 5e9043af89..9afd7920b9 100644
+--- a/Regram/RGStrings/Tests/LocalizationManagerTests.swift
++++ b/Regram/RGStrings/Tests/LocalizationManagerTests.swift
+@@ -4,7 +4,7 @@ func getAppBundle() -> Bundle { Bundle(path: CommandLine.arguments[1])! }
+ 
+ @main struct LocalizationManagerTests {
+     static func main() {
+-        for locale in ["zh-hans", "ZH_Hans", "zh-CN", "zh-SG", "zh-hans-raw"] {
++        for locale in ["zh-hans", "ZH_Hans", "zh-CN", "zh-SG", "zh-hans-raw", "regram-zh-hans", "regram-zh-hans-raw", "zhcncc"] {
+             assert("Settings.ProCategory.media".i18n(locale) == "媒体与链接", locale)
+         }
+         for locale in ["zh-hant", "ZH_Hant", "zh-TW", "zh-HK"] {
+@@ -14,6 +14,7 @@ func getAppBundle() -> Bundle { Bundle(path: CommandLine.arguments[1])! }
+         assert("Fixture.Format".i18n("en", args: "42", 7) == "42 / 7")
+         assert(i18n("Fixture.Format", "en", "label", 9) == "label / 9")
+         assert(RGLocalizationManager.shared.preferredLocale(primary: "zh-CN", secondary: "en") == "zh-hans")
++        assert(RGLocalizationManager.shared.preferredLocale(primary: "regram-zh-hans", secondary: "en") == "zh-hans")
+         assert(RGLocalizationManager.shared.preferredLocale(primary: "ZH_TW", secondary: "en") == "zh-hant")
+         assert(RGLocalizationManager.shared.preferredLocale(primary: "unsupported-custom", secondary: "en") == "en")
+         for language in ["en", "zh-hans", "zh-hant"] {

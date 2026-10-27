@@ -22,7 +22,7 @@ public func RegramInlineRulesController(context: any AccountContextProtocol) -> 
     let signal = combineLatest(regramPreferenceChanges(accountId: accountId), rules, appearanceSignal) |> map { settings, rules, _ -> InputDataSignalValue in
         var rows: [InputDataEntry] = [.sectionId(0, type: .normal)]
         rows.append(.desc(sectionId: 1, index: 0, text: .plain(regramString("ios.features.InlineBots.Title")), data: .init(color: theme.colors.listGrayText, viewType: .textTopItem)))
-        rows.append(.general(sectionId: 1, index: 1, value: .none, error: nil, identifier: InputDataIdentifier("inlineRules_enabled"), data: .init(name: regramString("ios.features.AutoInlineBot.Enabled"), color: theme.colors.text, type: .switchable(settings["features.autoInlineBotEnabled"].bool), viewType: .singleItem, action: {
+        rows.append(.general(sectionId: 1, index: 1, value: .none, error: nil, identifier: InputDataIdentifier("inlineBots.enabled"), data: .init(name: regramString("ios.features.AutoInlineBot.Enabled"), color: theme.colors.text, type: .switchable(settings["features.autoInlineBotEnabled"].bool), viewType: .singleItem, action: {
             RegramPreferences.shared.update(accountId: accountId) { $0["features.autoInlineBotEnabled"] = .bool(!settings["features.autoInlineBotEnabled"].bool) }
         })))
         rows.append(.desc(sectionId: 1, index: 2, text: .plain(regramString("ios.features.AutoInlineBot.Footer")), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))

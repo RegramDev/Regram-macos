@@ -127,6 +127,7 @@ public protocol SettingsPeerInfoController: ViewController {
 
 public protocol SettingsChatController: ViewController {
     var mode: ChatMode { get }
+    var chatLocation: ChatLocation { get }
 }
 
 @available(macOS 10.15, *)

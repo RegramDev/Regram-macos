@@ -676,11 +676,16 @@ public func messageEntries(_ messagesEntries: [MessageHistoryEntry], location: C
     var groupInfo: MessageGroupInfo?
         
     var messagesEntries = messagesEntries
+    let originalCount = messagesEntries.count
     if let accountPeerId {
         let accountId = accountPeerId.toInt64()
         messagesEntries.removeAll { regramShouldHideMessage($0.message, accountId: accountId) }
     }
-    
+    let maxReadIndex = maxReadIndex.flatMap { index -> MessageIndex? in
+        if messagesEntries.count < originalCount, !messagesEntries.contains(where: { !$0.message.flags.intersection(.IsIncomingMask).isEmpty && $0.message.index > index }) { return nil }
+        return index
+    }
+
     if let cachedData = cachedData as? CachedChannelData, cachedData.isNotAccessible {
         messagesEntries = []
     }

@@ -18,10 +18,10 @@ private struct RegramBackupState: Equatable {
 public func RegramSettingsBackupController(context: any AccountContextProtocol, focusSetting: String? = nil, initialBackup: RegramSettingsBackup? = nil) -> InputDataController {
     let accountId = context.peerId.toInt64()
     let initial = RegramBackupState(candidate: initialBackup)
-    let state = Atomic(value: initial)
+    let stateValue = Atomic(value: initial)
     let promise = ValuePromise(initial)
     let actions = DisposableSet()
-    func update(_ transform: (inout RegramBackupState) -> Void) { promise.set(state.modify { value in var value = value; transform(&value); return value }) }
+    func update(_ transform: (inout RegramBackupState) -> Void) { promise.set(stateValue.modify { value in var value = value; transform(&value); return value }) }
     func presentError() { showModalText(for: context.window, text: regramString("Backup.Error.Notice"), title: regramString("Backup.Error")) }
     func export(_ categories: Set<RegramBackupCategory>) {
         actions.add((RegramNativeNavigation.visibility(context: context) |> take(1) |> deliverOnMainQueue).start(next: { native in
@@ -76,7 +76,11 @@ public func RegramSettingsBackupController(context: any AccountContextProtocol, 
     let signal = combineLatest(promise.get(), appearanceSignal) |> map { state, _ -> InputDataSignalValue in
         var page = RegramPageBuilder(page: "backup")
         page.section()
-        page.row("export", title: regramString("Backup.Export"), enabled: !state.categories.isEmpty, action: { export(state.categories) })
+        page.row("export", title: regramString("Backup.Export"), enabled: !state.categories.isEmpty, action: {
+            let categories = stateValue.with { $0.categories }
+            guard !categories.isEmpty else { return }
+            export(categories)
+        })
         page.row("import", title: regramString("Backup.Import"), enabled: !state.importing, action: importFile)
         if state.importing { page.row("importing", title: regramString("loading"), type: .loading) }
         page.text(regramString("Backup.Notice"))
@@ -90,12 +94,20 @@ public func RegramSettingsBackupController(context: any AccountContextProtocol, 
             let date = DateFormatter.localizedString(from: backup.createdAt, dateStyle: .medium, timeStyle: .none)
             page.text(date)
             page.text("\(backup.selectedValues(categories: state.categories).count) " + regramString("Backup.Items"))
-            page.row("restore", title: regramString("Backup.Restore"), enabled: !state.categories.isEmpty, action: { restore(backup, categories: state.categories) })
+            page.row("restore", title: regramString("Backup.Restore"), enabled: !state.categories.isEmpty, action: {
+                let current = stateValue.with { $0 }
+                guard let backup = current.candidate, !current.categories.isEmpty else { return }
+                restore(backup, categories: current.categories)
+            })
             page.row("cancelPreview", title: regramString("Backup.CancelPreview"), action: { update { $0.candidate = nil } })
             page.text(regramString("Backup.Fonts.Notice"))
         }
         page.section()
-        page.row("reset", title: regramString("Backup.Reset"), enabled: !state.categories.isEmpty, color: theme.colors.redUI, action: { restore(nil, categories: state.categories) })
+        page.row("reset", title: regramString("Backup.Reset"), enabled: !state.categories.isEmpty, color: theme.colors.redUI, action: {
+            let categories = stateValue.with { $0.categories }
+            guard !categories.isEmpty else { return }
+            restore(nil, categories: categories)
+        })
         page.text(regramString("Backup.Reset.Notice"))
         return InputDataSignalValue(entries: page.entries)
     }

@@ -22,10 +22,14 @@ class LeftSidebarFolderItem: TableRowItem {
     let badge: CGImage?
     let nameLayout: TextViewLayout
     let unreadCount: Int
+    let compact: Bool
+    var verticalInset: CGFloat { compact ? 4 : 8 }
+    var titleSpacing: CGFloat { compact ? 2 : 4 }
 
 
-    init(_ initialSize: NSSize, context: any AccountContextProtocol, environment: SidebarUIEnvironment, folder: ChatListFilter, selected: Bool, unreadCount: Int, hasUnmutedUnread: Bool, callback: @escaping(ChatListFilter)->Void, menuItems: @escaping(ChatListFilter, Int?, Bool?) -> [ContextMenuItem]) {
+    init(_ initialSize: NSSize, context: any AccountContextProtocol, environment: SidebarUIEnvironment, folder: ChatListFilter, selected: Bool, compact: Bool = false, unreadCount: Int, hasUnmutedUnread: Bool, callback: @escaping(ChatListFilter)->Void, menuItems: @escaping(ChatListFilter, Int?, Bool?) -> [ContextMenuItem]) {
         self.folder = folder
+        self.compact = compact
         self.context = context
         self.selected = selected
         self.callback = callback
@@ -140,7 +144,7 @@ class LeftSidebarFolderItem: TableRowItem {
     }
 
     override var height: CGFloat {
-        return 32 + 8 + 8 + nameLayout.layoutSize.height + 4
+        return 32 + verticalInset * 2 + nameLayout.layoutSize.height + titleSpacing
     }
 
     override func viewClass() -> AnyClass {
@@ -264,8 +268,9 @@ private final class LeftSidebarFolderView : TableRowView {
     override func layout() {
         super.layout()
 
-        imageView.centerX(y: 8)
-        textView.centerX(y: imageView.frame.maxY + 4)
+        guard let item = item as? LeftSidebarFolderItem else { return }
+        imageView.centerX(y: item.verticalInset)
+        textView.centerX(y: imageView.frame.maxY + item.titleSpacing)
         badgeView.setFrameOrigin(NSMakePoint(imageView.frame.maxX - floorToScreenPixels(badgeView.frame.width / 2) - 4, imageView.frame.minY - 4))
     }
 

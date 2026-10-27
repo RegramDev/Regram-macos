@@ -9,7 +9,7 @@ package dependencies, so once the submodules are checked out the build is offlin
 
 ## Install a release build
 
-Download the [Regram 13.1.0 (283368) Universal DMG](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283368/Regram-13.1.0-283368-universal.dmg). This release supports Intel and Apple Silicon Macs and requires macOS 12.0 or later.
+Download Regram 13.1.0 (283374) for [Apple Silicon](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283374/Regram-13.1.0-283374-arm64.dmg) or [Intel](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283374/Regram-13.1.0-283374-x86_64.dmg). This release requires macOS 12.0 or later. Verify the download against [SHA256SUMS.txt](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283374/SHA256SUMS.txt).
 
 This release is signed with an Apple/Mac Development certificate and has not been notarized by Apple. Open the downloaded DMG, drag Regram to Applications, and launch it from that folder.
 
@@ -174,29 +174,20 @@ xcodebuild -workspace Telegram-Mac.xcworkspace -scheme Release -configuration Re
   'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) STABLE' build
 ```
 
-The v13.1.0-283368 release targets macOS 12.0 or later. Swift packages are resolved
+The v13.1.0-283374 release targets macOS 12.0 or later. Swift packages are resolved
 from the local paths in the workspace; no network access is needed.
 
-### Universal build
+### Separate Apple Silicon and Intel packages
 
-To build both architectures, use the same deployment target as the published release:
+Release builds produce two DMGs: `Regram-<version>-<build>-arm64.dmg` for Apple Silicon and `Regram-<version>-<build>-x86_64.dmg` for Intel. Each app and its nested executable code contain only the selected architecture.
 
-```
-xcodebuild -workspace Telegram-Mac.xcworkspace -scheme Release -configuration Release \
-  -destination 'generic/platform=macOS' -derivedDataPath build/RegramUniversal \
-  ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO MACOSX_DEPLOYMENT_TARGET=12.0 \
-  CODE_SIGNING_ALLOWED=NO ENABLE_DEBUG_DYLIB=NO \
-  'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) STABLE' build
-
-python3 scripts/install-regram-release.py --skip-build \
-  --derived-data build/RegramUniversal --identity YOUR_CERTIFICATE_SHA1
+```sh
+python3 scripts/package-regram-release.py --output ~/Downloads/Regram
 ```
 
-`ARCHS='arm64 x86_64'` and `ONLY_ACTIVE_ARCH=NO` keep both architecture slices.
-The installer defaults to a build for the host architecture. Use `--skip-build` with
-the same `--derived-data` directory to sign and install the existing Universal app
-without rebuilding it as a single-architecture app. Once an identity is saved, omit
-`--identity` to reuse that certificate.
+The script builds the architectures sequentially with four build jobs, retains the shared build cache, verifies Release/STABLE and nested signatures, and produces a checksum and size report beside each DMG. It uses the fixed certificate configured by the local installer. The source app is removed only after both packages succeed; installed applications and user data are untouched.
+
+To package one existing build, use `--source-app /path/to/Regram.app --architecture arm64` (or `x86_64`). This works on a copy and preserves the source bundle. The previous 283368 release remains available as a Universal download.
 
 ### Generated TelegramApi sources
 
@@ -282,8 +273,10 @@ This section describes the inherited Telegram channel and CI scripts. Some scrip
 still expect `Telegram.app` and Telegram's release-runner configuration. For local
 Regram Release builds and updates, use the [local installer](#local-regram-testing-and-updates).
 Regram installation packages are distributed through this repository's
-[GitHub Releases](https://github.com/RegramDev/Regram-macos/releases); automatic
-updating remains disabled.
+[GitHub Releases](https://github.com/RegramDev/Regram-macos/releases). Regram's updater
+uses the latest stable release, selects the matching architecture, and verifies
+the GitHub SHA-256 digest and the app's signing identity before installation.
+Automatic checking, downloading, and installation on quit are configurable in Regram Pro.
 
 `Telegram-Mac/common.xcconfig` holds the shared settings. The channel is selected by an
 xcconfig that defines `TYPE` (a Swift compiler flag) plus the Sparkle feed URL:

@@ -336,7 +336,7 @@ public class StickerPackPanelRowItem: TableRowItem {
                     default:
                         break inner
                     }
-                    if packInfo.installed, savedStickers.contains(file.fileId) {
+                    if packInfo != .saved, savedStickers.contains(file.fileId) {
                         items.append(ContextMenuItem(strings().chatContextRemoveFavoriteSticker, handler: {
                             showModalText(for: context.window, text: strings().chatContextStickerRemovedFromFavorites)
                             _ = removeSavedSticker(postbox: context.account.postbox, mediaId: file.fileId).start()

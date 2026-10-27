@@ -374,14 +374,11 @@ func installFeatureNavigationHooks() {
     }
     hooks.makeRegramMessageController = { context, message in RegramEditHistoryController(context: context, message: message) }
     hooks.makeRegramFilterImportController = { context, data in RegramFilterImportController(context: context, data: data) }
-    hooks.makeRegramSummaryController = { context, messages, permitsTimeRange in
-        RegramMessageSummaryController(context: context, messages: messages, permitsTimeRange: permitsTimeRange)
-    }
-    hooks.makeRegramSummaryRangeController = { context, peerId, threadId, selectedMessages in
-        RegramMessageSummaryRangeController(context: context, peerId: peerId, threadId: threadId, selectedMessages: selectedMessages)
-    }
     hooks.makeRegramWebTranslationController = { context, url in RegramWebTranslationController(context: context, url: url) }
     var regramHooks = RegramUIHooks()
+    #if !APP_STORE
+    regramHooks.makeUpdateController = { AppUpdateViewController() }
+    #endif
     regramHooks.restartApplication = { restartRegramApplication() }
     regramHooks.eraseAllData = { _ in requestRegramFullWipe(language: appCurrentLanguage.primaryLanguage.languageCode) }
     regramHooks.selectChat = { context, selected in
@@ -421,6 +418,7 @@ func installFeatureNavigationHooks() {
         case "media": controller = SettingsNavigationHooks.shared.makeDataAndStorageController(context, nil)
         case "translation": controller = LanguageController(context, focusOnItemTag: .doNotTranslate)
         case "appearance": controller = AppAppearanceViewController(context: context)
+        case "folderTags": controller = ChatListFiltersListController(context: context as! AccountContext, focusOnTags: true)
         case "appIcon": controller = AppAppearanceViewController(context: context, focusOnItemTag: .dockIcon)
         case "privacy": controller = SettingsNavigationHooks.shared.makePasscodeSettingsController(context)
         case "tools": controller = SettingsNavigationHooks.shared.makeRecentSessionsController(context)

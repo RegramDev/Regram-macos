@@ -8,14 +8,17 @@ import TelegramContext
 import TelegramTheme
 import TelegramUtils
 import InputDataUI
+import GeneralRows
 import RegramCore
 import RegramSignals
 import ChatHistoryModel
+import ShortPeerRow
 
 private let authorMessagesSearchId = InputDataIdentifier("authorMessages.search")
 
 private struct AuthorMessagesState: Equatable {
     var authorTitle = ""
+    var author: PeerEquatable?
     var query = ""
     var groupTitle = ""
     var rows: [RegramSearchMessageRow] = []
@@ -24,6 +27,11 @@ private struct AuthorMessagesState: Equatable {
     var failed = false
     var paused = false
     var hasMore = true
+}
+
+private struct AuthorMessagesIdentity: Equatable {
+    let author: PeerEquatable?
+    let groupTitle: String
 }
 
 private final class AuthorMessagesSearch {
@@ -42,9 +50,11 @@ private final class AuthorMessagesSearch {
     private var peersResolved = false
     private var allowed = false
     private var authorTitle = ""
+    private var author: Peer?
     private var group: Peer?
     private var query = ""
     private var inputQuery = ""
+    var currentQuery: String { inputQuery }
     private var cursor: SearchMessagesState?
     private var messages: [MessageId: Message] = [:]
     private var loaded = false
@@ -61,6 +71,7 @@ private final class AuthorMessagesSearch {
             self.peersResolved = true
             self.group = peerViewMainPeer(groupView)
             let author = peerViewMainPeer(authorView)
+            self.author = author
             self.authorTitle = author?.displayTitle ?? ""
             self.allowed = self.group.map(regramSearchIsGroup) == true && author?.id == authorPeerId
             if !self.allowed { self.cancelRequest() }
@@ -84,6 +95,7 @@ private final class AuthorMessagesSearch {
         let formatter = regramSearchDateFormatter()
         var value = AuthorMessagesState()
         value.authorTitle = authorTitle
+        value.author = author.map { PeerEquatable(peer: $0) }
         value.query = inputQuery
         value.groupTitle = regramSearchGroupTitle(group, peerId: chatPeerId, accountId: accountId)
         value.available = !peersResolved || allowed
@@ -213,33 +225,47 @@ private final class AuthorMessagesSearch {
 private func authorMessagesEntries(_ state: AuthorMessagesState, context: any AccountContextProtocol, authorPeerId: PeerId, search: AuthorMessagesSearch) -> [InputDataEntry] {
     var entries: [InputDataEntry] = [.sectionId(0, type: .normal)]
     var index: Int32 = 0
-    entries.append(.general(sectionId: 1, index: index, value: .none, error: nil, identifier: InputDataIdentifier("authorMessages.author"), data: .init(name: state.authorTitle.isEmpty ? regramString("AuthorMessages.PageTitle") : state.authorTitle, color: theme.colors.text, type: .next, viewType: .firstItem, description: state.groupTitle, action: { RegramUIHooks.shared.openPeerInfo(context, authorPeerId) })))
-    index += 1
-    entries.append(.input(sectionId: 1, index: index, value: .string(state.query), error: nil, identifier: authorMessagesSearchId, mode: .plain, data: .init(viewType: .lastItem, rightItem: .action(theme.icons.recentDismiss, .clearText)), placeholder: nil, inputPlaceholder: regramString("AuthorMessages.Search"), filter: { $0 }, limit: 4096))
-    index += 1
-    entries.append(.desc(sectionId: 1, index: index, text: .plain(String(format: regramString("AuthorMessages.Loaded"), state.rows.count)), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
-    index += 1
-    entries.append(.sectionId(2, type: .normal))
-    entries.append(contentsOf: regramSearchMessageEntries(state.rows, context: context, sectionId: 3, index: &index))
-    if !state.available || state.rows.isEmpty || state.failed || state.paused {
-        let key = !state.available ? "AuthorMessages.Unavailable" : state.loading ? "AuthorMessages.Loading" : state.failed ? "AuthorMessages.LoadFailed" : state.paused ? "AuthorMessages.Paused" : "AuthorMessages.Empty"
-        entries.append(.desc(sectionId: 3, index: index, text: .plain(regramString(key)), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
+    if let author = state.author?.peer {
+        entries.append(.custom(sectionId: 1, index: index, value: .none, identifier: InputDataIdentifier("authorMessages.author"), equatable: InputDataEquatable(AuthorMessagesIdentity(author: state.author, groupTitle: state.groupTitle)), comparable: nil, item: { size, stableId in
+            ShortPeerRowItem(size, peer: author, account: context.account, context: context, stableId: stableId, height: 64, photoSize: NSSize(width: 40, height: 40), status: state.groupTitle, viewType: .firstItem, action: { RegramUIHooks.shared.openPeerInfo(context, authorPeerId) })
+        }))
         index += 1
     }
-    if state.available {
+    entries.append(regramSearchEntry(sectionId: 1, index: index, value: state.query, identifier: authorMessagesSearchId, viewType: state.author == nil ? .singleItem : .lastItem, update: search.updateQuery))
+    index += 1
+    entries.append(.desc(sectionId: 1, index: index, text: .plain(regramString("AuthorMessages.Scope")), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
+    index += 1
+    entries.append(.sectionId(2, type: .normal))
+    if state.rows.isEmpty {
+        let key = !state.available ? "AuthorMessages.Unavailable" : state.loading ? "AuthorMessages.Loading" : state.failed ? "AuthorMessages.LoadFailed" : state.paused ? "AuthorMessages.Paused" : state.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "AuthorMessages.Empty" : "AuthorMessages.NoResults"
+        let action: SearchEmptyRowItem.Action? = state.available && !state.loading && (state.failed || state.paused) ? .init(click: search.primaryAction, title: regramString(state.failed ? "AuthorMessages.Retry" : "CommonGroups.Continue")) : nil
+        entries.append(.custom(sectionId: 3, index: index, value: .none, identifier: InputDataIdentifier("authorMessages.empty"), equatable: InputDataEquatable(state), comparable: nil, item: { size, stableId in
+            SearchEmptyRowItem(size, stableId: stableId, height: action == nil ? 180 : 210, isLoading: state.available && state.loading, text: regramString(key), action: action)
+        }))
+        index += 1
+    } else {
+        entries.append(.desc(sectionId: 3, index: index, text: .plain(String(format: regramString("AuthorMessages.Loaded"), state.rows.count)), data: .init(color: theme.colors.listGrayText, viewType: .textTopItem)))
+        index += 1
+        entries.append(contentsOf: regramSearchMessageEntries(state.rows, context: context, sectionId: 3, index: &index, author: state.author?.peer, query: state.query))
+        if state.failed || state.paused {
+            entries.append(.desc(sectionId: 3, index: index, text: .plain(regramString(state.failed ? "AuthorMessages.LoadFailed" : "AuthorMessages.Paused")), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
+            index += 1
+        }
+    }
+    if state.available && (!state.rows.isEmpty || state.loading || (!state.failed && !state.paused)) {
         entries.append(.sectionId(4, type: .normal))
         let key = state.loading ? "CommonGroups.Cancel" : state.paused ? "CommonGroups.Continue" : state.failed ? "AuthorMessages.Retry" : "CommonGroups.Refresh"
-        entries.append(.general(sectionId: 5, index: index, value: .none, error: nil, identifier: InputDataIdentifier("authorMessages.primary"), data: .init(name: regramString(key), color: theme.colors.accent, type: .none, viewType: state.hasMore && !state.loading ? .firstItem : .singleItem, action: search.primaryAction)))
+        let showMore = state.hasMore && !state.loading && !state.paused && !state.failed && !state.rows.isEmpty
+        entries.append(.general(sectionId: 5, index: index, value: .none, error: nil, identifier: InputDataIdentifier("authorMessages.primary"), data: .init(name: regramString(key), color: theme.colors.accent, type: state.loading && !state.rows.isEmpty ? .loading : .none, viewType: showMore ? .firstItem : .singleItem, action: search.primaryAction)))
         index += 1
-        if state.hasMore && !state.loading {
-            entries.append(.general(sectionId: 5, index: index, value: .none, error: nil, identifier: InputDataIdentifier("authorMessages.more"), data: .init(name: regramString("CommonGroups.LoadMore"), color: theme.colors.accent, type: .none, viewType: .lastItem, enabled: !state.paused && !state.failed, action: search.loadMore)))
+        if showMore {
+            entries.append(.general(sectionId: 5, index: index, value: .none, error: nil, identifier: InputDataIdentifier("authorMessages.more"), data: .init(name: regramString("CommonGroups.LoadMore"), color: theme.colors.accent, type: .none, viewType: .lastItem, action: search.loadMore)))
             index += 1
-        } else if !state.hasMore && !state.loading {
+        } else if !state.hasMore && !state.loading && !state.rows.isEmpty {
             entries.append(.desc(sectionId: 5, index: index, text: .plain(regramString("CommonGroups.AllLoaded")), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
             index += 1
         }
     }
-    entries.append(.desc(sectionId: 5, index: index, text: .plain(regramString("AuthorMessages.Scope")), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
     return entries
 }
 
@@ -260,6 +286,7 @@ public func RegramAuthorMessagesController(context: any AccountContextProtocol, 
             if case .bottom = position.direction { search.loadMore() }
         }
     }
+    regramRestoreSearchQuery(controller, identifier: authorMessagesSearchId, query: { search.currentQuery })
     controller.onDeinit = { search.dispose() }
     regramFocusSettings(controller, page: "authorMessages", item: focusSetting)
     return controller

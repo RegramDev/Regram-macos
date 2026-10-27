@@ -32,7 +32,10 @@ public func RegramNetworkPolicyController(context: any AccountContextProtocol, f
         var page = RegramPageBuilder(page: "networkPolicy")
         page.section()
         page.row("enabled", title: regramString("NetworkPolicy.DNSMode"), type: .contextSelector(regramString(policy.dnsMode.titleKey), RegramNetworkPolicy.DNSMode.allCases.map { mode in ContextMenuItem(regramString(mode.titleKey), handler: { update { $0.policy.dnsMode = mode } }, state: mode == policy.dnsMode ? .on : .off) }))
-        page.input("endpoint", value: policy.endpoint, title: regramString("NetworkPolicy.Endpoint"), placeholder: "https://dns.google/resolve")
+        if policy.dnsMode == .custom {
+            page.text(regramString("NetworkPolicy.Endpoint"), header: true)
+            page.input("endpoint", value: policy.endpoint, title: "", placeholder: "https://dns.google/resolve")
+        }
         if policy.dnsMode == .custom, let failure = state.failure { page.text(regramString("NetworkPolicy.DoHFailure." + failure)) }
         if policy.dnsMode == .custom && !RegramNetworkPolicy.validEndpoint(policy.endpoint) { page.text(regramString("NetworkPolicy.InvalidURL")) }
         page.text(regramString("NetworkPolicy.DoHNotice"))
@@ -43,8 +46,12 @@ public func RegramNetworkPolicyController(context: any AccountContextProtocol, f
         page.row("disableBackup", title: regramString("NetworkPolicy.DisableBackup"), type: .switchable(policy.disableBackupAddresses), action: { update { $0.policy.disableBackupAddresses.toggle() } })
         page.text(regramString("NetworkPolicy.BackupNotice"))
         page.section()
-        page.row("test", title: regramString("DNSDiagnostics.Title"), type: .next, action: { context.bindings.rootNavigation().push(RegramDNSController(context: context, policy: policy)) })
+        page.row("test", title: regramString("DNSDiagnostics.Title"), type: .next, action: {
+            context.bindings.rootNavigation().push(RegramDNSController(context: context, policy: value.with { $0.policy }))
+        })
         page.row("apply", title: regramString("NetworkPolicy.Apply"), enabled: policy.dnsMode != .custom || RegramNetworkPolicy.validEndpoint(policy.endpoint), action: {
+            let policy = value.with { $0.policy }
+            guard policy.dnsMode != .custom || RegramNetworkPolicy.validEndpoint(policy.endpoint) else { return }
             RegramPreferences.shared.update(accountId: accountId) { policy.apply(to: &$0) }
             showModalText(for: context.window, text: regramString("NetworkPolicy.Applied"))
         })

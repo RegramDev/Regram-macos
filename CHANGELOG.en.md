@@ -2,6 +2,28 @@
 
 [简体中文](CHANGELOG.md) · **English**
 
+## 13.1.0 (283374) — 2026-10-27
+
+### Added and improved
+
+- Separate Apple Silicon and Intel packages, with matching architecture throughout each app and its embedded components.
+- Automatic update checks, downloads, and installation on quit, with download digest and signing identity validation.
+- Message bookmarks on the main Settings page, with an enable switch that preserves saved bookmarks and tags when disabled.
+- Native Regram Pro, bookmark, and author-message screens, with complete sidebar selection corners and corrected search state after returning.
+- Faster filtered previews, unread synchronization, and folder switching through fewer repeated queries, text expansions, and rule matches.
+- Avoid unnecessary interface-wide refreshes when returning to the app without a font configuration change.
+- Image translation follows the selected service and Chinese language variant, with stable region mapping and clear size-limit feedback.
+- Merge 15 upstream updates covering Liquid Glass controls, shared media, photo editing, batch photo saving, and message reactions.
+
+### Fixed and changed
+
+- Fix input crashes and profile navigation for mentions; pasted images default to photos.
+- Fix network policy saving and reconnection, data center result display and copying, and configuration diagnostics.
+- Accept complete request paths in model base URLs and fill in the provider path when omitted.
+- Fix image translation loading states, misplaced regions, shrinking layers, and stale results after switching images.
+- Adjust profile data center, Peer ID, registration estimate, and local gift display.
+- Remove message summaries and message screenshot export.
+
 ## 13.1.0 (283368) — 2026-10-26
 
 ### Added

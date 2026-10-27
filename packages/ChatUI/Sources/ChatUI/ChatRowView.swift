@@ -729,13 +729,6 @@ public class ChatRowView: TableRowView, Notifable, MultipleSelectable, ChatTextS
     
     public override func mouseUp(with event: NSEvent) {
         super.mouseUp(with: event)
-        if event.clickCount == 1, !mouseDragged, let item = item as? ChatRowItem, item.message != nil,
-           !item.chatInteraction.isLogInteraction, !item.sending, item.chatInteraction.presentation.state == .normal,
-           RegramPreferences.shared.settings(accountId: item.context.peerId.toInt64())["features.tapMessageRowToOpenContextMenu"].bool,
-           !NSPointInRect(convert(event.locationInWindow, from: nil), rightView.frame) {
-            showContextMenu(event)
-            return
-        }
         
         if let item = item as? ChatRowItem, !item.chatInteraction.isLogInteraction && !item.chatInteraction.disableSelectAbility, !item.sending {
             if item.chatInteraction.presentation.state != .selecting {
@@ -2566,9 +2559,7 @@ public class ChatRowView: TableRowView, Notifable, MultipleSelectable, ChatTextS
     
     public override func doubleClick(in location: NSPoint) {
         if let item = self.item as? ChatRowItem, isAllowedToDoubleAction(location), let message = item.message {
-            if !regramHandleMessageDoubleClick(item, view: self, location: location) {
-                item.chatInteraction.setupReplyMessage(message, .init(messageId: message.id, quote: nil, innerSubject: nil))
-            }
+            item.chatInteraction.setupReplyMessage(message, .init(messageId: message.id, quote: nil, innerSubject: nil))
         }
     }
     

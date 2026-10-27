@@ -33,11 +33,10 @@ public func RegramTranslationSettingsController(context: any AccountContextProto
         rows.append(.desc(sectionId: 1, index: 6, text: .markdown(regramString("Common.NoTelegramPremiumNeeded").replacingOccurrences(of: "%@", with: "Telegram Premium"), linkHandler: { _ in }), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
         rows.append(.sectionId(2, type: .normal))
         rows.append(.desc(sectionId: 3, index: 7, text: .plain(regramString("Settings.Section.Speech")), data: .init(color: theme.colors.listGrayText, viewType: .textTopItem)))
-        rows.append(.custom(sectionId: 3, index: 8, value: .none, identifier: InputDataIdentifier("pro.translation.transcriptionSettings"), equatable: nil, comparable: nil, item: { size, stableId in
-            GeneralInteractedRowItem(size, stableId: stableId, name: regramString("RG.STTSettings"), icon: RegramSettingsArtwork.editor("waveform", color: .systemPurple), description: regramString("Settings.Editor.transcriptionSettings.Description"), type: .next, viewType: .singleItem, action: {
-                context.bindings.rootNavigation().push(RegramServiceController(context: context, purpose: .transcription))
-            })
-        }))
+        rows.append(.general(sectionId: 3, index: 8, value: .none, error: nil, identifier: InputDataIdentifier("pro.translation.transcriptionSettings"), data: .init(name: regramString("RG.STTSettings"), color: theme.colors.text, type: .next, viewType: .singleItem, action: {
+            context.bindings.rootNavigation().push(RegramServiceController(context: context, purpose: .transcription))
+        })))
+        rows.append(.desc(sectionId: 3, index: 9, text: .plain(regramString("Settings.Editor.transcriptionSettings.Description")), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
         return InputDataSignalValue(entries: rows)
     }
     let controller = InputDataController(dataSignal: signal, title: regramString("Settings.ProCategory.translation"), removeAfterDisappear: false, hasDone: false, identifier: "regram.translation")

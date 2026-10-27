@@ -36,7 +36,7 @@ public func RegramDiagnosticsController(context: any AccountContextProtocol, foc
         page.row("filter", title: regramString(state.testing ? "Common.Cancel" : "Diagnostics.Filter.Run"), type: state.testing ? .loading : .none, action: {
             if state.testing { cancel(); return }
             let token = benchmark.begin()
-            let rules = settings.filterRules
+            let rules = RegramPreferences.shared.settings(accountId: context.peerId.toInt64()).filterRules
             update { $0.testing = true }
             Queue.concurrentDefaultQueue().async {
                 let result = RGFilterBenchmark.measure(rules: rules, shouldContinue: { benchmark.isActive(token) })

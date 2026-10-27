@@ -57,7 +57,7 @@ public func RegramDNSController(context: any AccountContextProtocol, policy: Reg
         page.text(regramString("NetworkPolicy.IP") + ": " + regramString(policy.ipVersion.titleKey))
         if state.running { page.row("host", title: state.host, enabled: false) }
         else { page.input("host", value: state.host, title: regramString("DNSDiagnostics.Host"), limit: 253) }
-        page.row("start", title: regramString(state.running ? "Common.Cancel" : "DNSDiagnostics.Start"), type: state.running ? .loading : .none, enabled: !state.host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && (policy.dnsMode != .custom || RegramNetworkPolicy.validEndpoint(policy.endpoint)), action: { if state.running { cancel() } else { start() } })
+        page.row("start", title: regramString(state.running ? "Common.Cancel" : "DNSDiagnostics.Start"), type: state.running ? .loading : .none, enabled: !state.host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && (policy.dnsMode != .custom || RegramNetworkPolicy.validEndpoint(policy.endpoint)), action: { if value.with({ $0.running }) { cancel() } else { start() } })
         page.text(regramString("DNSDiagnostics.Notice"))
         if !state.running && !state.results.isEmpty {
             page.section("DNSDiagnostics.PolicyAddresses")

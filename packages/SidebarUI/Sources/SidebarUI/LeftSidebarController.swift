@@ -160,13 +160,13 @@ enum LeftSibarBarEntry : Comparable, Identifiable {
         return lhs.index < rhs.index
     }
     case topOffset
-    case folder(index: Int, selected: Bool, filter: ChatListFilter, unreadCount: Int, hasUnmutedUnread: Bool, hidesUnreadCount: Bool = false)
+    case folder(index: Int, selected: Bool, filter: ChatListFilter, unreadCount: Int, hasUnmutedUnread: Bool, hidesUnreadCount: Bool = false, compact: Bool = false)
 
     var stableId: Int32 {
         switch self {
         case .topOffset:
             return -2
-        case let .folder(_, _, filter, _, _, _):
+        case let .folder(_, _, filter, _, _, _, _):
             return filter.sidebarId
         }
     }
@@ -175,29 +175,29 @@ enum LeftSibarBarEntry : Comparable, Identifiable {
         switch self {
         case .topOffset:
             return -1
-        case let .folder(index, _, _, _, _, _):
+        case let .folder(index, _, _, _, _, _, _):
             return index
         }
     }
 
     fileprivate func item(_ arguments: LeftSidebarArguments, initialSize: NSSize) -> TableRowItem {
         switch self {
-        case let .folder(_, selected, filter, unreadCount, hasUnmutedUnread, hidesUnreadCount):
+        case let .folder(_, selected, filter, unreadCount, hasUnmutedUnread, hidesUnreadCount, compact):
             let badge = RegramFolderBadgePresentation(count: unreadCount, hasUnmutedUnread: hasUnmutedUnread, hidden: hidesUnreadCount)
-            return LeftSidebarFolderItem(initialSize, context: arguments.context, environment: arguments.environment, folder: filter, selected: selected, unreadCount: badge.count, hasUnmutedUnread: badge.hasUnmutedUnread, callback: arguments.callback, menuItems: { filter, _, allMuted in arguments.menuItems(filter, unreadCount, allMuted) })
+            return LeftSidebarFolderItem(initialSize, context: arguments.context, environment: arguments.environment, folder: filter, selected: selected, compact: compact, unreadCount: badge.count, hasUnmutedUnread: badge.hasUnmutedUnread, callback: arguments.callback, menuItems: { filter, _, allMuted in arguments.menuItems(filter, unreadCount, allMuted) })
         case .topOffset:
             return GeneralRowItem(initialSize, height: 30, stableId: stableId, backgroundColor: .clear)
         }
     }
 }
 
-func leftSidebarEntries(_ filterData: SidebarState, _ badges: ChatListFilterBadges, hideUnreadCounts: Bool = false) -> [LeftSibarBarEntry] {
+func leftSidebarEntries(_ filterData: SidebarState, _ badges: ChatListFilterBadges, hideUnreadCounts: Bool = false, compact: Bool = false) -> [LeftSibarBarEntry] {
     return leftSidebarEntries(filterData, badgeForFilter: { filter in
         badges.count(for: filter).map { ($0.count, $0.hasUnmutedUnread) }
-    }, hideUnreadCounts: hideUnreadCounts)
+    }, hideUnreadCounts: hideUnreadCounts, compact: compact)
 }
 
-func leftSidebarEntries(_ filterData: SidebarState, badgeForFilter: (ChatListFilter) -> (count: Int, hasUnmutedUnread: Bool)?, hideUnreadCounts: Bool = false) -> [LeftSibarBarEntry] {
+func leftSidebarEntries(_ filterData: SidebarState, badgeForFilter: (ChatListFilter) -> (count: Int, hasUnmutedUnread: Bool)?, hideUnreadCounts: Bool = false, compact: Bool = false) -> [LeftSibarBarEntry] {
     var index: Int = 1
 
     var entries:[LeftSibarBarEntry] = []
@@ -205,7 +205,7 @@ func leftSidebarEntries(_ filterData: SidebarState, badgeForFilter: (ChatListFil
 
     for filter in filterData.tabs {
         let badge = badgeForFilter(filter)
-        entries.append(.folder(index: index, selected: filter.sidebarId == filterData.selectedFilterId, filter: filter, unreadCount: badge?.count ?? 0, hasUnmutedUnread: badge?.hasUnmutedUnread ?? false, hidesUnreadCount: hideUnreadCounts))
+        entries.append(.folder(index: index, selected: filter.sidebarId == filterData.selectedFilterId, filter: filter, unreadCount: badge?.count ?? 0, hasUnmutedUnread: badge?.hasUnmutedUnread ?? false, hidesUnreadCount: hideUnreadCounts, compact: compact))
         index += 1
     }
 
@@ -275,9 +275,9 @@ public final class LeftSidebarController: SidebarViewController<LeftSidebarView>
         }, for: .Click)
 
 
-        let hiddenCounts = regramPreferenceChanges(accountId: context.peerId.toInt64()) |> map { $0["features.hideFolderUnreadCount"].bool } |> distinctUntilChanged
-        let signal: Signal<TableUpdateTransition, NoError> = combineLatest(queue: prepareQueue, filterData, badges, appearanceSignal, hiddenCounts) |> map { filterData, badges, appearance, hidden in
-            let entries = leftSidebarEntries(filterData, badges, hideUnreadCounts: hidden).map { AppearanceWrapperEntry.init(entry: $0, appearance: appearance) }
+        let folderPresentation = regramPreferenceChanges(accountId: context.peerId.toInt64()) |> map { [$0["features.hideFolderUnreadCount"].bool, $0["compactFolderNames"].bool] } |> distinctUntilChanged
+        let signal: Signal<TableUpdateTransition, NoError> = combineLatest(queue: prepareQueue, filterData, badges, appearanceSignal, folderPresentation) |> map { filterData, badges, appearance, presentation in
+            let entries = leftSidebarEntries(filterData, badges, hideUnreadCounts: presentation[0], compact: presentation[1]).map { AppearanceWrapperEntry.init(entry: $0, appearance: appearance) }
             return prepareTransition(left: previous.swap(entries), right: entries, initialSize: initialSize.with { $0 }, arguments: arguments)
         } |> deliverOnMainQueue
 

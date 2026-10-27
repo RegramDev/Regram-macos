@@ -1196,10 +1196,6 @@ public class ChatListRowItem: TableRowItem {
             }
         }
         
-        if messages.isEmpty, !originalMessages.isEmpty, previewMessages != nil {
-            let text = regramLocalizedString("filters.hiddenPreview", languageCode: appCurrentLanguage.primaryLanguage.languageCode)
-            messageLayout = TextViewLayout(.initialize(string: text, color: theme.colors.grayText, font: .normal(.text)), maximumNumberOfLines: 1)
-        }
         _ = makeSize(initialSize.width, oldWidth: 0)
         
         

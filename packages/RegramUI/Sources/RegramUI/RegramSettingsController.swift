@@ -35,7 +35,7 @@ public func RegramSettingsController(context: any AccountContextProtocol, page: 
     let normalized = RegramSettingsRoute.normalized(page: rawPage, item: rawFocus)
     let route = normalized?.page ?? rawPage
     let focus: String? = normalized == nil ? rawFocus : normalized!.item
-    let disclosures = ["messagesPage": "pro.messages", "inputPage": "pro.input", "networkPage": "pro.network", "translationPage": "pro.translation", "privacyPage": "pro.privacy", "mediaPage": "pro.media", "appearancePage": "pro.appearance", "notificationsPage": "pro.notifications", "toolsPage": "pro.tools", "messageActionsSettings": "settings.messageActions", "chatListSettings": "settings.chatList", "folderSettings": "settings.folders", "translationSettings": "settings.translation", "transcriptionSettings": "stt", "photoSettings": "settings.photos", "stickerSettings": "settings.stickers", "recordingSettings": "settings.recording", "mediaSettings": "settings.media", "appearanceSettings": "settings.appearance", "profileSettings": "settings.profiles", "storiesSettings": "settings.stories", "appSettings": "settings.app", "inputSettings": "settings.input", "transferSettings": "settings.transfer", "privacySettings": "settings.privacy", "bookmarks": "bookmarks", "inlineBotRules": "inlineBots", "groupProfileSettings": "groupProfile", "summarySettings": "summary", "networkPolicy": "networkPolicy", "llmTranslationSettings": "llm", "bottomBarLayout": "bottomBar", "contextMenuOrder": "contextMenu", "linkPreviewSettings": "linkPreview", "appUpdate": "updates", "antiFeatures": "antiFeatures", "ghostMode": "ghostMode", "messageFilter": "messageFilter", "hiddenUsers": "hiddenUsers", "antiRevokeChats": "antiRevokeChats", "fonts": "fonts", "backup": "backup", "chatPreferences": "chatPreferences", "revokedMessages": "revokedMessages", "diagnostics": "diagnostics", "localGifts": "localGifts"]
+    let disclosures = ["messagesPage": "pro.messages", "inputPage": "pro.input", "networkPage": "pro.network", "translationPage": "pro.translation", "privacyPage": "pro.privacy", "mediaPage": "pro.media", "appearancePage": "pro.appearance", "notificationsPage": "pro.notifications", "toolsPage": "pro.tools", "messageActionsSettings": "settings.messageActions", "chatListSettings": "settings.chatList", "folderSettings": "settings.folders", "translationSettings": "settings.translation", "transcriptionSettings": "stt", "photoSettings": "settings.photos", "stickerSettings": "settings.stickers", "recordingSettings": "settings.recording", "mediaSettings": "settings.media", "appearanceSettings": "settings.appearance", "profileSettings": "settings.profiles", "storiesSettings": "settings.stories", "appSettings": "settings.app", "inputSettings": "settings.input", "transferSettings": "settings.transfer", "privacySettings": "settings.privacy", "bookmarks": "bookmarks", "inlineBotRules": "inlineBots", "groupProfileSettings": "groupProfile", "networkPolicy": "networkPolicy", "llmTranslationSettings": "llm", "bottomBarLayout": "bottomBar", "contextMenuOrder": "contextMenu", "linkPreviewSettings": "linkPreview", "appUpdate": "updates", "antiFeatures": "antiFeatures", "ghostMode": "ghostMode", "messageFilter": "messageFilter", "hiddenUsers": "hiddenUsers", "antiRevokeChats": "antiRevokeChats", "fonts": "fonts", "backup": "backup", "chatPreferences": "chatPreferences", "revokedMessages": "revokedMessages", "diagnostics": "diagnostics", "localGifts": "localGifts"]
     if route.hasPrefix("pro.") || route.hasPrefix("settings."), let focus, let target = disclosures[focus] {
         return RegramSettingsController(context: context, page: target)
     }
@@ -48,7 +48,6 @@ public func RegramSettingsController(context: any AccountContextProtocol, page: 
     }
     switch route {
     case "llm": return RegramServiceController(context: context, purpose: .translation, focusSetting: focus)
-    case "summary": return RegramServiceController(context: context, purpose: .summary, focusSetting: focus)
     case "stt": return RegramServiceController(context: context, purpose: .transcription, focusSetting: focus)
     case "inlineBots", "inlineRules":
         let controller = RegramInlineRulesController(context: context)
@@ -75,6 +74,7 @@ public func RegramSettingsController(context: any AccountContextProtocol, page: 
     case "revokedMessages": return RegramRetainedMessagesController(context: context, focusSetting: focus)
     case "chatPreferences": return RegramChatPreferencesController(context: context, focusSetting: focus)
     case "bookmarks": return RegramBookmarksController(context: context)
+    case "updates": return RegramUIHooks.shared.makeUpdateController() ?? regramSettingsHomeController(context: context)
     case "recent": return RegramRecentChatsController(context: context)
     case "backup": return RegramSettingsBackupController(context: context, focusSetting: focus)
     case "localGifts": return RegramShowroomController(context: context, focusSetting: focus)
@@ -86,43 +86,54 @@ public func RegramSettingsController(context: any AccountContextProtocol, page: 
 }
 
 private func regramSettingsHomeController(context: any AccountContextProtocol) -> InputDataController {
-    let state = Atomic(value: RegramHomeState())
+    let queryValue = Atomic(value: "")
     let promise = ValuePromise(RegramHomeState(), ignoreRepeated: true)
     let signal = combineLatest(promise.get(), appearanceSignal) |> map { state, _ -> InputDataSignalValue in
         var builder = RegramPageBuilder(page: "pro.home")
         builder.section()
-        builder.input("search", value: state.query, title: "", placeholder: strings().searchFieldSearch, limit: 128, icon: NSImage(named: NSImage.touchBarSearchTemplateName)?.precomposed(theme.colors.grayText))
+        builder.search("search", value: state.query, update: { query in
+            _ = queryValue.swap(query)
+            promise.set(RegramHomeState(query: query))
+        })
         let query = state.query.trimmingCharacters(in: .whitespacesAndNewlines)
         if query.isEmpty {
             let groups: [[RegramCategory]] = [[.messages, .input, .translation], [.privacy, .media, .appearance, .notifications], [.network, .tools]]
             for group in groups {
                 builder.section()
                 for category in group where category != .notifications || RegramSettingsScope.includesNotifications {
-                    builder.row("category." + category.rawValue, title: regramString("Settings.ProCategory." + category.rawValue), type: .next, icon: RegramSettingsArtwork.category(category), description: regramString("Settings.ProCategory." + category.rawValue + ".Description"), action: { context.bindings.rootNavigation().push(RegramSettingsController(context: context, page: "pro." + category.rawValue)) })
+                    builder.row("category." + category.rawValue, title: regramString("Settings.ProCategory." + category.rawValue), type: .next, icon: RegramSettingsArtwork.category(category), action: { context.bindings.rootNavigation().push(RegramSettingsController(context: context, page: "pro." + category.rawValue)) })
                 }
             }
             builder.section()
-            builder.row("localGifts", title: regramString("Showroom.Title"), type: .next, icon: RegramSettingsArtwork.editor("star.fill", color: NSColor(rgb: 0xff9500)), description: regramString("Showroom.Description"), action: { context.bindings.rootNavigation().push(RegramSettingsController(context: context, page: "localGifts")) })
+            builder.row("localGifts", title: regramString("Showroom.Title"), type: .next, icon: theme.icons.settingsPremium, action: { context.bindings.rootNavigation().push(RegramSettingsController(context: context, page: "localGifts")) })
         } else {
-            builder.section()
             let results = RegramSettingsCatalog.results(query: query, language: appCurrentLanguage.primaryLanguage.languageCode)
+            let grouped = Dictionary(grouping: results, by: { $0.page == "pro.home" ? "Settings.Pro.Title" : $0.pageTitleKey })
+            var seen = Set<String>()
             for result in results {
-                builder.row("result." + result.sourceIdentifier, title: regramString(result.titleKey), type: .nextContext(regramString(result.pageTitleKey)), action: {
-                    if result.destination == "settings.appearance/appIcon" {
-                        RegramUIHooks.shared.openNativeSettings(context, "appIcon")
-                    } else {
-                        context.bindings.rootNavigation().push(RegramSettingsController(context: context, page: result.destination))
-                    }
-                })
+                let group = result.page == "pro.home" ? "Settings.Pro.Title" : result.pageTitleKey
+                guard seen.insert(group).inserted else { continue }
+                builder.section(group)
+                for result in grouped[group] ?? [] {
+                    builder.row("result." + result.sourceIdentifier, title: regramString(result.titleKey), type: .next, action: {
+                        if result.destination == "settings.appearance/appIcon" {
+                            RegramUIHooks.shared.openNativeSettings(context, "appIcon")
+                        } else {
+                            context.bindings.rootNavigation().push(RegramSettingsController(context: context, page: result.destination))
+                        }
+                    })
+                }
             }
-            if results.isEmpty { builder.text(regramString("Settings.Search.NoResults")) }
+            if results.isEmpty {
+                builder.section()
+                builder.custom("empty", equatable: InputDataEquatable(query), item: { size, stableId in SearchEmptyRowItem(size, stableId: stableId, height: 180, text: regramString("Settings.Search.NoResults")) })
+            }
         }
         return InputDataSignalValue(entries: builder.entries)
     }
-    return InputDataController(dataSignal: signal, title: "Regram Pro", updateDatas: { data in
-        if let query = data[InputDataIdentifier("pro.home.search")]?.stringValue { promise.set(state.modify { _ in RegramHomeState(query: query) }) }
-        return .fail(.none)
-    }, removeAfterDisappear: false, hasDone: false, identifier: "regram.pro.home")
+    let controller = InputDataController(dataSignal: signal, title: "Regram Pro", removeAfterDisappear: false, hasDone: false, identifier: "regram.pro.home")
+    regramRestoreSearchQuery(controller, identifier: InputDataIdentifier("pro.home.search"), query: { queryValue.with { $0 } })
+    return controller
 }
 
 private func regramComposedSettingsController(context: any AccountContextProtocol, category: RegramCategory, focus: String?) -> InputDataController {
@@ -158,6 +169,7 @@ private func regramComposedSettingsController(context: any AccountContextProtoco
             page.text(regramString("Common.KnowWhatYouDo"))
         case .tools:
             page.section("Settings.ProCategory.tools")
+            page.row("appUpdate", title: regramString("AppUpdate.Title"), type: .next, action: { push("updates") })
             page.row("backup", title: regramString("Backup.Title"), type: .next, action: { push("backup") })
             page.row("eraseAllData", title: regramString("EraseData.Title"), color: theme.colors.redUI, action: {
                 verifyAlert(for: context.window, header: regramString("EraseData.Title"), information: regramString("EraseData.Confirm"), successHandler: { _ in RegramUIHooks.shared.eraseAllData(context) })

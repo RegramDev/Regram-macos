@@ -5,7 +5,7 @@ public struct RegramContextMenuConfiguration {
         .favoriteSticker, .saveNotificationSound, .reply, .sendGift,
         .repeatForward, .repeatCopy, .sendScheduledNow, .editScheduledTime,
         .copy, .translate, .saveMedia, .messageReplies, .edit, .editHistory,
-        .bookmark, .summarize, .messageScreenshot, .unvotePoll, .addTodoTask, .unpin, .pin, .stopPoll,
+        .bookmark, .unvotePoll, .addTodoTask, .unpin, .pin, .stopPoll,
         .copyLink, .saveGif, .viewStickerPack, .saveToCloud, .forward,
         .forwardNoQuote, .report, .viewStats, .factCheck, .select, .selectFromUser, .delete, .json, .addFilter
     ]

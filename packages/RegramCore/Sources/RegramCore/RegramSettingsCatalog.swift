@@ -2,7 +2,7 @@ import Foundation
 
 public enum RegramSettingsScope {
     public static let includesNotifications = false
-    public static let includesUpdates = false
+    public static let includesUpdates = true
 }
 
 public struct RegramSettingsSearchQuery {
@@ -44,10 +44,10 @@ public struct RegramSettingsCatalogEntry {
     public var pageTitleKey: String {
         if page.hasPrefix("pro.") { return "Settings.ProCategory." + page.dropFirst(4) }
         if page.hasPrefix("settings.") { return "Settings.ProCategory." + category.rawValue }
-        return ["inlineBots": "features.InlineBots.Title", "groupProfile": "features.GroupProfileSettings", "startupFolder": "features.ChatListStartupFolder", "summary": "Summary.Title", "networkPolicy": "NetworkPolicy.Title", "bottomBar": "RG.BottomBarLayout", "llm": "LLMTranslation.Title", "stt": "RG.STTSettings", "updates": "AppUpdate.Title", "linkPreview": "LinkPreview.Repair", "antiFeatures": "AntiFeatures.Header", "revokedMarker": "RevokedMarker.Title", "ghostMode": "Ghost.Header", "fonts": "Fonts.Title", "backup": "Backup.Title", "diagnostics": "Diagnostics.Title", "datacenters": "Diagnostics.DC.Title", "bookmarks": "Bookmarks.Title", "chatPreferences": "ChatPreferences.Title", "localGifts": "Showroom.Title"][page] ?? "Settings.Pro.Title"
+        return ["inlineBots": "features.InlineBots.Title", "groupProfile": "features.GroupProfileSettings", "startupFolder": "features.ChatListStartupFolder", "networkPolicy": "NetworkPolicy.Title", "bottomBar": "RG.BottomBarLayout", "llm": "LLMTranslation.Title", "stt": "RG.STTSettings", "updates": "AppUpdate.Title", "linkPreview": "LinkPreview.Repair", "antiFeatures": "AntiFeatures.Header", "revokedMarker": "RevokedMarker.Title", "ghostMode": "Ghost.Header", "fonts": "Fonts.Title", "backup": "Backup.Title", "diagnostics": "Diagnostics.Title", "datacenters": "Diagnostics.DC.Title", "bookmarks": "Bookmarks.Title", "chatPreferences": "ChatPreferences.Title", "localGifts": "Showroom.Title"][page] ?? "Settings.Pro.Title"
     }
     public func alternate(language: String) -> [String] {
-        let pageContext = ["summary": "LLM OpenAI Anthropic AI summary summarize 大模型 总结 摘要 總結", "llm": "LLM OpenAI Anthropic 大模型", "stt": "STT ASR OpenAI Whisper 自定义识别 自訂辨識"]
+        let pageContext = ["llm": "LLM OpenAI Anthropic 大模型", "stt": "STT ASR OpenAI Whisper 自定义识别 自訂辨識"]
         let aliases = (RegramSettingsCatalog.aliases[key] ?? []) + [pageContext[page] ?? ""]
         return ["Regram Pro", title(language: language), title(language: "en"), regramLocalizedString(pageTitleKey, languageCode: language), regramLocalizedString(pageTitleKey, languageCode: "en"), keywords, key] + aliases.map { $0.contains(".") ? regramLocalizedString($0, languageCode: language) : $0 }
     }
@@ -58,7 +58,7 @@ public enum RegramSettingsCatalog {
     public static func category(for page: String) -> RegramCategory {
         if page.hasPrefix("pro."), let value = RegramCategory(rawValue: String(page.dropFirst(4))) { return value }
         let value = page.hasPrefix("settings.") ? String(page.dropFirst(9)) : page
-        if ["messageActions", "chatList", "folders", "summary", "bookmarks", "startupFolder"].contains(value) { return .messages }
+        if ["messageActions", "chatList", "folders", "bookmarks", "startupFolder"].contains(value) { return .messages }
         if ["input", "inlineBots"].contains(value) { return .input }
         if ["translation", "llm", "stt"].contains(value) { return .translation }
         if ["privacy", "stories", "app", "antiFeatures", "revokedMarker", "ghostMode", "hiddenUsers", "antiRevokeChats", "revokedMessages"].contains(value) { return .privacy }
@@ -80,7 +80,6 @@ public enum RegramSettingsCatalog {
         .init("inlineBots", "enabled", "features.AutoInlineBot.Enabled", keywords: "inline bot 自动查询 机器人"),
         .init("settings.messageActions", "inlineBotRules", "features.InlineBots.Title", keywords: "bot Twitter Pixiv Music163 rules 机器人 規則 规则"),
         .init("settings.folders", "showFoldersInShareSheet", "features.ShowFoldersInShareSheet"),
-        .init("settings.messageActions", "tapMessageRowToOpenContextMenu", "features.TapMessageRowToOpenContextMenu"),
         .init("settings.messageActions", "confirmUnpin", "features.ConfirmUnpin"),
         .init("settings.chatList", "hideSavedAndArchivedMessagesInList", "features.HideSavedAndArchivedMessagesInList"),
         .init("settings.chatList", "hidePrivateChatActivities", "features.HidePrivateChatActivities", keywords: "隐藏私聊活动状态 隱藏私聊活動狀態 incoming typing recording 对方 正在输入 錄音"),
@@ -93,7 +92,6 @@ public enum RegramSettingsCatalog {
         .init("settings.stories", "disableChatAvatarStories", "features.DisableChatAvatarStories"),
         .init("settings.chatList", "keepNewChatsVisibleAtTop", "features.KeepNewChatsVisibleAtTop"),
         .init("settings.chatList", "chatListSwipeAction", "features.ChatListSwipeAction"),
-        .init("settings.folders", "chatListFolderTabDisplayMode", "features.ChatListFolderTabDisplayMode"),
         .init("settings.chatList", "communityAvatarTapAction", "features.CommunityAvatarTapAction"),
         .init("settings.profiles", "groupProfileSettings", "features.GroupProfileSettings"),
         .init("settings.folders", "startupFolder", "features.ChatListStartupFolder", keywords: "remember last specific folder 记住上次分组 指定分组 記住上次分組 指定分組"),
@@ -114,15 +112,14 @@ public enum RegramSettingsCatalog {
         .init("groupProfile", "community", "features.GroupProfileSettings.Item.community"),
         .init("groupProfile", "deleteGroup", "features.GroupProfileSettings.Item.deleteGroup"),
         .init("groupProfile", "other", "features.GroupProfileSettings.Item.other"),
+        .init("settings.appearance", "folderTags", "Settings.FolderTags", keywords: "folder tags 标签视图 標籤視圖"),
         .init("settings.appearance", "nyStyleSnow", "Settings.NY.Style.snow"),
         .init("settings.appearance", "nyStyleLightning", "Settings.NY.Style.lightning"),
         .init("settings.appearance", "nyStyle", "Settings.NY.Style"),
-        .init("settings.app", "contentSettings", "Settings.ContentSettings"),
         .init("settings.appearance", "bottomBarLayout", "Settings.Tabs.Customize"),
         .init("settings.folders", "foldersAtBottom", "Settings.Folders.BottomTab"),
         .init("settings.folders", "allChatsHidden", "Settings.Folders.AllChatsHidden"),
         .init("settings.folders", "compactFolderNames", "Settings.Folders.CompactNames"),
-        .init("settings.folders", "allChatsTitleLengthOverride", "Settings.Folders.AllChatsTitle"),
         .init("settings.folders", "chooseFolderAfterJoining", "JoinFolder.Setting"),
         .init("settings.chatList", "compactChatList", "Settings.CompactChatList"),
         .init("settings.chatList", "chatListLines", "Settings.ChatList.Lines"),
@@ -155,9 +152,8 @@ public enum RegramSettingsCatalog {
         .init("settings.app", "hideChannelBottomButton", "Settings.showChannelBottomButton"),
         .init("settings.appearance", "wideChannelPosts", "Settings.wideChannelPosts"),
         .init("settings.messageActions", "secondsInMessages", "Settings.secondsInMessages"),
-        .init("settings.messageActions", "messageDoubleTapAction", "DoubleTap.Action", keywords: "reaction reply repeat translate edit 回应 回复 复读 翻译 编辑 回應 回覆 複讀 編輯"),
-        .init("settings.messageActions", "messageDoubleTapActionWithoutEditPermission", "DoubleTap.WithoutEditPermission", keywords: "reaction reply repeat translate edit 回应 回复 复读 翻译 编辑 回應 回覆 複讀 編輯"),
         .init("settings.messageActions", "showMessageId", "Settings.ShowMessageId"),
+        .init("settings.messageActions", "messageBookmarksEnabled", "Bookmarks.Title", keywords: "message bookmarks bookmark tags labels enable toggle 书签 标签 开关 启用 書籤 標籤 開關 啟用"),
         .init("settings.messageActions", "automaticallyRevealSpoilers", "Settings.AutomaticallyRevealSpoilers", keywords: "spoiler 剧透 劇透 reveal"),
         .init("settings.messageActions", "showForwardedMessageDate", "Settings.ShowForwardedMessageDate"),
         .init("settings.messageActions", "hideRecordingButton", "Settings.RecordingButton"),
@@ -233,7 +229,6 @@ public enum RegramSettingsCatalog {
         .init("ghostMode", "ghostDontReadStories", "Ghost.DontReadStories"),
         .init("ghostMode", "ghostDontSendOnline", "Ghost.DontSendOnline"),
         .init("ghostMode", "ghostDontSendTyping", "Ghost.DontSendTyping"),
-        .init("pro.messages", "summarySettings", "Summary.Title", keywords: "AI summary summarize 总结 摘要 總結"),
         .init("pro.network", "networkPolicy", "NetworkPolicy.Title", keywords: "DNS DoH IP IPv4 IPv6"),
         .init("networkPolicy", "enabled", "NetworkPolicy.DNSMode", keywords: "DoH DNS 系统 内置 Google Cloudflare IPv4 IPv6"),
         .init("networkPolicy", "endpoint", "NetworkPolicy.Endpoint"),
@@ -241,19 +236,8 @@ public enum RegramSettingsCatalog {
         .init("networkPolicy", "disableBackup", "NetworkPolicy.DisableBackup"),
         .init("networkPolicy", "test", "DNSDiagnostics.Title"),
         .init("networkPolicy", "apply", "NetworkPolicy.Apply"),
-        .init("summary", "enabled", "Summary.Enabled"),
-        .init("summary", "format", "LLMTranslation.Format"),
-        .init("summary", "baseURL", "LLMTranslation.BaseURL"),
-        .init("summary", "endpoint", "LLMTranslation.Endpoint"),
-        .init("summary", "apiKey", "LLMTranslation.APIKey"),
-        .init("summary", "model", "LLMTranslation.Model"),
-        .init("summary", "fetchModels", "LLMTranslation.FetchModels"),
-        .init("summary", "testModel", "LLMTranslation.TestModel"),
-        .init("summary", "prompt", "LLMTranslation.Prompt"),
-        .init("summary", "temperature", "LLMTranslation.Temperature"),
         .init("llm", "format", "LLMTranslation.Format"),
         .init("llm", "baseURL", "LLMTranslation.BaseURL"),
-        .init("llm", "endpoint", "LLMTranslation.Endpoint"),
         .init("llm", "apiKey", "LLMTranslation.APIKey"),
         .init("llm", "model", "LLMTranslation.Model"),
         .init("llm", "fetchModels", "LLMTranslation.FetchModels"),
@@ -271,12 +255,9 @@ public enum RegramSettingsCatalog {
         .init("stt", "test", "RG.STTTest"),
         .init("updates", "check", "AppUpdate.Check"),
         .init("updates", "github", "AppUpdate.OpenGitHub"),
-        .init("updates", "installationMethod", "AppUpdate.InstallationMethod"),
-        .init("updates", "liveActivity", "AppUpdate.LiveActivity", keywords: "ActivityKit 灵动岛 靈動島 实时活动 即時動態"),
         .init("updates", "automaticCheck", "AppUpdate.AutomaticCheck"),
         .init("updates", "automaticDownload", "AppUpdate.AutomaticDownload"),
-        .init("updates", "automaticExit", "AppUpdate.AutomaticExit"),
-        .init("updates", "certificate", "AppUpdate.ImportSigningMaterials", keywords: "certificate p12 mobileprovision 证书 描述文件 憑證 描述檔"),
+        .init("updates", "installOnQuit", "AppUpdate.InstallOnQuit"),
         .init("updates", "install", "AppUpdate.Install"),
         .init("bottomBar", "visibility", "RG.BottomBarLayout.Visibility", keywords: "bottom tabs contacts calls 底栏 联系人 通话 底欄 聯絡人 通話"),
         .init("bottomBar", "width", "RG.BottomBarLayout.Width"),
