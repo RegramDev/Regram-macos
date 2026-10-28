@@ -9,7 +9,7 @@ package dependencies, so once the submodules are checked out the build is offlin
 
 ## Install a release build
 
-Download Regram 13.1.0 (283381) for [Apple Silicon](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283381/Regram-13.1.0-283381-arm64.dmg) or [Intel](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283381/Regram-13.1.0-283381-x86_64.dmg). This release requires macOS 12.0 or later. Verify the download against [SHA256SUMS.txt](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283381/SHA256SUMS.txt).
+Download Regram 13.1.0 (283382) for [Apple Silicon](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283382/Regram-13.1.0-283382-arm64.dmg) or [Intel](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283382/Regram-13.1.0-283382-x86_64.dmg). This release requires macOS 12.0 or later. Verify the download against [SHA256SUMS.txt](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283382/SHA256SUMS.txt).
 
 This release is signed with an Apple/Mac Development certificate and has not been notarized by Apple. Open the downloaded DMG, drag Regram to Applications, and launch it from that folder.
 
@@ -174,7 +174,7 @@ xcodebuild -workspace Telegram-Mac.xcworkspace -scheme Release -configuration Re
   'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) STABLE' build
 ```
 
-The v13.1.0-283381 release targets macOS 12.0 or later. Swift packages are resolved
+The v13.1.0-283382 release targets macOS 12.0 or later. Swift packages are resolved
 from the local paths in the workspace; no network access is needed.
 
 ### Separate Apple Silicon and Intel packages

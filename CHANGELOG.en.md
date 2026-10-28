@@ -2,6 +2,16 @@
 
 [简体中文](CHANGELOG.md) · **English**
 
+## 13.1.0 (283382) — 2026-10-28
+
+- Merge nine upstream fixes through `78be930d`.
+- Allow Save As for undownloaded files, audio, images, and shared media, preserving Regram save-menu settings and original-image copying.
+- Fix duplicated or missing rows after drag-and-drop, including folder and Saved Messages dialog ordering.
+- Correct avatar-menu mention ranges and channel-author handling, preserving nickname mentions and author-message navigation.
+- Keep the current reply when sending an Article and clear the reply state after sending.
+- Correct forum message-link positioning, Saved Messages dialog pinning, and multiline draft previews in the chat list.
+- Use a neutral AI translation tone by default and open video chat and livestream invite links in the call interface.
+
 ## 13.1.0 (283381) — 2026-10-28
 
 - Fix partially sharp, partially blurred progressive image previews.
