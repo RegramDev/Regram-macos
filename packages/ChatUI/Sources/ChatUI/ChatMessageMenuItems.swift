@@ -341,6 +341,53 @@ private func copyRichTextMessage(_ message: Message, text: String, page: Instant
 }
 
 
+public func messageFileSaveMenuItem(file: TelegramMediaFile, context: any AccountContextProtocol, message: Message, title: String, keyEquivalent: ContextMenuItem.KeyEquiavalent = .none) -> ContextMenuItem {
+    if isHLSVideo(file: file), let quality = HLSQualitySet(baseFile: .message(message: MessageReference(message), media: file)) {
+        let download = ContextMenuItem(strings().galleryContextSaveVideo, itemImage: MenuAnimation.menu_save_as.value)
+        let downloadMenu = ContextMenu()
+        let downloadOrShow: (TelegramMediaFile) -> Void = { file in
+            let status = chatMessageFileStatus(context: context, message: message, file: file)
+            |> take(1)
+            |> deliverOnMainQueue
+
+            _ = status.startStandalone(next: { status in
+                let text: String
+                if status == .Local {
+                    text = strings().galleryContextAlertDownloaded
+                } else {
+                    _ = messageMediaFileInteractiveFetched(context: context, messageId: message.id, messageReference: MessageReference(message), file: file, userInitiated: true).startStandalone()
+                    text = strings().galleryContextAlertDownloading
+                }
+                showModalText(for: context.window, text: text, callback: { _ in
+                    if status == .Local {
+                        showInFinder(file, account: context.account)
+                    } else {
+                        ChatHistoryUIHooks.shared.makeDownloadSearch(context)
+                    }
+                })
+            })
+        }
+        if context.isPremium, let size = file.size {
+            downloadMenu.addItem(ContextMenuItem(strings().galleryContextOriginal + " (\(String.prettySized(with: size)))", handler: {
+                downloadOrShow(file)
+            }))
+        }
+        for (key, value) in quality.qualityFiles.sorted(by: { $0.key < $1.key }) {
+            let quality = "\(ChatNavigationHooks.shared.roundToStandardQuality(key))p"
+            if let size = value.media.size {
+                downloadMenu.addItem(ContextMenuItem(quality + " (\(String.prettySized(with: size)))", handler: {
+                    downloadOrShow(value.media)
+                }))
+            }
+        }
+        download.submenu = downloadMenu
+        return download
+    }
+    return ContextMenuItem(title, handler: {
+        saveAs(file, context: context, message: message)
+    }, itemImage: MenuAnimation.menu_save_as.value, keyEquivalent: keyEquivalent)
+}
+
 public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLayout: (TextViewLayout?, LinkType?)?, chatInteraction: ChatInteraction, useGroupIfNeeded: Bool = true, fromAdPromo: Bool = false, source: ChatMenuItemSource = .general) -> Signal<[ContextMenuItem], NoError> {
     
     if chatInteraction.interactionContext.isFrozen {
@@ -1405,91 +1452,40 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                                 }, completed: {
                                     showModalText(for: context.window, text: strings().chatContextSaveRingtoneRemoveSuccess)
                                 })
-                                
+
                             }, itemImage: MenuAnimation.menu_note_slash.value).regramAction(.saveNotificationSound))
                         }
                     }
-                    if !data.isMediaStory, data.message.pendingProcessingAttribute == nil {
-                        
-                        if isHLSVideo(file: file), let quality = HLSQualitySet(baseFile: FileMediaReference.message(message: .init(message), media: file)) {
-                            
-                            let download = ContextMenuItem(strings().galleryContextSaveVideo, itemImage: MenuAnimation.menu_save_as.value).regramAction(.saveMedia)
-                            let downloadMenu = ContextMenu()
+                }
 
-                            let downloadOrShow:(TelegramMediaFile)->Void = { file in
-                                
-                                let status = chatMessageFileStatus(context: context, message: message, file: file)
-                                |> take(1)
-                                |> deliverOnMainQueue
-                                
-                                _ = status.startStandalone(next: { status in
-                                    let text: String
-                                    if status == .Local {
-                                        text = strings().galleryContextAlertDownloaded
-                                    } else {
-                                        _ = messageMediaFileInteractiveFetched(context: context, messageId: message.id, messageReference: .init(message), file: file, userInitiated: true).startStandalone()
-                                        text = strings().galleryContextAlertDownloading
-                                    }
-                                    showModalText(for: context.window, text: text, callback: { _ in
-                                        if status == .Local {
-                                            showInFinder(file, account: context.account)
-                                        } else {
-                                            ChatHistoryUIHooks.shared.makeDownloadSearch(context)
-                                        }
-                                    })
-                                })
-                            }
-                            if context.isPremium {
-                                if let size = file.size {
-                                    downloadMenu.addItem(ContextMenuItem(strings().galleryContextOriginal + " (\(String.prettySized(with: size)))", handler: {
-                                        downloadOrShow(file)
-                                    }))
-                                }
-                            }
-                            let sorted = quality.qualityFiles.sorted(by: { $0.key < $1.key })
-                            for (key, value) in sorted {
-                                let q = "\(ChatNavigationHooks.shared.roundToStandardQuality(key))p"
-                                if let size = value.media.size {
-                                    downloadMenu.addItem(ContextMenuItem(q + " (\(String.prettySized(with: size)))", handler: {
-                                        downloadOrShow(value.media)
-                                    }))
-                                }
-                            }
-                            download.submenu = downloadMenu
-                            thirdBlock.append(download)
-                        } else {
-                            thirdBlock.append(ContextMenuItem(strings().chatContextSaveMedia, handler: {
-                                saveAs(file, account: account)
-                            }, itemImage: MenuAnimation.menu_save_as.value, keyEquivalent: .cmds).regramAction(.saveMedia))
-                            thirdBlock.append(ContextMenuItem(regramLocalizedString("ios.Native.SaveToFiles", languageCode: appCurrentLanguage.primaryLanguage.languageCode), handler: {
-                                saveAs(file, account: account)
-                            }, itemImage: MenuAnimation.menu_save_as.value).regramAction(.saveToFiles))
-                            if file.isSticker {
-                                thirdBlock.append(ContextMenuItem(regramLocalizedString("ios.Native.SaveSticker", languageCode: appCurrentLanguage.primaryLanguage.languageCode), handler: {
-                                    saveAs(file, account: account)
-                                }, itemImage: MenuAnimation.menu_save_as.value).regramAction(.saveStickerToCameraRoll))
-                            }
+                if !data.isMediaStory, data.message.pendingProcessingAttribute == nil {
+                    let saveMediaItem = messageFileSaveMenuItem(file: file, context: context, message: message, title: strings().chatContextSaveMedia, keyEquivalent: .cmds)
+                    thirdBlock.append(saveMediaItem.regramAction(.saveMedia))
+                    if saveMediaItem.submenu == nil {
+                        thirdBlock.append(ContextMenuItem(regramLocalizedString("ios.Native.SaveToFiles", languageCode: appCurrentLanguage.primaryLanguage.languageCode), handler: {
+                            saveAs(file, context: context, message: message)
+                        }, itemImage: MenuAnimation.menu_save_as.value).regramAction(.saveToFiles))
+                        if file.isSticker {
+                            thirdBlock.append(ContextMenuItem(regramLocalizedString("ios.Native.SaveSticker", languageCode: appCurrentLanguage.primaryLanguage.languageCode), handler: {
+                                saveAs(file, context: context, message: message)
+                            }, itemImage: MenuAnimation.menu_save_as.value).regramAction(.saveStickerToCameraRoll))
                         }
-                       
-                    }
-                    
-                    if data.fileFinderPath != nil {
                     }
                 }
-               
-            } else if data.image != nil, !data.isMediaStory {
-                if resourceData.complete {
+
+            } else if let image = data.image, !data.isMediaStory {
+                if let resourceData = data.resourceData, resourceData.complete {
                     let text = strings().chatContextCopyMedia
                     thirdBlock.append(ContextMenuItem(text, handler: {
                         copyImageToPasteboard(path: resourceData.path, message: data.message, interaction: chatInteraction)
                     }, itemImage: MenuAnimation.menu_copy_media.value, keyEquivalent: .cmdc).regramAction(.copy))
-                    thirdBlock.append(ContextMenuItem(strings().chatContextSaveMedia, handler: {
-                        savePanel(file: resourceData.path, ext: "jpg", for: context.window)
-                    }, itemImage: MenuAnimation.menu_save_as.value, keyEquivalent: .cmds).regramAction(.saveMedia))
-                    thirdBlock.append(ContextMenuItem(regramLocalizedString("ios.Native.SaveToFiles", languageCode: appCurrentLanguage.primaryLanguage.languageCode), handler: {
-                        savePanel(file: resourceData.path, ext: "jpg", for: context.window)
-                    }, itemImage: MenuAnimation.menu_save_as.value).regramAction(.saveToFiles))
                 }
+                thirdBlock.append(ContextMenuItem(strings().chatContextSaveMedia, handler: {
+                    saveImageAs(image, context: context, message: message)
+                }, itemImage: MenuAnimation.menu_save_as.value, keyEquivalent: .cmds).regramAction(.saveMedia))
+                thirdBlock.append(ContextMenuItem(regramLocalizedString("ios.Native.SaveToFiles", languageCode: appCurrentLanguage.primaryLanguage.languageCode), handler: {
+                    saveImageAs(image, context: context, message: message)
+                }, itemImage: MenuAnimation.menu_save_as.value).regramAction(.saveToFiles))
             }
         }
         

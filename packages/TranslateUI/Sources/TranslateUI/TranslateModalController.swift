@@ -863,7 +863,7 @@ private func entries(_ state: State, arguments: Arguments) -> [InputDataEntry] {
                 toneMenu: nil
             )
         } else if isTranslateMode {
-            let isDefaultTone = state.toneId == (tones.first?.id ?? "neutral")
+            let isDefaultTone = state.toneId == "neutral"
             let languageWithTone: String
             if !isDefaultTone {
                 languageWithTone = "\(toName) (\(toneName))"
@@ -878,7 +878,10 @@ private func entries(_ state: State, arguments: Arguments) -> [InputDataEntry] {
 
                     let toneItem = ContextMenuItem(strings().translateTone, handler: {}, itemImage: MenuAnimation.menu_tune_fork.value)
                     let toneSubmenu = ContextMenu()
-                    for tone in tones {
+                    toneSubmenu.addItem(ContextMenuItem(strings().chatHeaderToneNeutral, handler: {
+                        arguments.updateTone("neutral")
+                    }, state: isDefaultTone ? .on : nil))
+                    for tone in tones where tone.id != "neutral" {
                         toneSubmenu.addItem(ContextMenuItem(tone.title, handler: {
                             arguments.updateTone(tone.id)
                         }, state: state.toneId == tone.id ? .on : nil))
@@ -1082,10 +1085,8 @@ public func TranslateModalController(context: any AccountContextProtocol, from: 
     var configurationIdentity = RegramPreferences.shared.settings(accountId: accountId).translationIdentity
 
     let configTones = translationStyles(from: context)
-    let defaultToneId = configTones.first?.id ?? "neutral"
     var initialState = State(text: text, textEntities: entities, from: from, to: Translate.normalizeLanguageCode(toLang), fromIsRevealed: !canBreak, toIsRevealed: true)
     initialState.tones = configTones
-    initialState.toneId = defaultToneId
     initialState.mode = isInputMode ? .style : .translate
     initialState.styleId = ""
     if isInputMode {
@@ -1258,7 +1259,7 @@ public func TranslateModalController(context: any AccountContextProtocol, from: 
                         changeStyle = .standard(state.styleId)
                     }
                 }
-            } else if state.mode == .translate {
+            } else if state.mode == .translate && state.toneId != "neutral" {
                 changeStyle = .standard(state.toneId)
             }
             let emojify = state.mode == .fix ? false : state.emojify
@@ -1305,7 +1306,7 @@ public func TranslateModalController(context: any AccountContextProtocol, from: 
                 } else {
                     changeStyle = .standard(state.styleId)
                 }
-            } else if state.mode == .translate {
+            } else if state.mode == .translate && state.toneId != "neutral" {
                 changeStyle = .standard(state.toneId)
             } else {
                 changeStyle = nil
