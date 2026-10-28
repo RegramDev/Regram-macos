@@ -9,7 +9,7 @@ public struct RegramSettingsRoute: Equatable {
         "pro.home", "pro.messages", "pro.input", "pro.privacy", "pro.translation", "pro.media", "pro.appearance", "pro.notifications", "pro.network", "pro.tools",
         "settings.appearance", "settings.folders", "settings.chatList", "settings.profiles", "settings.stories", "settings.translation", "settings.messageActions", "settings.media", "settings.photos", "settings.stickers", "settings.recording", "settings.app",
         "settings.input", "settings.transfer", "settings.privacy",
-        "inlineBots", "groupProfile", "startupFolder", "summary", "networkPolicy", "bottomBar", "llm", "stt", "updates", "linkPreview", "antiFeatures", "revokedMarker", "ghostMode", "fonts", "backup", "diagnostics", "datacenters", "bookmarks", "chatPreferences", "messageFilter", "hiddenUsers", "antiRevokeChats", "revokedMessages", "localGifts", "contextMenu"
+        "inlineBots", "groupProfile", "startupFolder", "summary", "networkPolicy", "bottomBar", "llm", "stt", "updates", "linkPreview", "antiFeatures", "revokedMarker", "ghostMode", "backup", "diagnostics", "datacenters", "bookmarks", "chatPreferences", "messageFilter", "hiddenUsers", "antiRevokeChats", "revokedMessages", "localGifts", "contextMenu"
     ]
     public static func normalized(page: String, item: String? = nil) -> (page: String, item: String?)? {
         guard Self.pages.contains(page), item.map(Self.validItem) ?? true else { return nil }

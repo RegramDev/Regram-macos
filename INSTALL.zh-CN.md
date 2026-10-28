@@ -8,7 +8,7 @@
 
 ## 安装发布包
 
-下载 Regram 13.1.0 (283374) 的 [Apple Silicon 安装包](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283374/Regram-13.1.0-283374-arm64.dmg)或 [Intel 安装包](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283374/Regram-13.1.0-283374-x86_64.dmg)。此版本要求 macOS 12.0 或更高版本，校验值见 [SHA256SUMS.txt](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283374/SHA256SUMS.txt)。
+下载 Regram 13.1.0 (283381) 的 [Apple Silicon 安装包](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283381/Regram-13.1.0-283381-arm64.dmg)或 [Intel 安装包](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283381/Regram-13.1.0-283381-x86_64.dmg)。此版本要求 macOS 12.0 或更高版本，校验值见 [SHA256SUMS.txt](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283381/SHA256SUMS.txt)。
 
 此版本使用 Apple/Mac Development 开发证书签名，尚未经 Apple 公证。打开下载的 DMG，将 Regram 拖到 Applications（应用程序）文件夹，再从该文件夹启动。
 
@@ -68,8 +68,8 @@ bash scripts/prepare-regram-core.sh
 ```
 
 上述两个 widget 仓库不是原生应用的依赖。打开工作区前先应用[仓库维护的核心补丁](patches/README.md)；
-原生库准备流程也会应用该补丁。Regram 使用独立的应用标识和数据路径，自动更新已停用，
-后续版本需手动安装。
+原生库准备流程也会应用该补丁。Regram 使用独立的应用标识和数据路径，可按当前架构从 GitHub Releases 检查和下载更新，
+并校验摘要与签名身份，也支持手动安装。
 
 构建 Regram 前，先配置 Telegram API 凭据：
 
@@ -166,7 +166,7 @@ xcodebuild -workspace Telegram-Mac.xcworkspace -scheme Release -configuration Re
   'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) STABLE' build
 ```
 
-v13.1.0-283374 发布版的部署目标为 macOS 12.0 或更高版本。
+v13.1.0-283381 发布版的部署目标为 macOS 12.0 或更高版本。
 Swift 包从工作区中的本地路径解析，不需要访问网络。
 
 <a id="separate-architecture-packages"></a>

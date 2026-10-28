@@ -2566,8 +2566,8 @@ public class ChatRowView: TableRowView, Notifable, MultipleSelectable, ChatTextS
     }
     
     public override func doubleClick(in location: NSPoint) {
-        if let item = self.item as? ChatRowItem, isAllowedToDoubleAction(location), let message = item.message {
-            item.chatInteraction.setupReplyMessage(message, .init(messageId: message.id, quote: nil, innerSubject: nil))
+        if let item = self.item as? ChatRowItem, isAllowedToDoubleAction(location) {
+            _ = regramHandleMessageDoubleClick(item, view: self, location: location)
         }
     }
     

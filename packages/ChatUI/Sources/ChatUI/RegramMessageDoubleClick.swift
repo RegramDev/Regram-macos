@@ -4,8 +4,9 @@ import TelegramCore
 import TelegramUtils
 import MessageUtils
 import RegramCore
+import TGUIKit
 
-func regramHandleMessageDoubleClick(_ item: ChatRowItem, view: ChatRowView, location: NSPoint) -> Bool {
+func regramHandleMessageDoubleClick(_ item: ChatRowItem, view: TableRowView, location: NSPoint) -> Bool {
     guard let message = item.message else { return false }
     let interaction = item.chatInteraction
     let settings = RegramPreferences.shared.settings(accountId: item.context.peerId.toInt64())

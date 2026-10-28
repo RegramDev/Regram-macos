@@ -42,17 +42,15 @@ final class CanvasTextInputClientTests: AppKitTestCase {
         XCTAssertEqual(r.length, 0)
     }
 
-    // attributedSubstring concatenates the text over a global range (across block boundaries), and reports
-    // the clamped actualRange.
-    func test_attributedSubstring_returnsTextForGlobalRange() {
+    func test_attributedSubstring_returnsContiguousLeafAndMatchingActualRange() {
         let v = canvas()
         let lo = v.boxes[0].textStart + 4   // "a" of Alpha
         let hi = v.boxes[1].textStart + 1   // "B" of Beta
         var actual = NSRange(location: 0, length: 0)
         let s = v.attributedSubstring(forProposedRange: NSRange(location: lo, length: hi - lo),
                                       actualRange: &actual)
-        XCTAssertEqual(s?.string, "aB")
-        XCTAssertEqual(actual, NSRange(location: lo, length: hi - lo))
+        XCTAssertEqual(s?.string, "a")
+        XCTAssertEqual(actual, NSRange(location: lo, length: 1))
     }
 
     func test_attributedSubstring_clampsOutOfRange() {

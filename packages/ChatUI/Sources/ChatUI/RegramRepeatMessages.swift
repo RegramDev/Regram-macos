@@ -48,9 +48,7 @@ func regramRepeatCopy(_ messages: [Message], interaction: ChatInteraction) {
 }
 
 func regramRepeatForward(_ messages: [Message], interaction: ChatInteraction) {
-    guard regramCanRepeatHere(messages, interaction: interaction), messages.allSatisfy({ canForwardMessage($0, chatInteraction: interaction) }) else { return }
-    let action = ChatForwardMenuAction(chatInteraction: interaction, sources: messages)
-    let object = ChatHistoryUIHooks.shared.makeForwardMessagesObjectObserved(interaction.interactionContext, messages, false, interaction.getMessages)
-    guard let peer = interaction.presentation.peer, object.possibilityPerformTo(peer) else { return }
-    action.forward(object, peerId: interaction.peerId, threadId: interaction.chatLocation.threadId)
+    guard !messages.isEmpty, messages.count <= 100, regramCanRepeatHere(messages, interaction: interaction),
+          messages.allSatisfy({ canForwardMessage($0, chatInteraction: interaction) }) else { return }
+    _ = Sender.forwardMessages(messageIds: messages.map { $0.id }, context: interaction.interactionContext, peerId: interaction.peerId, replyId: nil, threadId: interaction.chatLocation.threadId, sendAsPeerId: interaction.presentation.currentSendAsPeerId).startStandalone()
 }

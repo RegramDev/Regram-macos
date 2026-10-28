@@ -44,7 +44,7 @@ public struct RegramSettingsCatalogEntry {
     public var pageTitleKey: String {
         if page.hasPrefix("pro.") { return "Settings.ProCategory." + page.dropFirst(4) }
         if page.hasPrefix("settings.") { return "Settings.ProCategory." + category.rawValue }
-        return ["inlineBots": "features.InlineBots.Title", "groupProfile": "features.GroupProfileSettings", "startupFolder": "features.ChatListStartupFolder", "networkPolicy": "NetworkPolicy.Title", "bottomBar": "RG.BottomBarLayout", "llm": "LLMTranslation.Title", "stt": "RG.STTSettings", "updates": "AppUpdate.Title", "linkPreview": "LinkPreview.Repair", "antiFeatures": "AntiFeatures.Header", "revokedMarker": "RevokedMarker.Title", "ghostMode": "Ghost.Header", "fonts": "Fonts.Title", "backup": "Backup.Title", "diagnostics": "Diagnostics.Title", "datacenters": "Diagnostics.DC.Title", "bookmarks": "Bookmarks.Title", "chatPreferences": "ChatPreferences.Title", "localGifts": "Showroom.Title"][page] ?? "Settings.Pro.Title"
+        return ["inlineBots": "features.InlineBots.Title", "groupProfile": "features.GroupProfileSettings", "startupFolder": "features.ChatListStartupFolder", "networkPolicy": "NetworkPolicy.Title", "bottomBar": "RG.BottomBarLayout", "llm": "LLMTranslation.Title", "stt": "RG.STTSettings", "updates": "AppUpdate.Title", "linkPreview": "LinkPreview.Repair", "antiFeatures": "AntiFeatures.Header", "revokedMarker": "RevokedMarker.Title", "ghostMode": "Ghost.Header", "backup": "Backup.Title", "diagnostics": "Diagnostics.Title", "datacenters": "Diagnostics.DC.Title", "bookmarks": "Bookmarks.Title", "chatPreferences": "ChatPreferences.Title", "localGifts": "Showroom.Title"][page] ?? "Settings.Pro.Title"
     }
     public func alternate(language: String) -> [String] {
         let pageContext = ["llm": "LLM OpenAI Anthropic 大模型", "stt": "STT ASR OpenAI Whisper 自定义识别 自訂辨識"]
@@ -63,7 +63,7 @@ public enum RegramSettingsCatalog {
         if ["translation", "llm", "stt"].contains(value) { return .translation }
         if ["privacy", "stories", "app", "antiFeatures", "revokedMarker", "ghostMode", "hiddenUsers", "antiRevokeChats", "revokedMessages"].contains(value) { return .privacy }
         if ["media", "photos", "stickers", "recording", "linkPreview"].contains(value) { return .media }
-        if ["appearance", "profiles", "fonts", "groupProfile", "bottomBar"].contains(value) { return .appearance }
+        if ["appearance", "profiles", "groupProfile", "bottomBar"].contains(value) { return .appearance }
         if ["network", "transfer", "networkPolicy", "diagnostics", "datacenters"].contains(value) { return .network }
         return .tools
     }
@@ -147,6 +147,8 @@ public enum RegramSettingsCatalog {
         .init("settings.stickers", "stickerSize", "Catalog.StickerSize"),
         .init("settings.stickers", "stickerTimestamp", "Settings.Stickers.Timestamp"),
         .init("settings.stickers", "recentStickerLimit", "Settings.Stickers.RecentLimit"),
+        .init("settings.messageActions", "messageDoubleTapAction", "DoubleTap.Action", keywords: "double click double tap 双击 双擊 雙擊 按兩下 點兩下"),
+        .init("settings.messageActions", "messageDoubleTapActionWithoutEditPermission", "setting.messageDoubleTapActionWithoutEditPermission", keywords: "double click double tap edit unavailable 双击 不可编辑 雙擊 無法編輯 按兩下 點兩下"),
         .init("settings.messageActions", "contextMenuOrder", "Settings.ContextMenu.Customize"),
         .init("settings.app", "hideChannelBottomButton", "Settings.showChannelBottomButton"),
         .init("settings.appearance", "wideChannelPosts", "Settings.wideChannelPosts"),
@@ -191,7 +193,6 @@ public enum RegramSettingsCatalog {
         .init("pro.notifications", "filterNotifications", "Notifications.ContentFilter"),
         .init("settings.appearance", "hideTabBarPermissionWarnings", "features.HideTabBarPermissionWarnings", keywords: "notifications permissions exclamation warning badge 通知 权限 感叹号 角标 通知 權限 驚嘆號"),
         .init("settings.appearance", "appIcon", "Appearance.ChangeIcon"),
-        .init("pro.appearance", "fonts", "Fonts.Title"),
         .init("pro.tools", "backup", "Backup.Title"),
         .init("pro.tools", "diagnostics", "Diagnostics.Title"),
         .init("pro.tools", "eraseAllData", "EraseData.Title"),
@@ -263,14 +264,8 @@ public enum RegramSettingsCatalog {
         .init("bottomBar", "width", "RG.BottomBarLayout.Width", keywords: "bottom tabs width size 底栏 宽度 底欄 寬度"),
         .init("linkPreview", "xHost", "LinkPreview.XService"),
         .init("linkPreview", "instagramHost", "LinkPreview.InstagramService"),
-        .init("fonts", "latin", "Fonts.Latin.Title"),
-        .init("fonts", "chinese", "Fonts.Chinese.Title"),
         .init("linkPreview", "enabled", "LinkPreview.Repair"),
         .init("linkPreview", "reset", "Common.Reset"),
-        .init("fonts", "import", "Fonts.Import", keywords: "TTF OTF TTC"),
-        .init("fonts", "storage", "Fonts.Storage"),
-        .init("fonts", "messages", "Fonts.Messages"),
-        .init("fonts", "interface", "Fonts.Interface"),
         .init("backup", "export", "Backup.Export"),
         .init("backup", "import", "Backup.Import"),
         .init("backup", "reset", "Backup.Reset"),
@@ -314,7 +309,6 @@ public enum RegramSettingsCatalog {
         "ghostMode": ["Ghost.Header", "Ghost.DontReadStories", "Ghost.DontSendOnline", "Ghost.DontSendTyping", "ghost online typing 幽灵 在线 输入状态 快拍"],
         "pinnedMessageNotifications": ["Notifications.PinnedMessages.Title", "pinned notification 置顶 通知"],
         "mentionsAndRepliesNotifications": ["Notifications.MentionsAndReplies.Title", "mention reply notification 提及 回复 通知"],
-        "fonts": ["Fonts.Title", "Fonts.Import", "Fonts.Storage", "font 字体 字體 字型 TTF OTF TTC JetBrains Anthropic Google 中文 英文 下载 下載 导入 匯入"],
         "eraseAllData": ["EraseData.Title", "erase reset 清除数据"],
         "backup": ["Backup.Title", "Backup.Import", "Backup.Export", "backup restore 备份 備份 恢复 還原 配置"],
         "chatPreferences": ["ChatPreferences.Title", "chat settings per chat 会话 對話 格式"],

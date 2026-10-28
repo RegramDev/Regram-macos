@@ -801,7 +801,7 @@ public class ChatMessageItem: ChatRowItem {
 
         
         func messageFont(_ native: () -> NSFont) -> NSFont {
-            RegramFonts.messageFont(base: InterfaceFontProvider.withNativeFonts(native), accountId: context.peerId.toInt64())
+            native()
         }
         let string = NSMutableAttributedString(string: text, attributes: [NSAttributedString.Key.font: messageFont { NSFont.normal(fontSize) }, NSAttributedString.Key.foregroundColor: textColor])
         

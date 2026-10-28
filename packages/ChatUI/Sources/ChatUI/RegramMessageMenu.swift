@@ -116,8 +116,10 @@ func regramMessageMenu(message: Message, messages: [Message], interaction: ChatI
         let forward = ChatForwardMenuAction(chatInteraction: interaction, sources: messages)
         let object = ChatHistoryUIHooks.shared.makeForwardMessagesObjectObserved(context, messages, false, interaction.getMessages)
         if canReply, regramCanRepeatHere(messages, interaction: interaction), let peer = interaction.presentation.peer, object.possibilityPerformTo(peer) {
+            let action = interaction.captureDeferredSendAction()
             result.append(ContextMenuItem(menuTitle("menu.repeatForward"), handler: {
-                forward.forward(object, peerId: interaction.peerId, threadId: interaction.chatLocation.threadId)
+                guard action.takeIfCurrent() else { return }
+                regramRepeatForward(messages, interaction: interaction)
             }, itemImage: MenuAnimation.menu_plus.value).regramAction(.repeatForward))
         }
         if let makeModal = ChatUIHooks.shared.makeForwardMessagesWithoutQuoteShareModal {

@@ -196,6 +196,7 @@ extension TLottieBridge : @retroactive R_LottieBridge {
 
 
 class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterDelegate, NSWindowDelegate {
+    private let regramThemeRepairDisposable = MetaDisposable()
    
 
     @IBOutlet weak var window: Window! {
@@ -497,6 +498,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         let appEncryption = AppEncryptionParameters(path: rootPath)
 
         let accountManager = AccountManager<TelegramAccountManagerTypes>(basePath: containerUrl + "/accounts-metadata", isTemporary: false, isReadOnly: false, useCaches: true, removeDatabaseOnError: true, accessChallenge: makeAccountManagerAccessChallenge(basePath: containerUrl + "/accounts-metadata", isTemporary: false, isReadOnly: false))
+        regramThemeRepairDisposable.set(bindRegramThemeRepairs(accountManager: accountManager))
 
         if let crash = self.rustEngineCrash {
             self.rustEngineCrash = nil

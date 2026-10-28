@@ -29,6 +29,9 @@ extension DocumentCanvasView {
     }
 
     func typingAttributeDict(region: LeafTextRegion, atLocal location: Int) -> [NSAttributedString.Key: Any] {
+        if isUpdatingInputComposition, let composition = inputComposition {
+            return composition.typingAttributes
+        }
         // A code block types in the monospace code attributes regardless of caret context — the block
         // carries no inline formatting, so pending toggles and inherited attrs don't apply.
         if case .code = region.ref {
@@ -115,6 +118,7 @@ extension DocumentCanvasView {
     var selectedGlobalRange: (Int, Int) {
         get { (anchor, head) }
         set {
+            finishInputComposition()
             clearTableSelection()
             pendingFormatToggles.removeAll()
             anchor = clamp(newValue.0); head = clamp(newValue.1)
@@ -173,36 +177,153 @@ extension DocumentCanvasView {
     }
 }
 
-// MARK: - NSTextInputClient
+@available(macOS 12, *)
+struct CanvasInputComposition {
+    var range: NSRange
+    let blocks: [CanvasModelBlock]
+    let anchor: Int
+    let head: Int
+    let typingAttributes: [NSAttributedString.Key: Any]
+    let pendingFormat: Set<PendingFormatToggle>
+}
 
 @available(macOS 12, *)
 extension DocumentCanvasView: NSTextInputClient {
-    // --- Text commit (NOT NSResponder.insertText) ---
     func insertText(_ string: Any, replacementRange: NSRange) {
         let text = (string as? String) ?? (string as? NSAttributedString)?.string ?? ""
-        commitText(text)   // commitText holds the old insertText body (see +Editing editing entry)
+        let range = inputReplacementRange(replacementRange)
+        if inputComposition != nil {
+            replaceInputComposition(with: text, range: range)
+            unmarkText()
+            refreshInputComposition()
+        } else {
+            anchor = range.location
+            head = NSMaxRange(range)
+            commitText(text)
+        }
     }
 
-    // --- Marked text (minimal-but-real: commit immediately; supports dead keys) ---
     func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
         let text = (string as? String) ?? (string as? NSAttributedString)?.string ?? ""
-        if !text.isEmpty { commitText(text) }   // immediate-commit strategy; no composition UI
+        let range = inputReplacementRange(replacementRange)
+        if inputComposition == nil {
+            guard !text.isEmpty else { return }
+            inputComposition = CanvasInputComposition(range: range, blocks: currentModelBlocks(), anchor: anchor, head: head, typingAttributes: typingAttributesAtGlobal(range.location), pendingFormat: pendingFormatToggles)
+            breakUndoCoalescing()
+        }
+        let composition = inputComposition!
+        replaceInputComposition(with: text, range: range)
+        if text.isEmpty {
+            if composition.anchor == composition.head && range == composition.range {
+                inputComposition = nil
+                setModelBlocks(composition.blocks, width: effectiveWidth)
+                anchor = composition.anchor
+                head = composition.head
+                pendingFormatToggles = composition.pendingFormat
+            } else {
+                unmarkText()
+            }
+        } else {
+            let length = (text as NSString).length
+            let start = max(0, head - length)
+            inputComposition?.range = NSRange(location: start, length: length)
+            let relative = selectedRange.location == NSNotFound ? length : min(max(0, selectedRange.location), length)
+            anchor = start + relative
+            head = anchor + min(max(0, selectedRange.length), length - relative)
+        }
+        refreshInputComposition()
     }
-    func unmarkText() {}
-    func hasMarkedText() -> Bool { false }
-    func markedRange() -> NSRange { NSRange(location: NSNotFound, length: 0) }
+
+    func unmarkText() {
+        guard let composition = inputComposition else { return }
+        inputComposition = nil
+        breakUndoCoalescing()
+        if currentModelBlocks() != composition.blocks {
+            registerUndo(snapshot: composition.blocks, anchor: composition.anchor, head: composition.head)
+        }
+        needsDisplay = true
+    }
+
+    func finishInputComposition() {
+        guard !isUpdatingInputComposition, inputComposition != nil else { return }
+        unmarkText()
+        inputContext?.discardMarkedText()
+    }
+
+    private func inputReplacementRange(_ range: NSRange) -> NSRange {
+        let requested = range.location == NSNotFound ? (inputComposition?.range ?? self.selectedRange()) : range
+        return normalizedInputRange(requested)
+    }
+
+    private func normalizedInputRange(_ range: NSRange) -> NSRange {
+        let location = range.location == NSNotFound ? selFrom : clampGlobal(range.location)
+        let length = range.location == NSNotFound ? 0 : min(max(0, range.length), documentSizeValue - location)
+        return NSRange(location: location, length: length)
+    }
+
+    private func replaceInputComposition(with text: String, range: NSRange) {
+        isUpdatingInputComposition = true
+        defer { isUpdatingInputComposition = false }
+        anchor = range.location
+        head = NSMaxRange(range)
+        commitText(text)
+    }
+
+    private func refreshInputComposition() {
+        recomputeDocumentHasSpoilers()
+        scheduleSyntaxHighlightPass()
+        invalidateIntrinsicContentSize()
+        needsLayout = true
+        needsDisplay = true
+        layoutSubtreeIfNeeded()
+        notifySelectionChanged()
+    }
+
+    func drawInputComposition(in context: CGContext) {
+        guard let range = inputComposition?.range else { return }
+        context.setFillColor(editorAppearance.defaultForeground.cgColor)
+        for rect in selectionRects(globalFrom: range.location, globalTo: NSMaxRange(range)) {
+            context.fill(CGRect(x: rect.minX, y: rect.maxY - 1, width: rect.width, height: 1))
+        }
+    }
+
+    @objc func undo(_ sender: Any?) {
+        finishInputComposition()
+        effectiveUndoManager?.undo()
+    }
+
+    @objc func redo(_ sender: Any?) {
+        finishInputComposition()
+        effectiveUndoManager?.redo()
+    }
+
+    func hasMarkedText() -> Bool { inputComposition != nil }
+    func markedRange() -> NSRange { inputComposition?.range ?? NSRange(location: NSNotFound, length: 0) }
     func selectedRange() -> NSRange { NSRange(location: selFrom, length: selTo - selFrom) }
 
     func attributedSubstring(forProposedRange range: NSRange, actualRange: NSRangePointer?) -> NSAttributedString? {
-        let lo = clampGlobal(range.location), hi = clampGlobal(range.location + range.length)
+        guard range.location != NSNotFound else {
+            actualRange?.pointee = NSRange(location: NSNotFound, length: 0)
+            return nil
+        }
+        let resolved = normalizedInputRange(range)
+        guard let region = allLeafRegions().first(where: { $0.globalStart + $0.length > resolved.location && $0.globalStart < NSMaxRange(resolved) }) else {
+            actualRange?.pointee = NSRange(location: NSNotFound, length: 0)
+            return nil
+        }
+        let lo = max(region.globalStart, resolved.location)
+        let hi = min(region.globalStart + region.length, NSMaxRange(resolved))
         actualRange?.pointee = NSRange(location: lo, length: hi - lo)
-        return NSAttributedString(string: text(inGlobalRange: lo, hi))
+        return region.layout.attributedString.attributedSubstring(from: NSRange(location: lo - region.globalStart, length: hi - lo))
     }
     func validAttributesForMarkedText() -> [NSAttributedString.Key] { [] }
 
-    // --- Geometry: flat-char space ≈ global offset (LTR, single axis); screen coords out/in ---
     func firstRect(forCharacterRange range: NSRange, actualRange: NSRangePointer?) -> NSRect {
-        let lo = clampGlobal(range.location), hi = clampGlobal(range.location + range.length)
+        layoutSubtreeIfNeeded()
+        let resolved = normalizedInputRange(range)
+        let lo = snapToRenderable(resolved.location, forward: true)
+        let hi = max(lo, min(NSMaxRange(resolved), tokenizer.lineBoundary(fromGlobal: lo, forward: true)))
+        actualRange?.pointee = NSRange(location: lo, length: hi - lo)
         let rect = selectionRects(globalFrom: lo, globalTo: hi).first ?? caretRect(forGlobal: lo)
         guard let window else { return rect }
         return window.convertToScreen(convert(rect, to: nil))

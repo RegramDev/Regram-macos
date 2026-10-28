@@ -112,7 +112,6 @@ public func chatMessagePhotoDatas(postbox: Postbox, imageReference: ImageMediaRe
             sources.append(.miniThumbnail(data: miniThumbnail))
         }
         let thumbnailByteSize = Int64(progressiveRepresentation.progressiveSizes[0])
-        var largestByteSize = Int64(progressiveRepresentation.progressiveSizes[0])
         var imageByteSizes = Set<Int64>()
         for (maxDimension, byteSizes) in progressiveRangeMap {
             if Int(fullRepresentationSize.width) > 100 && maxDimension <= 100 {
@@ -121,7 +120,6 @@ public func chatMessagePhotoDatas(postbox: Postbox, imageReference: ImageMediaRe
             for sizeIndex in byteSizes where sizeIndex < progressiveRepresentation.progressiveSizes.count {
                 imageByteSizes.insert(Int64(progressiveRepresentation.progressiveSizes[sizeIndex]))
             }
-            largestByteSize = Int64(progressiveRepresentation.progressiveSizes[min(progressiveRepresentation.progressiveSizes.count - 1, byteSizes.last!)])
             if maxDimension >= Int64(fullRepresentationSize.width) {
                 break
             }
@@ -142,9 +140,9 @@ public func chatMessagePhotoDatas(postbox: Postbox, imageReference: ImageMediaRe
                         return (source, data)
                     }
                 case let .resource(resource):
-                    let size = resource.size ?? 0
-                    return postbox.mediaBox.resourceData(resource, size: size, in: 0 ..< size, mode: .complete, notifyAboutIncomplete: true, attemptSynchronously: synchronousLoad)
-                    |> map { (data, _) -> (SizeSource, Data?) in
+                    return postbox.mediaBox.resourceData(resource, option: .complete(waitUntilFetchStatus: false), attemptSynchronously: synchronousLoad)
+                    |> map { value -> (SizeSource, Data?) in
+                        let data = value.complete ? try? Data(contentsOf: URL(fileURLWithPath: value.path), options: .mappedIfSafe) : nil
                         return (source, data)
                     }
                 }
@@ -160,8 +158,9 @@ public func chatMessagePhotoDatas(postbox: Postbox, imageReference: ImageMediaRe
                         if let data = results[i].1, data.count != 0 {
                             foundData = true
                             if emission.shouldEmitImage(byteCount: data.count) {
-                                subscriber.putNext(ImageRenderData(nil, data, isLastSize))
-                                if isLastSize {
+                                let complete = data.count >= Int(progressiveRepresentation.progressiveSizes.last!)
+                                subscriber.putNext(ImageRenderData(nil, data, complete))
+                                if complete {
                                     subscriber.putCompletion()
                                 }
                             }
@@ -190,7 +189,8 @@ public func chatMessagePhotoDatas(postbox: Postbox, imageReference: ImageMediaRe
             })
             var fetchDisposable: Disposable?
             if autoFetchFullSize {
-                fetchDisposable = fetchedMediaResource(mediaBox: postbox.mediaBox, userLocation: imageReference.userLocation, userContentType: imageReference.userContentType, reference: imageReference.resourceReference(progressiveRepresentation.resource), range: (0 ..< largestByteSize, .default), statsCategory: .image).start()
+                let resource = (fullRepresentation ?? imageReference.media.representationForDisplayAtSize(.init(fullRepresentationSize)))?.resource ?? progressiveRepresentation.resource
+                fetchDisposable = fetchedMediaResource(mediaBox: postbox.mediaBox, userLocation: imageReference.userLocation, userContentType: imageReference.userContentType, reference: imageReference.resourceReference(resource), statsCategory: .image).start()
             } else if useMiniThumbnailIfAvailable {
                 fetchDisposable = fetchedMediaResource(mediaBox: postbox.mediaBox, userLocation: imageReference.userLocation, userContentType: imageReference.userContentType, reference: imageReference.resourceReference(progressiveRepresentation.resource), range: (0 ..< thumbnailByteSize, .default), statsCategory: .image).start()
             }
@@ -601,8 +601,8 @@ public func chatMessagePhoto(account: Account, imageReference: ImageMediaReferen
         return ImageDataTransformation(data: data, execute: { arguments, data in
             let context = DrawingContext(size: arguments.drawingSize, scale:scale, clear: true)
             
-            let fullSizeData = data.fullSizeData
-            let thumbnailData = data.thumbnailData
+            let fullSizeData = data.fullSizeComplete ? data.fullSizeData : nil
+            let thumbnailData = data.thumbnailData ?? (data.fullSizeComplete ? nil : data.fullSizeData)
             
             let drawingRect = arguments.drawingRect
             var fittedSize = arguments.imageSize.aspectFilled(arguments.boundingSize)
@@ -616,25 +616,12 @@ public func chatMessagePhoto(account: Account, imageReference: ImageMediaReferen
             
             var fullSizeImage: CGImage?
             if let fullSizeData = fullSizeData {
-                if data.fullSizeComplete {
-                    let options = NSMutableDictionary()
-                    options.setValue(max(fittedSize.width * context.scale, fittedSize.height * context.scale) as NSNumber, forKey: kCGImageSourceThumbnailMaxPixelSize as String)
-                    options.setValue(false as NSNumber, forKey: kCGImageSourceShouldCache as String)
-
-                       options.setValue(true as NSNumber, forKey: kCGImageSourceCreateThumbnailFromImageAlways as String)
-                    if let imageSource = CGImageSourceCreateWithData(fullSizeData as CFData, nil), let image = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, options as CFDictionary) {
-                        fullSizeImage = image
-                    }
-                    
-                } else {
-                    let imageSource = CGImageSourceCreateIncremental(nil)
-                    CGImageSourceUpdateData(imageSource, fullSizeData as CFData, data.fullSizeComplete)
-                    
-                    let options = NSMutableDictionary()
-                    options[kCGImageSourceShouldCache as NSString] = false as NSNumber
-                    if let image = CGImageSourceCreateImageAtIndex(imageSource, 0, options as CFDictionary) {
-                        fullSizeImage = image
-                    }
+                let options = NSMutableDictionary()
+                options.setValue(max(fittedSize.width * context.scale, fittedSize.height * context.scale) as NSNumber, forKey: kCGImageSourceThumbnailMaxPixelSize as String)
+                options.setValue(false as NSNumber, forKey: kCGImageSourceShouldCache as String)
+                options.setValue(true as NSNumber, forKey: kCGImageSourceCreateThumbnailFromImageAlways as String)
+                if let imageSource = CGImageSourceCreateWithData(fullSizeData as CFData, nil), let image = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, options as CFDictionary) {
+                    fullSizeImage = image
                 }
             }
             
@@ -736,12 +723,6 @@ public func chatMessagePhoto(account: Account, imageReference: ImageMediaReferen
                     }
                 }
                 
-                // (A) Skip the blurred-thumbnail draw when the fully-decoded
-                // image is opaque and will cover the same `fittedRect` — the
-                // blurred draw beneath would be pure overdraw. We only keep
-                // the blurred draw when the full image is incomplete
-                // (incremental decode in progress) or has alpha that would
-                // let the clear context show through.
                 if let blurredThumbnailImage = blurredThumbnailImage, !fullCoversBlurred {
                     c.interpolationQuality = .low
                     c.draw(blurredThumbnailImage, in: fittedRect)
@@ -750,13 +731,7 @@ public func chatMessagePhoto(account: Account, imageReference: ImageMediaReferen
 
 
                 if let fullSizeImage = fullSizeImage {
-                    // (B) The full image was already sized to the target via
-                    // `kCGImageSourceThumbnailMaxPixelSize` when the decode
-                    // was complete, so the draw is ~1:1 — `.low` saves real
-                    // time vs `.medium` with no perceptible quality loss.
-                    // For an incremental (non-thumbnailed) decode the source
-                    // is full-size and we keep `.medium` for the downscale.
-                    c.interpolationQuality = data.fullSizeComplete ? .low : .medium
+                    c.interpolationQuality = .low
                     c.draw(fullSizeImage, in: fittedRect)
                 }
 

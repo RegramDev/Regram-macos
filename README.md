@@ -4,7 +4,7 @@
   <h1>Regram for macOS</h1>
   <p>基于 Telegram 原生 macOS 客户端，提供更灵活的消息、翻译与外观设置。</p>
   <p>
-    <a href="https://github.com/RegramDev/Regram-macos/releases/tag/v13.1.0-283377">下载</a> ·
+    <a href="https://github.com/RegramDev/Regram-macos/releases/tag/v13.1.0-283381">下载</a> ·
     <a href="CHANGELOG.md">更新日志</a> ·
     <a href="INSTALL.zh-CN.md">构建说明</a> ·
     <a href="https://github.com/RegramDev/Regram-macos/issues">问题反馈</a>
@@ -15,11 +15,11 @@ Regram 是基于 [Telegram for macOS](https://github.com/TelegramMessenger/teleg
 
 ## 功能
 
-- **消息与记录**：消息菜单自定义、无引用复读与转发、书签、标签、群备注，以及按作者或共同群组查找消息。
+- **消息与记录**：消息菜单与双击动作自定义、直接复读与无引用转发、书签、标签、群备注，以及按作者或共同群组查找消息。
 - **翻译与语音**：选择翻译引擎，提供单条、整聊、发送前、网页及图片翻译；支持自定义 LLM 翻译和语音转写。
 - **隐私与过滤**：关键词和正则表达式过滤、隐藏用户、过滤规则导入、本地撤回与编辑记录。
 - **图片与媒体**：原图复制、高画质图片粘贴、媒体信息查看及链接预览设置。
-- **外观与导航**：自定义字体、九款 Regram 图标、紧凑聊天列表，以及底栏项目与宽度调整。
+- **外观与导航**：九款 Regram 图标、紧凑聊天列表，以及底栏项目与宽度调整。
 - **设置与网络**：设置搜索、分类备份与恢复、DNS 和代理策略、连接诊断。
 - **显摆一下**：本地会员外观、手机号、评级、Stars、TON 和礼物展示。
 
@@ -27,14 +27,14 @@ Regram 是基于 [Telegram for macOS](https://github.com/TelegramMessenger/teleg
 
 ## 下载与更新
 
-Regram 13.1.0 (283377) 要求 macOS 12.0 或更高版本，按处理器提供独立安装包：
+Regram 13.1.0 (283381) 要求 macOS 12.0 或更高版本，按处理器提供独立安装包：
 
 | Mac | 安装包 |
 | --- | --- |
-| Apple Silicon（M 系列） | [arm64 DMG](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283377/Regram-13.1.0-283377-arm64.dmg) |
-| Intel | [x86_64 DMG](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283377/Regram-13.1.0-283377-x86_64.dmg) |
+| Apple Silicon（M 系列） | [arm64 DMG](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283381/Regram-13.1.0-283381-arm64.dmg) |
+| Intel | [x86_64 DMG](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283381/Regram-13.1.0-283381-x86_64.dmg) |
 
-校验值见 [SHA256SUMS.txt](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283377/SHA256SUMS.txt)，新增功能与修复内容见[更新日志](CHANGELOG.md)。
+校验值见 [SHA256SUMS.txt](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283381/SHA256SUMS.txt)，新增功能与修复内容见[更新日志](CHANGELOG.md)。
 
 此版本使用 Apple/Mac Development 开发证书签名，尚未经 Apple 公证。打开下载的 DMG，将 Regram 拖到 Applications（应用程序）文件夹，再从该文件夹启动。
 

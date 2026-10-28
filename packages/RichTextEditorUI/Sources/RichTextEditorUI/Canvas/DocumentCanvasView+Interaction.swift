@@ -15,6 +15,7 @@ extension DocumentCanvasView {
     func installSelectionInteractions() {}
 
     override func mouseDown(with event: NSEvent) {
+        finishInputComposition()
         window?.makeFirstResponder(self)
         // Control-click IS a context-menu click: the overridden mouseDown would otherwise swallow it as
         // a caret-placing left click (clearing the selection and never showing a menu). Route it through

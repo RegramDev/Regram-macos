@@ -241,8 +241,8 @@ public final class RichTextEditorView: NSView {
     /// Toggles the checked state of the caret's `.checklist` item (a checkbox is also toggled by clicking it).
     public func toggleChecklistItem() { canvas.toggleChecklistAtCaret() }
 
-    public func undo() { canvas.effectiveUndoManager?.undo() }
-    public func redo() { canvas.effectiveUndoManager?.redo() }
+    public func undo() { canvas.undo(nil) }
+    public func redo() { canvas.redo(nil) }
 
     /// True when a non-collapsed text selection exists.
     public var hasSelection: Bool { canvas.selFrom != canvas.selTo }

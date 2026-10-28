@@ -115,7 +115,6 @@ public func RegramAppearanceCategoryController(context: any AccountContextProtoc
     let signal = combineLatest(regramPreferenceChanges(accountId: accountId), appearanceSignal) |> map { settings, _ -> InputDataSignalValue in
         var builder = RegramPageBuilder(page: "personalization")
         builder.section("Settings.Section.Personalization")
-        builder.row("fonts", title: regramString("Fonts.Title"), type: .next, action: { context.bindings.rootNavigation().push(RegramFontController(context: context)) })
         var section = builder.nextSectionId
         var index = builder.nextIndex
         var entries = builder.entries

@@ -8,6 +8,11 @@ extension DocumentCanvasView {
     /// registers a self-re-registering undo, and refreshes layout/display. This is the single entry
     /// point for every editing operation (typing, structural, list).
     func editing(coalescing: UndoCoalescing = .none, _ body: () -> Void) {
+        if isUpdatingInputComposition {
+            body()
+            return
+        }
+        finishInputComposition()
         let before = currentModelBlocks()
         let beforeAnchor = anchor, beforeHead = head
         // Does this edit CONTINUE the open coalescing run? Same kind, a collapsed caret (not a
@@ -971,6 +976,11 @@ extension DocumentCanvasView {
 @available(macOS 12, *)
 extension DocumentCanvasView {
     override func insertNewline(_ sender: Any?) {
+        if hasMarkedText() {
+            unmarkText()
+            return
+        }
+        if isHandlingMarkedKeyEvent { return }
         if let onReturnKey = onReturnKey, onReturnKey() { return }
         clearTableSelection()
         // Return in a code block's LANGUAGE line moves the caret to the start of the code text — the

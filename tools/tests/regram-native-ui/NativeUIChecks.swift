@@ -492,7 +492,27 @@ struct NativeUIChecks {
             let baselineSource = source.replacingOccurrences(of: "(?m)^listBackground =.*$", with: "listBackground = \(background)", options: .regularExpression)
             try baselineSource.write(to: baselinePath, atomically: true, encoding: .utf8)
             guard let baseline = importPalette(baselinePath.path) else { throw NativeCheckError.failed("missing baseline \(name)") }
-            for (suffix, palette, repaired) in [("fixed", fixed, true), ("baseline", baseline, false)] {
+            let migrated = regramRepairedThemePalette(baseline)
+            let isGraphite = name == "Regram-Graphite"
+            check((migrated !== baseline) == isGraphite, "\(name) repair only matches old dark theme")
+            check(regramRepairedThemePalette(fixed) === fixed, "\(name) repaired theme remains unchanged")
+            check(regramRepairedThemePalette(migrated) === migrated, "\(name) repair is idempotent")
+            check(regramRepairedThemePalette(baseline.withUpdatedName("Custom Graphite")).listBackground == baseline.listBackground, "\(name) custom theme remains unchanged")
+            if isGraphite {
+                check(migrated == fixed, "Graphite migration matches corrected palette")
+                let previous = try JSONSerialization.jsonObject(with: JSONEncoder().encode(ThemePaletteSettings.defaultTheme.withUpdatedPalette(baseline))) as! [String: Any]
+                let updated = try JSONSerialization.jsonObject(with: JSONEncoder().encode(ThemePaletteSettings.defaultTheme.withUpdatedPalette(migrated))) as! [String: Any]
+                var expected = previous["palette"] as! [String: Any]
+                expected["listBackground"] = Int32(bitPattern: NSColor(0x1e2127).argb)
+                check(NSDictionary(dictionary: expected).isEqual(to: updated["palette"] as! [String: Any]), "Graphite migration preserves every other palette field")
+                let customizedPath = output.appendingPathComponent("Graphite-customized.palette")
+                let customizedSource = baselineSource.replacingOccurrences(of: "bubbleBackground_outgoing = #2A3748", with: "bubbleBackground_outgoing = #223344,#334455").replacingOccurrences(of: "accent = #5D97D0", with: "accent = #7799BB")
+                try customizedSource.write(to: customizedPath, atomically: true, encoding: .utf8)
+                guard let customized = importPalette(customizedPath.path) else { throw NativeCheckError.failed("missing customized theme") }
+                let customizedRepair = regramRepairedThemePalette(customized)
+                check(customized.bubbleBackground_outgoing.count == 2 && customizedRepair.bubbleBackground_outgoing == customized.bubbleBackground_outgoing && customizedRepair.accent == customized.accent, "Graphite repair preserves custom accent and outgoing gradient")
+            }
+            for (suffix, palette, repaired) in [("fixed", fixed, true), ("baseline", baseline, false), ("migrated", migrated, isGraphite)] {
                 telegramUpdateTheme(generateTheme(palette: palette, cloudTheme: nil, bubbled: false, fontSize: 13, wallpaper: ThemeWallpaper(), liquidGlass: false), animated: false)
                 let item = GeneralInteractedRowItem(NSSize(width: 600, height: 44), stableId: name + suffix, name: "Native settings row", type: .switchable(false), viewType: .singleItem)
                 let view = makeView(item, width: 600)
@@ -504,6 +524,9 @@ struct NativeUIChecks {
                 _ = try layerComposite(view, path: output.appendingPathComponent("theme-row-\(name)-\(suffix).png"))
                 measurements.append(["kind": "nativeThemeRow", "theme": name, "repaired": repaired, "plain": GeneralViewType.singleItem.isPlainMode, "separatorHidden": view.borderView.isHidden])
             }
+        }
+        for palette in [dayClassicPalette, whitePalette, darkPalette, nightAccentPalette, systemPalette] {
+            check(regramRepairedThemePalette(palette) === palette, "\(palette.name) built-in palette remains unchanged")
         }
     }
 

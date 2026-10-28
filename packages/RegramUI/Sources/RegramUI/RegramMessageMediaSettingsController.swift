@@ -48,7 +48,7 @@ private final class RegramMessageMediaArguments {
 }
 
 private func regramParityText(_ key: String) -> String {
-    if ["Media.ClipboardOriginalImages", "Media.ClipboardOriginalImages.Notice", "Bookmarks.Title"].contains(key) { return regramString(key) }
+    if key.hasPrefix("setting.") || ["Media.ClipboardOriginalImages", "Media.ClipboardOriginalImages.Notice", "Bookmarks.Title"].contains(key) { return regramString(key) }
     let text = regramString("ios." + key)
     let argument: String
     switch key {
@@ -62,6 +62,9 @@ private func regramParityText(_ key: String) -> String {
 private func regramParityRows(_ page: String) -> [RegramParityRow] {
     switch page {
     case "messageActions": return [
+        .header("DoubleTap.Action"),
+        .picker("messageDoubleTapAction", "DoubleTap.Action"),
+        .picker("messageDoubleTapActionWithoutEditPermission", "setting.messageDoubleTapActionWithoutEditPermission"),
         .header("Settings.ContextMenu"),
         .action("contextMenuOrder", "Settings.ContextMenu.Customize"),
         .notice("Settings.ContextMenu.Notice"),

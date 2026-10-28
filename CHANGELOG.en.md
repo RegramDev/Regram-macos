@@ -2,6 +2,16 @@
 
 [简体中文](CHANGELOG.md) · **English**
 
+## 13.1.0 (283381) — 2026-10-28
+
+- Fix partially sharp, partially blurred progressive image previews.
+- Correct chat input candidate-window positioning and rich-text composition, selection, and undo handling.
+- Remove custom fonts and restore native interface and message typography.
+- Restore message double-click actions and the editing-unavailable override.
+- Send repeat actions immediately, preserving topics, send-as identities, and existing drafts.
+- Repair the list background of previously imported Regram Graphite palettes automatically.
+- Add an on-demand capture tool for slow sessions.
+
 ## 13.1.0 (283377) — 2026-10-27
 
 ### Interface and navigation

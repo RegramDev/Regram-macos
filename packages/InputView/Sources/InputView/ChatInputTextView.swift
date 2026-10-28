@@ -560,10 +560,9 @@ private final class ChatInputTextContainer: NSTextContainer {
 }
 
 public final class InputTextView: BaseTextView, NSLayoutManagerDelegate, NSTextStorageDelegate {
-    
-    
-    
-    
+    private var inputGeometryObservers: [NSObjectProtocol] = []
+    private var inputGeometryRefreshScheduled = false
+
     public weak var customDelegate: ChatInputTextViewDelegate?
     private var quoteContinuation: (location: Int, quote: TextInputTextQuoteAttribute)?
     
@@ -826,6 +825,70 @@ public final class InputTextView: BaseTextView, NSLayoutManagerDelegate, NSTextS
             self.customLayoutManager.ensureLayout(for: self.customTextContainer)
         }
         updateTextElements()
+        refreshInputCharacterCoordinates()
+    }
+
+    public override func firstRect(forCharacterRange range: NSRange, actualRange: NSRangePointer?) -> NSRect {
+        enclosingScrollView?.layoutSubtreeIfNeeded()
+        layoutSubtreeIfNeeded()
+        customLayoutManager.ensureLayout(for: customTextContainer)
+        let length = customTextStorage.length
+        let selection = selectedRange()
+        let requestedLocation = range.location == NSNotFound ? selection.location : range.location
+        let location = requestedLocation == NSNotFound ? length : min(max(0, requestedLocation), length)
+        let requestedLength = range.location == NSNotFound ? 0 : range.length
+        let resolvedRange = NSRange(location: location, length: min(max(0, requestedLength), length - location))
+        return super.firstRect(forCharacterRange: resolvedRange, actualRange: actualRange)
+    }
+
+    public override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        observeInputGeometry()
+        refreshInputCharacterCoordinates()
+    }
+
+    public override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        observeInputGeometry()
+        refreshInputCharacterCoordinates()
+    }
+
+    private func refreshInputCharacterCoordinates() {
+        guard !inputGeometryRefreshScheduled, window?.firstResponder === self else { return }
+        inputGeometryRefreshScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.inputGeometryRefreshScheduled = false
+            guard self.window?.firstResponder === self else { return }
+            self.inputContext?.invalidateCharacterCoordinates()
+        }
+    }
+
+    private func removeInputGeometryObservers() {
+        for observer in inputGeometryObservers { NotificationCenter.default.removeObserver(observer) }
+        inputGeometryObservers.removeAll()
+    }
+
+    private func observeInputGeometry() {
+        removeInputGeometryObservers()
+        guard let window, window.firstResponder === self else { return }
+        let center = NotificationCenter.default
+        let refresh: (Notification) -> Void = { [weak self] _ in self?.refreshInputCharacterCoordinates() }
+        var ancestor: NSView? = self
+        while let view = ancestor {
+            view.postsFrameChangedNotifications = true
+            view.postsBoundsChangedNotifications = true
+            inputGeometryObservers.append(center.addObserver(forName: NSView.frameDidChangeNotification, object: view, queue: nil, using: refresh))
+            inputGeometryObservers.append(center.addObserver(forName: NSView.boundsDidChangeNotification, object: view, queue: nil, using: refresh))
+            ancestor = view.superview
+        }
+        for name in [NSWindow.didMoveNotification, NSWindow.didResizeNotification, NSWindow.didChangeScreenNotification, NSWindow.didChangeBackingPropertiesNotification] {
+            inputGeometryObservers.append(center.addObserver(forName: name, object: window, queue: nil, using: refresh))
+        }
+    }
+
+    deinit {
+        removeInputGeometryObservers()
     }
     
     public func setAttributedString(_ attributedString: NSAttributedString) {
@@ -1569,16 +1632,23 @@ public final class InputTextView: BaseTextView, NSLayoutManagerDelegate, NSTextS
     }
     
     public override func becomeFirstResponder() -> Bool {
+        let accepted = super.becomeFirstResponder()
+        if accepted {
+            observeInputGeometry()
+            refreshInputCharacterCoordinates()
+        }
         DispatchQueue.main.async { [weak self] in
             self?.customDelegate?.inputViewResponderDidUpdate()
         }
-        return super.becomeFirstResponder()
+        return accepted
     }
     public override func resignFirstResponder() -> Bool {
+        let accepted = super.resignFirstResponder()
+        if accepted { removeInputGeometryObservers() }
         DispatchQueue.main.async { [weak self] in
             self?.customDelegate?.inputViewResponderDidUpdate()
         }
-        return super.resignFirstResponder()
+        return accepted
     }
     
     private var settingsKey: String {

@@ -6261,8 +6261,8 @@ public class ChatServiceRowView: TableRowView, RevealTableView {
 
     public override func doubleClick(in location: NSPoint) {
         if let item = self.item as? ChatRowItem, item.chatInteraction.presentation.state == .normal {
-            if self.hitTest(location) == nil || self.hitTest(location) == self, let message = item.message {
-                item.chatInteraction.setupReplyMessage(message, .init(messageId: message.id, quote: nil, innerSubject: nil) )
+            if self.hitTest(location) == nil || self.hitTest(location) == self {
+                _ = regramHandleMessageDoubleClick(item, view: self, location: location)
             }
         }
     }

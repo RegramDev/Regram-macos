@@ -48,16 +48,16 @@ final class RegramNetworkAppearanceTests: XCTestCase {
         XCTAssertFalse(entries.isEmpty)
         XCTAssertEqual(Set(entries.map(\.stableId)).count, entries.count)
         XCTAssertTrue(entries.allSatisfy { $0.stableId >= 0x40000000 })
-        XCTAssertFalse(entries.contains { ["messageDoubleTapAction", "messageDoubleTapActionWithoutEditPermission", "tapMessageRowToOpenContextMenu", "allChatsTitleLengthOverride", "chatListFolderTabDisplayMode"].contains($0.key) })
+        XCTAssertFalse(entries.contains { ["tapMessageRowToOpenContextMenu", "allChatsTitleLengthOverride", "chatListFolderTabDisplayMode"].contains($0.key) })
         XCTAssertFalse(entries.contains { $0.key == "contentSettings" })
-        for destination in ["networkPolicy/endpoint", "bottomBar/contacts", "fonts/chinese", "groupProfile/location", "settings.stories/showRepostToStory"] {
+        for destination in ["networkPolicy/endpoint", "bottomBar/contacts", "groupProfile/location", "settings.stories/showRepostToStory"] {
             XCTAssertTrue(entries.contains(where: { $0.destination == destination }), destination)
         }
         XCTAssertFalse(entries.contains(where: { $0.category == .notifications }))
         XCTAssertTrue(entries.contains(where: { $0.page == "updates" }))
         XCTAssertTrue(RegramSettingsCatalog.results(query: "更新", language: "zh-Hans").contains(where: { $0.page == "updates" || $0.key == "appUpdate" }))
         XCTAssertTrue(RegramSettingsCatalog.results(query: "DoH", language: "en").contains(where: { $0.destination == "pro.network/networkPolicy" }))
-        XCTAssertEqual(RegramSettingsCatalogEntry("fonts", "chinese", "Fonts.Chinese.Title").stableId, entries.first(where: { $0.destination == "fonts/chinese" })?.stableId)
+        XCTAssertEqual(RegramSettingsCatalogEntry("networkPolicy", "endpoint", "NetworkPolicy.Endpoint").stableId, entries.first(where: { $0.destination == "networkPolicy/endpoint" })?.stableId)
         XCTAssertTrue(RegramSettingsSearchQuery("ＣＡＦＥ", language: "en").matches("café"))
         XCTAssertTrue(RegramSettingsSearchQuery("正则 过滤", language: "zh-Hans").matches("关键词 正则 过滤"))
         XCTAssertFalse(RegramSettingsSearchQuery("  ", language: "en").matches("anything"))

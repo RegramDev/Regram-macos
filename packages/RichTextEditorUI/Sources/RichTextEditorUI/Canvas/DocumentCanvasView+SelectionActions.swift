@@ -57,6 +57,7 @@ extension DocumentCanvasView {
     }
 
     private func applySelection(from: Int, to: Int) {
+        finishInputComposition()
         anchor = clampGlobal(from); head = clampGlobal(to)
         needsDisplay = true; notifySelectionChanged()
     }

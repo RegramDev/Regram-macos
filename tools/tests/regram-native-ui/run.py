@@ -68,6 +68,10 @@ def main():
     with extracted.open("a") as source:
         source.write("import RegramCore\nfunc rebuildNativeBottomBar(_ tabController: TabBarController, tabs regramTabs: [RegramBottomBarItemId: TabItem], visible: [RegramBottomBarItemId], selected: RegramBottomBarItemId) {\n" + navigation + "\n}\n")
         source.write(navigation_switches + "\n")
+        appearance_source = ROOT / "Telegram-Mac/packages-integration/bridges/RegramAppearanceIntegration.swift"
+        source.write("import ColorPalette\nimport ThemeSettings\nimport Postbox\nimport TelegramCore\n")
+        source.write(declaration(appearance_source.read_text(), "func regramRepairedThemePalette(") + "\n")
+        source.write(declaration(appearance_source.read_text(), "func bindRegramThemeRepairs(") + "\n")
     sdk = subprocess.check_output(["xcrun", "--sdk", "macosx", "--show-sdk-path"], text=True).strip()
     args = ["xcrun", "swiftc", "-module-name", "RegramNativeUIChecks", "-parse-as-library", "-D", "SWIFT_PACKAGE", "-D", "STABLE", "-target", "arm64-apple-macos12.0", "-sdk", sdk, "-F", str(products), "-I", str(products), "-I", str(products / "include")]
     for module_map in sorted((intermediates / "GeneratedModuleMaps").glob("*.modulemap")):
@@ -90,7 +94,7 @@ def main():
     for framework in ["AppKit", "Foundation", "Security", "Speech", "AuthenticationServices", "CodeSyntax", "SceneKit", "CoreMediaIO", "Carbon", "WebKit", "MetalKit", "Metal", "CoreSpotlight", "RLottie", "CoreMedia", "Sparkle", "Contacts", "QuartzCore", "VideoToolbox", "Accelerate", "EventKit", "LocalAuthentication", "CoreServices", "CoreVideo", "OpenGL", "IOKit", "QuickLook", "JavaScriptCore", "MapKit", "Quartz", "AVFoundation", "MediaPlayer"]:
         args += ["-framework", framework]
     args += ["-o", str(executable)]
-    source_files = [options.page_builder, ROOT / "packages/RegramUI/Sources/RegramUI/RegramSelectionRows.swift", ROOT / "packages/SettingsUI/Sources/SettingsUI/AccountViewController.swift", ROOT / "packages/RegramUI/Sources/RegramUI/RegramBookmarksController.swift", navigation_source, navigation_controller_source]
+    source_files = [options.page_builder, ROOT / "packages/RegramUI/Sources/RegramUI/RegramSelectionRows.swift", ROOT / "packages/SettingsUI/Sources/SettingsUI/AccountViewController.swift", ROOT / "packages/RegramUI/Sources/RegramUI/RegramBookmarksController.swift", navigation_source, navigation_controller_source, appearance_source]
     manifest = {"productionSources": {str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in source_files}, "accountIconExpressions": glyphs, "cachedObjects": len(objects), "applicationObjectsLinked": False, "shareExtensionObjectsLinked": False, "imageResources": "installed Assets.car", "target": "arm64-apple-macos12.0"}
     (output / "manifest.json").write_text(json.dumps(manifest, indent=2))
     (output / "compile-command.txt").write_text(shlex.join(args))
