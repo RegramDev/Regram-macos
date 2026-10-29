@@ -989,6 +989,8 @@
 		E83AD432732D5B3FA3BA9F2D /* RegramUI in Frameworks */ = {isa = PBXBuildFile; productRef = 84A1701E123256D7A0BC172E /* RegramUI */; };
 		803CFDF764EE45BD8E2BF38A /* RegramAppearanceIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7C88C7600AA4E26AFE2B15B /* RegramAppearanceIntegration.swift */; };
 		1BCDBD573C254AA69AF06F28 /* RegramDataReset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F8C66E561C84F2EAD6433CB /* RegramDataReset.swift */; };
+		C0DEBACC1000000000000001 /* AccountResetSupport in Frameworks */ = {isa = PBXBuildFile; productRef = C0DEBACC1000000000000003 /* AccountResetSupport */; };
+		C0DEBACC1000000000000002 /* AccountResetSupport in Frameworks */ = {isa = PBXBuildFile; productRef = C0DEBACC1000000000000004 /* AccountResetSupport */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -2024,6 +2026,7 @@
 				2037C058F06EC3DBD00E2F08 /* AvatarUIShare in Frameworks */,
 				B1FA9B51E5E4F05E194C4934 /* TelegramUtilsShare in Frameworks */,
 				72C71783A0E1779049B81298 /* TelegramContextShare in Frameworks */,
+				C0DEBACC1000000000000002 /* AccountResetSupport in Frameworks */,
 				31864961DB5EA80D31BE47DB /* GeneralRowsShare in Frameworks */,
 				D7B6E2D49B7BB627BA468E5C /* TelegramThemeShare in Frameworks */,
 				B84A7663ED2EC1703C61889D /* FoundationUtils in Frameworks */,
@@ -2125,6 +2128,7 @@
 				085B6C90304CA53F691DF2BC /* QuickSwitcher in Frameworks */,
 				1862EEF9189FCF93570DBB3C /* SelectPeersUI in Frameworks */,
 				29B9B2CF4D64B3C4CF4AEA48 /* SettingsUI in Frameworks */,
+				C0DEBACC1000000000000001 /* AccountResetSupport in Frameworks */,
 				203539E61CF29A531AFDC6B6 /* CallsUI in Frameworks */,
 				440D4FCF2D61E243EFA4AB47 /* StoriesUI in Frameworks */,
 				5E1BA73BB5BD511EA38CFA55 /* WallpaperUI in Frameworks */,
@@ -3654,6 +3658,7 @@
 				2DBE492FD219DCD254A93957 /* AvatarUIShare */,
 				F3DD5977041CBCE33A98E464 /* TelegramUtilsShare */,
 				44E83C8CAD7652510D91ABEA /* TelegramContextShare */,
+				C0DEBACC1000000000000004 /* AccountResetSupport */,
 				478591E264E224F9B26FA893 /* GeneralRowsShare */,
 				7C13C59242BA714DFE654DEC /* TelegramThemeShare */,
 				5A62F6BDEB7EDB55D4C17A92 /* FoundationUtils */,
@@ -3760,6 +3765,7 @@
 				50941F4CCB10813A5A22AAD4 /* QuickSwitcher */,
 				57E7338A178CB9DFD6AB2173 /* SelectPeersUI */,
 				F31F9758C68E1A13DB8606A5 /* SettingsUI */,
+				C0DEBACC1000000000000003 /* AccountResetSupport */,
 				B8A8E44F7300232B017AAAB2 /* CallsUI */,
 				A98D4E6AB0807C52D9939D93 /* StoriesUI */,
 				196E677E6F95C4389353C1C1 /* WallpaperUI */,
@@ -6096,6 +6102,14 @@
 		};
 		8BE0F3050B8B5791956B3FE4 /* RegramCore */ = {isa = XCSwiftPackageProductDependency; package = 96295964D06C55868CFC39B7; productName = RegramCore; };
 		84A1701E123256D7A0BC172E /* RegramUI */ = {isa = XCSwiftPackageProductDependency; package = E6847C64125E57E996743CCA; productName = RegramUI; };
+		C0DEBACC1000000000000003 /* AccountResetSupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AccountResetSupport;
+		};
+		C0DEBACC1000000000000004 /* AccountResetSupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AccountResetSupport;
+		};
 /* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = D098C70D1D7E175A007784E4 /* Project object */;

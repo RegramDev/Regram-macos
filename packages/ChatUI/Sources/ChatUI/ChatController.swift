@@ -3923,13 +3923,8 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                         let countViewKey: PostboxViewKey = .historyTagSummaryView(tag: MessageTags(), peerId: peerId, threadId: savedMessagesPeerId.toInt64(), namespace: Namespaces.Message.Cloud, customTag: nil)
                         answersCount = context.account.postbox.combinedView(keys: [basicPeerKey, countViewKey])
                         |> map { views -> Int32? in
-                            
-                            var messageCount = 0
-                            if let summaryView = views.views[countViewKey] as? MessageHistoryTagSummaryView, let count = summaryView.count {
-                                messageCount += Int(count)
-                            }
-                            
-                            return Int32(messageCount)
+                            let count = (views.views[countViewKey] as? MessageHistoryTagSummaryView)?.count
+                            return mode.isSavedMessagesThread ? count : count ?? 0
                         }
 
                     } else if isThread {
@@ -4611,7 +4606,9 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                         guard let strongSelf, strongSelf.messageFocusRequestId == requestId,
                               strongSelf.chatLocation == chatLocation, strongSelf.locationValue?.tag == locationTag else { return }
                         if let messageId = messageId {
-                            strongSelf.chatInteraction.focusMessageId(nil, .init(messageId: messageId, string: nil), .top(id: 0, innerId: nil, animated: true, focus: .init(focus: false), inset: 30))
+                            let topInset = strongSelf.genericView.tableView.contentInsets.top
+                            let inset: CGFloat = topInset + 30 + 10
+                            strongSelf.chatInteraction.focusMessageId(nil, .init(messageId: messageId, string: nil), .top(id: 0, innerId: nil, animated: true, focus: .init(focus: false), inset: inset))
                         }
                     }))
                 case .scheduled:
@@ -4631,7 +4628,9 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                         return true
                     })
                     if let targetItem {
-                        strongSelf.genericView.tableView.scroll(to: .top(id: targetItem.stableId, innerId: nil, animated: true, focus: .init(focus: false), inset: 30))
+                        let topInset = strongSelf.genericView.tableView.contentInsets.top
+                        let inset: CGFloat = topInset + 30 + 10
+                        strongSelf.genericView.tableView.scroll(to: .top(id: targetItem.stableId, innerId: nil, animated: true, focus: .init(focus: false), inset: inset))
                     }
                 case .pinned:
                     break
@@ -11524,6 +11523,9 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
             return takeTableItem?(msgId)
         })
         super.init(context)
+        if mode.isSavedMessagesThread {
+            SavedChatControllerRegistry.shared.add(self)
+        }
 
         self.bar = .init(height: 0)
         self.insets = NSEdgeInsets()
@@ -11959,7 +11961,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
             }
             
             if let peer = value.mainPeer, let oldPeer = oldValue.mainPeer {
-                if TelegramUtilsHooks.shared.peerIsForum(peer) && !TelegramUtilsHooks.shared.peerIsForum(oldPeer) || (oldValue.threadInfo != nil && value.threadInfo == nil && !peer.displayForumAsTabs(splitState: context.layout)), !peer.isMonoForum {
+                if TelegramUtilsHooks.shared.peerIsForum(peer) && !TelegramUtilsHooks.shared.peerIsForum(oldPeer) || (!self.mode.isSavedMessagesThread && oldValue.threadInfo != nil && value.threadInfo == nil && !peer.displayForumAsTabs(splitState: context.layout)), !peer.isMonoForum {
                     if (self.navigationController?.stackCount ?? 0) > 1 {
                         self.navigationController?.removeImmediately(self)
                     } else if self.mode == .preview {

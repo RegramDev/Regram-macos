@@ -241,6 +241,31 @@ public class ChatDateStickView : TableStickView {
         
         containerView.set(handler: { [weak self] _ in
             guard let self, let item = self.item as? ChatDateStickItem, let interaction = item.chatInteraction else { return }
+            var ignore: Bool = false
+            let table = item.table ?? (self.superview as? TableView)
+            if let table {
+                let row = table.visibleRows()
+                if row.length > 0 {
+                    let minRow = max(0, row.location)
+                    let maxRow = min(table.count - 1, row.location + row.length - 1)
+                    for i in minRow ... maxRow {
+                        if let underItem = table.item(at: i) as? ChatDateStickItem, underItem.timestamp == item.timestamp {
+                            ignore = true
+                            break
+                        }
+                    }
+                }
+            }
+            if self.header && !ignore {
+                self.cancelCount()
+                if let location = item.messageCountLocation, case let .peer(_, _, _, _, _, minDate?, _) = location {
+                    interaction.jumpToDate(Date(timeIntervalSince1970: TimeInterval(minDate)))
+                } else {
+                    let timeDifference = interaction.mode == .scheduled ? 0 : interaction.interactionContext.timeDifference
+                    interaction.jumpToDate(Date(timeIntervalSince1970: TimeInterval(item.timestamp) + timeDifference))
+                }
+                return
+            }
             let canOpenCalendar: Bool
             switch interaction.mode {
             case .history, .thread:
