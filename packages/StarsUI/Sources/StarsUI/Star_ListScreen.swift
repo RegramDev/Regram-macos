@@ -1205,7 +1205,7 @@ private func entries(_ state: State, arguments: Arguments) -> [InputDataEntry] {
                 index += 1
                 
                 entries.append(.custom(sectionId: sectionId, index: index, value: .none, identifier: _id_transaction_mode, equatable: .init(state.transactionMode), comparable: nil, item: { initialSize, stableId in
-                    return SegmentTypesRowItem(initialSize, stableId: stableId, items: transactionSegments(state.transactionMode), viewType: .firstItem, callback: { uniqueId in
+                    return StarTransactionTabsRowItem(initialSize, stableId: stableId, items: transactionSegments(state.transactionMode), viewType: .firstItem, callback: { uniqueId in
                         switch uniqueId {
                         case 0:
                             arguments.toggleFilterMode(.all)
