@@ -347,7 +347,7 @@ func installSettingsUIHooks() {
         }
         context.sharedContext.openAccount(id: id)
     }, makeAccountBadgeNode: { account, context in
-        return GlobalBadgeNode(account, sharedContext: (context as! AccountContext).sharedContext, getColor: { _ in theme.colors.accent }, sync: true)
+        return GlobalBadgeNode(account, sharedContext: (context as! AccountContext).sharedContext, getColor: { _ in theme.colors.accent })
     }, makeChatListFiltersListController: { context in
         return ChatListFiltersListController(context: context as! AccountContext)
     }, appUpdateStateText: { state in

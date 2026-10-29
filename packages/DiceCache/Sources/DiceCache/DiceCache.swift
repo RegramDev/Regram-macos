@@ -112,6 +112,7 @@ private final class EmojiDataContext {
 open class DiceCache {
     private let postbox: Postbox
     private let engine: TelegramEngine
+    private let queue = Queue(name: "diceCache", qos: .userInitiated)
     private var dataContexts: [String : EmojiDataContext] = [:]
     private var dataEffectsContexts: [String : EmojiDataContext] = [:]
     
@@ -180,10 +181,9 @@ open class DiceCache {
         self.engine = engine
     }
 
-    private var hasLoaded = false
+    private let hasLoaded = Atomic(value: false)
     private func ensureLoaded() {
-        if hasLoaded { return }
-        hasLoaded = true
+        if hasLoaded.swap(true) { return }
 
         let postbox = self.postbox
         let engine = self.engine
@@ -316,7 +316,7 @@ open class DiceCache {
                 }
                 return dict
             }
-        } |> deliverOnResourceQueue
+        } |> deliverOn(self.queue)
         
         
         let dataEffects = sharedEmojiEffects.get() |> mapToSignal { values -> Signal<[String: [(String, Data?, TelegramMediaFile)]], NoError> in
@@ -342,7 +342,7 @@ open class DiceCache {
                 }
                 return dict
             }
-        } |> deliverOnResourceQueue
+        } |> deliverOn(self.queue)
         
         loadDataDisposable.set(combineLatest(data, dataEffects).start(next: { [weak self] data, dataEffects in
             guard let `self` = self else {
@@ -351,18 +351,18 @@ open class DiceCache {
             for diceData in data {
                 let context = self.dataContexts[diceData.key] ?? EmojiDataContext()
                 context.data = diceData.value
+                self.dataContexts[diceData.key] = context
                 for subscriber in context.subscribers.copyItems() {
                     subscriber(diceData.value)
                 }
-                self.dataContexts[diceData.key] = context
             }
             for effect in dataEffects {
                 let context = self.dataEffectsContexts[effect.key] ?? EmojiDataContext()
                 context.data = effect.value
+                self.dataEffectsContexts[effect.key] = context
                 for subscriber in context.subscribers.copyItems() {
                     subscriber(effect.value)
                 }
-                self.dataEffectsContexts[effect.key] = context
             }
         }))
         
@@ -370,101 +370,55 @@ open class DiceCache {
     
     open func animationEffect(for emoji: String) -> Signal<[(String, Data?, TelegramMediaFile)], NoError> {
         ensureLoaded()
-        return Signal { [weak self] subscriber in
-            guard let `self` = self else {
-                return EmptyDisposable
-            }
-            var cancelled = false
-            let disposable = MetaDisposable()
-
-            let invoke = { [self] in
-                if !cancelled {
-                    var dataContext: EmojiDataContext
-                    if let dc = self.dataEffectsContexts[emoji.withoutColorizer] {
-                        dataContext = dc
-                    } else {
-                        dataContext = EmojiDataContext()
-                    }
-                    
-                    self.dataEffectsContexts[emoji.withoutColorizer] = dataContext
-                    
-                    let index = dataContext.subscribers.add({ data in
-                        if !cancelled {
-                            subscriber.putNext(data)
-                        }
-                    })
-                    subscriber.putNext(dataContext.data)
-                    disposable.set(ActionDisposable { [weak self] in
-                        resourcesQueue.async {
-                            if let current = self?.dataEffectsContexts[emoji.withoutColorizer] {
-                                current.subscribers.remove(index)
-                            }
-                        }
-                    })
-                }
-                
-            }
-            resourcesQueue.sync(invoke)
-
-            return ActionDisposable {
-                disposable.dispose()
-                cancelled = true
-            }
-        }
+        return dataSignal(for: emoji.withoutColorizer, effects: true)
     }
 
     
     
-    open func interactiveSymbolData(baseSymbol: String, synchronous: Bool) -> Signal<[(String, Data?, TelegramMediaFile)], NoError> {
+    open func interactiveSymbolData(baseSymbol: String, synchronous _: Bool) -> Signal<[(String, Data?, TelegramMediaFile)], NoError> {
         ensureLoaded()
-        return Signal { [weak self] subscriber in
+        return dataSignal(for: baseSymbol, effects: false)
+    }
 
+    private func dataSignal(for symbol: String, effects: Bool) -> Signal<[(String, Data?, TelegramMediaFile)], NoError> {
+        return Signal { [weak self] subscriber in
             guard let `self` = self else {
                 return EmptyDisposable
             }
-            var cancelled = false
+            let cancelled = Atomic(value: false)
             let disposable = MetaDisposable()
-            
-            let invoke = { [self] in
-                if !cancelled {
-                    var dataContext: EmojiDataContext
-                    if let dc = self.dataContexts[baseSymbol] {
-                        dataContext = dc
-                    } else {
-                        dataContext = EmojiDataContext()
-                    }
-                    
-                    self.dataContexts[baseSymbol] = dataContext
-                    
-                    let index = dataContext.subscribers.add({ data in
-                        if !cancelled {
-                            subscriber.putNext(data)
-                        }
-                    })
-                    
-                    subscriber.putNext(dataContext.data)
-                    
-                    disposable.set(ActionDisposable { [weak self] in
-                        resourcesQueue.async {
-                            if let current = self?.dataContexts[baseSymbol] {
-                                current.subscribers.remove(index)
-                            }
-                        }
-                    })
+            let queue = self.queue
+
+            queue.async {
+                guard !cancelled.with({ $0 }) else {
+                    return
                 }
-                
+                let dataContext: EmojiDataContext
+                if effects {
+                    dataContext = self.dataEffectsContexts[symbol] ?? EmojiDataContext()
+                    self.dataEffectsContexts[symbol] = dataContext
+                } else {
+                    dataContext = self.dataContexts[symbol] ?? EmojiDataContext()
+                    self.dataContexts[symbol] = dataContext
+                }
+                let index = dataContext.subscribers.add { data in
+                    if !cancelled.with({ $0 }) {
+                        subscriber.putNext(data)
+                    }
+                }
+                disposable.set(ActionDisposable {
+                    queue.async {
+                        dataContext.subscribers.remove(index)
+                    }
+                })
+                if !cancelled.with({ $0 }) {
+                    subscriber.putNext(dataContext.data)
+                }
             }
-            
-          //  if synchronous {
-                resourcesQueue.sync(invoke)
-           // } else {
-            //    resourcesQueue.async(invoke)
-          //  }
-            
-            
+
             return ActionDisposable {
+                _ = cancelled.swap(true)
                 disposable.dispose()
-                cancelled = true
             }
         }
     }

@@ -85,7 +85,7 @@ let package = Package(name: "ChatHeaderChecks", platforms: [.macOS(.v12)], depen
         for marker, body in parts.items():
             text = text.replace(marker, body)
         (integration_dir / name).write_text(text)
-    common = ["--package-path", str(directory), "--disable-sandbox", "--jobs", "2"]
+    common = ["--package-path", str(directory), "--disable-sandbox", "--jobs", "2", "--configuration", "release", "-Xswiftc", "-DSTABLE"]
     if args.scratch_path:
         common += ["--scratch-path", str(args.scratch_path.resolve())]
     print("Testing exact layout source and extracted header methods with native TGUIKit controls and Translate", flush=True)

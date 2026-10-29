@@ -69,4 +69,4 @@ let package = Package(name: "PaidMessageState", targets: [.testTarget(name: "Pai
     environment = os.environ.copy()
     environment["CLANG_MODULE_CACHE_PATH"] = str(directory / "ModuleCache")
     environment["SWIFTPM_MODULECACHE_OVERRIDE"] = str(directory / "ModuleCache")
-    raise SystemExit(subprocess.run(["swift", "test", "--package-path", str(directory), "--disable-sandbox", "--jobs", "2"], env=environment).returncode)
+    raise SystemExit(subprocess.run(["swift", "test", "--package-path", str(directory), "--disable-sandbox", "--jobs", "2", "--configuration", "release", "-Xswiftc", "-DSTABLE"], env=environment).returncode)

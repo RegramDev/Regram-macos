@@ -1698,6 +1698,14 @@
     "Bookmarks.LocalNotice": "Bookmarks and tags are stored on this Mac. Open a message to view it in its original chat."
   },
   "macos": {
+    "AntiFeatures.SkipBots": "Do Not Keep Bot Messages",
+    "ios.RG.BottomBarLayout": "Bottom Bar Layout",
+    "ios.Settings.Editor.bottomBarLayout.Description": "Visible items, order, labels and width",
+    "ios.Settings.Tabs.Customize": "Bottom Bar Layout",
+    "RG.BottomBarLayout": "Bottom Bar",
+    "Settings.Editor.bottomBarLayout.Description": "Telegram bottom bar with optional contacts",
+    "Settings.Tabs.Customize": "Bottom Bar",
+    "GroupAdmins.Show": "Show Group Administrators",
     "Browser.Translation.SystemUnavailable": "Apple webpage translation is unavailable on this Mac. Select another translation service.",
     "Common.UpdateOS": "macOS update required",
     "EraseData.Notice": "Logs out every account and deletes Regram’s local data, caches and settings on this Mac. You will need to log in again.",

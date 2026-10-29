@@ -151,7 +151,20 @@ fileprivate struct ChannelAdminsControllerState: Equatable {
     
 }
 
-private func channelAdminsControllerEntries(context: any AccountContextProtocol, accountPeerId: PeerId, view: PeerView, state: ChannelAdminsControllerState, participants: [RenderedChannelParticipant]?, isCreator: Bool) -> [ChannelAdminsEntry] {
+private func channelAdminsControllerEntries(context: any AccountContextProtocol, accountPeerId: PeerId, view: PeerView, state: ChannelAdminsControllerState, participants: [RenderedChannelParticipant]?, isCreator: Bool, readOnly: Bool) -> [ChannelAdminsEntry] {
+    if readOnly {
+        guard let participants else {
+            return [.loading]
+        }
+        let sortedParticipants = participants.sorted(by: <)
+        var entries: [ChannelAdminsEntry] = [.section(1), .adminsHeader(sectionId: 2, strings().adminsGroupAdmins, .textTopItem)]
+        for (index, participant) in sortedParticipants.enumerated() {
+            entries.append(.adminPeerItem(sectionId: 2, Int32(index), participant, nil, bestGeneralViewType(sortedParticipants, for: index)))
+        }
+        entries.append(.section(2))
+        return entries
+    }
+
     var entries: [ChannelAdminsEntry] = []
     
     let participants = participants ?? []
@@ -417,13 +430,15 @@ open class ChannelAdminsViewController<Context: AccountContextProtocol>: Editabl
     fileprivate let stateValue = Atomic(value: ChannelAdminsControllerState())
 
     private let peerId:PeerId
+    private let readOnly: Bool
     
     private let addAdminDisposable:MetaDisposable = MetaDisposable()
     private let disposable:MetaDisposable = MetaDisposable()
     private let removeAdminDisposable:MetaDisposable = MetaDisposable()
     private let openPeerDisposable:MetaDisposable = MetaDisposable()
-    public init( _ context:Context, peerId:PeerId) {
+    public init( _ context:Context, peerId:PeerId, readOnly: Bool = false) {
         self.peerId = peerId
+        self.readOnly = readOnly
         super.init(context)
     }
     
@@ -433,6 +448,7 @@ open class ChannelAdminsViewController<Context: AccountContextProtocol>: Editabl
     
     open override func viewDidLoad() {
         super.viewDidLoad()
+        rightBarView.isHidden = self.readOnly
         genericView.contentInsets = NavigationBarView.contentTopInset
         genericView.getBackgroundColor = {
             theme.colors.listBackground
@@ -440,13 +456,14 @@ open class ChannelAdminsViewController<Context: AccountContextProtocol>: Editabl
         
         let context = self.context
         let peerId = self.peerId
+        let readOnly = self.readOnly
         
         
         let antiSpamBotConfiguration = AntiSpamBotConfiguration.with(appConfiguration: context.appConfiguration)
         
         let resolveAntiSpamPeerDisposable = MetaDisposable()
         actionsDisposable.add(resolveAntiSpamPeerDisposable)
-        if let antiSpamBotId = antiSpamBotConfiguration.antiSpamBotId {
+        if !readOnly, let antiSpamBotId = antiSpamBotConfiguration.antiSpamBotId {
             resolveAntiSpamPeerDisposable.set(
                 (context.engine.data.get(TelegramEngine.EngineData.Item.Peer.Peer(id: antiSpamBotId))
                 |> mapToSignal { peer -> Signal<Never, NoError> in
@@ -497,8 +514,14 @@ open class ChannelAdminsViewController<Context: AccountContextProtocol>: Editabl
                 }
             })
         
-        }, openAdmin: { participant in
-            showModal(with: ChannelAdminModalController(context, peerId: peerId, adminId: participant.peer.id, initialParticipant: participant.participant, updated: { _ in }, upgradedToSupergroup: upgradedToSupergroup), for: context.window)
+        }, openAdmin: { [weak self] participant in
+            if readOnly {
+                if let navigationController = self?.navigationController {
+                    ChannelAdminUIHooks.shared.pushPeerInfo(navigationController, context, participant.peer.id)
+                }
+            } else {
+                showModal(with: ChannelAdminModalController(context, peerId: peerId, adminId: participant.peer.id, initialParticipant: participant.participant, updated: { _ in }, upgradedToSupergroup: upgradedToSupergroup), for: context.window)
+            }
         }, removeAdmin: { [weak self] adminId in
             
             updateState {
@@ -546,6 +569,9 @@ open class ChannelAdminsViewController<Context: AccountContextProtocol>: Editabl
         let stateValue = self.stateValue
 
         self.onDeinit = {
+            guard !readOnly else {
+                return
+            }
             _ = (peerView.get() |> deliverOnMainQueue |> take(1)).start(next: { peerView in
                 if let peer = peerViewMainPeer(peerView) as? TelegramChannel {
                     switch peer.info {
@@ -614,8 +640,15 @@ open class ChannelAdminsViewController<Context: AccountContextProtocol>: Editabl
             membersAndLoadMoreControl = (membersDisposable, nil)
         }
         
-        let (membersDisposable, _) = membersAndLoadMoreControl
+        let (membersDisposable, loadMoreControl) = membersAndLoadMoreControl
         actionsDisposable.add(membersDisposable)
+        if readOnly, let loadMoreControl {
+            genericView.setScrollHandler { position in
+                if position.direction == .bottom {
+                    context.peerChannelMemberCategoriesContextsManager.loadMore(peerId: peerId, control: loadMoreControl)
+                }
+            }
+        }
         
 
         
@@ -633,12 +666,12 @@ open class ChannelAdminsViewController<Context: AccountContextProtocol>: Editabl
                     isSupergroup = channel.isSupergroup
                 }
                 _ = viewValue.swap(view)
-                let entries = channelAdminsControllerEntries(context: context, accountPeerId: context.peerId, view: view, state: state, participants: admins, isCreator: isCreator).map{AppearanceWrapperEntry(entry: $0, appearance: appearance)}
+                let entries = channelAdminsControllerEntries(context: context, accountPeerId: context.peerId, view: view, state: state, participants: admins, isCreator: isCreator, readOnly: readOnly).map{AppearanceWrapperEntry(entry: $0, appearance: appearance)}
                 return (prepareTransition(left: previousEntries.swap(entries), right: entries, initialSize: initialSize.modify{$0}, arguments: arguments, isSupergroup: isSupergroup), isCreator)
         }
         
         disposable.set((signal |> deliverOnMainQueue).start(next: { [weak self] transition, isCreator in
-            self?.rightBarView.isHidden = !isCreator
+            self?.rightBarView.isHidden = readOnly || !isCreator
             self?.genericView.merge(with: transition)
             self?.readyOnce()
         }))
@@ -666,6 +699,9 @@ open class ChannelAdminsViewController<Context: AccountContextProtocol>: Editabl
     }
     
     open override func update(with state: ViewControllerState) {
+        guard !readOnly else {
+            return
+        }
         super.update(with: state)
         self.statePromise.set(stateValue.modify({$0.withUpdatedEditing(state == .Edit)}))
     }

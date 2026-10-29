@@ -214,6 +214,7 @@ public enum RegramSettingsCatalog {
         .init("pro.privacy", "privacySettings", "Settings.Category.privacy"),
         .init("pro.tools", "appUpdate", "AppUpdate.Title"),
         .init("antiFeatures", "antiRevoke", "AntiFeatures.Revoke"),
+        .init("antiFeatures", "antiRevokeSkipBots", "AntiFeatures.SkipBots", keywords: "bot 机器人 機器人 防撤回"),
         .init("antiFeatures", "revokedMarker", "RevokedMarker.Title"),
         .init("revokedMarker", "style", "RevokedMarker.Style"),
         .init("revokedMarker", "text", "RevokedMarker.Text"),

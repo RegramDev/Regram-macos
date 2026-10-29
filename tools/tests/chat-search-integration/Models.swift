@@ -3,7 +3,7 @@ import ColorPalette
 import SwiftSignalKit
 import TGUIKit
 
-struct PeerId: Equatable, Hashable { let value: Int }
+struct PeerId: Equatable, Hashable { let value: Int; func toInt64() -> Int64 { Int64(value) } }
 class Peer: Equatable {
   let id: PeerId
   let compactDisplayTitle: String
@@ -22,6 +22,8 @@ struct Message {
   let id: MessageId
   let text: String
 }
+func regramMessageFilterChanges(accountId: Int64) -> Signal<Void, NoError> { .single(()) }
+func regramVisibleMessages(_ messages: [Message], accountId: Int64) -> [Message] { messages }
 struct MessageIndex { let messageId: MessageId }
 func isEqualMessages(_ a: Message, _ rhs: Message) -> Bool { a.id == rhs.id }
 struct SearchMessagesState: Equatable { let offset: Int }

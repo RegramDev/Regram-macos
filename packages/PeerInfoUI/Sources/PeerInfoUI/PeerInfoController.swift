@@ -839,7 +839,7 @@ public class PeerInfoController<Context: AccountContextProtocol>: EditableViewCo
             }
             
                 
-            _ = combineLatest(context.diceCache.animationEffect(for: emoji) |> take(1), yearStickers).startStandalone(next: { [weak item, weak self] values, yearStickers in
+            _ = (combineLatest(context.diceCache.animationEffect(for: emoji) |> take(1), yearStickers) |> deliverOnMainQueue).startStandalone(next: { [weak item, weak self] values, yearStickers in
                 if let file = values.first, let itemView = item?.view {
                     
                     let layer = InlineStickerView(account: context.account, file: file.2, size: NSMakeSize(300, 300), playPolicy: .onceEnd)

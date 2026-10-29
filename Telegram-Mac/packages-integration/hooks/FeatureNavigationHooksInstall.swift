@@ -326,6 +326,9 @@ func installFeatureNavigationHooks() {
     hooks.makeChannelAdminController = { context, peerId, adminId, initialParticipant, updated, upgradedToSupergroup in
         return ChannelAdminModalController(context as! AccountContext, peerId: peerId, adminId: adminId, initialParticipant: initialParticipant, updated: updated, upgradedToSupergroup: upgradedToSupergroup)
     }
+    hooks.makeGroupAdminsController = { context, peerId in
+        return ChannelAdminsViewController(context as! AccountContext, peerId: peerId, readOnly: true)
+    }
     hooks.makeChannelAdminControllerWithContext = { context, peerId, adminId, initialParticipant, updated, upgradedToSupergroup in
         return ChannelAdminModalController(context as! AccountContext, peerId: peerId, adminId: adminId, initialParticipant: initialParticipant, updated: updated, upgradedToSupergroup: upgradedToSupergroup)
     }

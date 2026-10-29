@@ -1149,12 +1149,12 @@ private let previewPlaceholderExtensions: Set<String> = ["jpg", "jpeg", "jpe", "
 private let previewPlaceholderResources = Atomic<[UInt32: LocalFileReferenceMediaResource]>(value: [:])
 private let previewPlaceholderSuccessors = Atomic<[MediaId: MediaId]>(value: [:])
 
-private func schedulePreviewPreparedMedias(_ apply: @escaping () -> Void, attempt: Int = 0) {
+private func schedulePreviewPreparedMedias(_ apply: @escaping () -> Void, queue: Queue, attempt: Int = 0) {
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: {
         if NSEvent.pressedMouseButtons != 0 && attempt < 40 {
-            schedulePreviewPreparedMedias(apply, attempt: attempt + 1)
+            schedulePreviewPreparedMedias(apply, queue: queue, attempt: attempt + 1)
         } else {
-            prepareQueue.async(apply)
+            queue.async(apply)
         }
     })
 }
@@ -1302,7 +1302,12 @@ private struct UrlAndState : Equatable {
 }
 
 
+private func makeMediaPreviewQueue() -> Queue {
+    return Queue(name: "mediaPreview", qos: .userInitiated)
+}
+
 public class PreviewSenderController: ModalViewController, Notifable {
+    private let preparationQueue = makeMediaPreviewQueue()
 
     public override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
@@ -2047,7 +2052,8 @@ public class PreviewSenderController: ModalViewController, Notifable {
         let previousMedias:Atomic<[PreviewMedia]> = Atomic(value: [])
         let savedStateMedias:Atomic<[PreviewSendingState : [PreviewMedia]]> = Atomic(value: [:])
 
-        let urlSignal = self.urlsAndStateValue.get() |> deliverOnPrepareQueue
+        let preparationQueue = self.preparationQueue
+        let urlSignal = self.urlsAndStateValue.get() |> deliverOn(preparationQueue)
         
         let placeholderResource = previewPlaceholderResource(color: (self.presentation ?? theme).colors.grayBackground)
         let mediaPreparationQueue = self.mediaPreparationQueue
@@ -2101,7 +2107,7 @@ public class PreviewSenderController: ModalViewController, Notifable {
                             return current
                         }.count == 1
                         if isFirst {
-                            schedulePreviewPreparedMedias(applyPreparedMedias)
+                            schedulePreviewPreparedMedias(applyPreparedMedias, queue: preparationQueue)
                         }
                     }
                 }
@@ -2151,7 +2157,7 @@ public class PreviewSenderController: ModalViewController, Notifable {
         
         let previousEntries:Atomic<[AppearanceWrapperEntry<PreviewEntry>]> = Atomic(value: [])
         
-        let itemsTransition: Signal<TableUpdateTransition, NoError> = combineLatest(queue: prepareQueue, statePromise.get() |> map { state -> ([PreviewEntry], PreviewState) in
+        let itemsTransition: Signal<TableUpdateTransition, NoError> = combineLatest(queue: preparationQueue, statePromise.get() |> map { state -> ([PreviewEntry], PreviewState) in
             return (previewMediaEntries(state), state)
         }, appearanceSignal) |> map { datas, appearance in
             let entries = datas.0.map { AppearanceWrapperEntry(entry: $0, appearance: appearance) }

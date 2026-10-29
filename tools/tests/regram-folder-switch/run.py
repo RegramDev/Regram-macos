@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import json
 import plistlib
+import re
 import shlex
 import shutil
 import subprocess
@@ -29,6 +30,7 @@ def main():
     parser.add_argument('--source-root', type=Path, default=ROOT)
     parser.add_argument('--negative-control', type=Path)
     parser.add_argument('--negative-layout', type=Path)
+    parser.add_argument('--negative-scroll', type=Path)
     options = parser.parse_args()
     output = options.output
     output.mkdir(parents=True, exist_ok=True)
@@ -43,6 +45,7 @@ def main():
     archive_source = controller
     geometry_source = peers
     layout_source = reveal
+    scroll_source = (options.negative_scroll / 'ChatListController.swift').read_text() if options.negative_scroll else controller
     if options.negative_control:
         route_source = (options.negative_control / 'PeersListController.swift').read_text()
         geometry_source = route_source
@@ -55,11 +58,13 @@ def main():
     segment_start = reveal.index('        let previousItems = Dictionary(uniqueKeysWithValues: segmentItems.map')
     segment_end = reveal.index('        guard !items.isEmpty', segment_start)
     replacements = {
-        'PRODUCTION_FILTER_DATA': declaration(controller, 'public struct FilterData : Equatable').replace('public ', ''),
+        'PRODUCTION_FILTER_DATA': declaration(scroll_source, 'public struct FilterData : Equatable').replace('public ', ''),
         'PRODUCTION_BASE_UPDATE': declaration(peers, '    open func updateState(_ f:').replace('open ', ''),
         'PRODUCTION_BASE_SELECT': declaration(peers, '    open func selectFilter(').replace('open ', ''),
         'PRODUCTION_CHAT_SELECT': declaration(controller, '    public override func selectFilter(').replace('public ', ''),
-        'PRODUCTION_CHAT_UPDATE': declaration(controller, '    public func updateFilter(').replace('public ', ''),
+        'PRODUCTION_CHAT_UPDATE': declaration(scroll_source, '    public func updateFilter(').replace('public ', ''),
+        'PRODUCTION_CHAT_SCROLL': declaration(scroll_source, 'genericView.tableView.setScrollHandler({ [weak self] scroll in').split('setScrollHandler(', 1)[1],
+        'NATIVE_PAGING_COUNT': re.search(r'aroundChatListView\(groupId: groupId, filterPredicate: filterPredicate, index: index, count: (\d+)\)', (ROOT / 'packages/TelegramUtils/Sources/TelegramUtils/ChatListFilterPredicate.swift').read_text()).group(1),
         'PRODUCTION_TOP_ROUTE': route,
         'PRODUCTION_SIDEBAR_ROUTE': declaration(bridge, 'func navigateToChatListFilter('),
         'PRODUCTION_ARCHIVE': archive_source[archive_start:archive_end] + '\nreturn regramArchiveGroup',
@@ -104,7 +109,7 @@ def main():
     shutil.copyfile(Path('/Applications/Regram.app/Contents/Resources/Assets.car'), resources / 'Assets.car')
     args += ['-o', str(binary)]
     (output / 'compile-command.txt').write_text(shlex.join(args))
-    (output / 'manifest.json').write_text(json.dumps({'productionSources': {str(path.relative_to(options.source_root)): hashlib.sha256(path.read_bytes()).hexdigest() for path in [chat / 'ChatListController.swift', chat / 'PeersListController.swift', chat / 'ChatListRevealItem.swift', options.source_root / 'Telegram-Mac/packages-integration/bridges/SidebarUIIntegration.swift']}, 'nativeScrollableSegmentView': True, 'realSwiftSignalKit': True, 'appObjectsLinked': False, 'sourceExtractionHashes': {name: hashlib.sha256(value.encode()).hexdigest() for name, value in replacements.items()}, 'negativeControl': str(options.negative_control) if options.negative_control else None, 'negativeLayout': str(options.negative_layout) if options.negative_layout else None}, indent=2))
+    (output / 'manifest.json').write_text(json.dumps({'productionSources': {str(path.relative_to(options.source_root)): hashlib.sha256(path.read_bytes()).hexdigest() for path in [chat / 'ChatListController.swift', chat / 'PeersListController.swift', chat / 'ChatListRevealItem.swift', options.source_root / 'Telegram-Mac/packages-integration/bridges/SidebarUIIntegration.swift']}, 'nativeScrollableSegmentView': True, 'realSwiftSignalKit': True, 'appObjectsLinked': False, 'sourceExtractionHashes': {name: hashlib.sha256(value.encode()).hexdigest() for name, value in replacements.items()}, 'negativeControl': str(options.negative_control) if options.negative_control else None, 'negativeLayout': str(options.negative_layout) if options.negative_layout else None, 'negativeScroll': str(options.negative_scroll) if options.negative_scroll else None, 'nativeScrollViewGeometry': True}, indent=2))
     with (output / 'compile.log').open('w') as log:
         result = subprocess.run(args, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
     print(f'folder switch compile exit={result.returncode}; log={output / "compile.log"}', flush=True)

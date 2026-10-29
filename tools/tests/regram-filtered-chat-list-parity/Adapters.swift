@@ -335,6 +335,7 @@ final class SchedulingQueue {
     func reset() { precondition(events.isEmpty); continuationDispatches = 0; startCalls = 0 }
 }
 
+typealias Queue = SchedulingQueue
 let prepareQueue = SchedulingQueue()
 infix operator |> : AdditionPrecedence
 func |> <A, B>(value: A, transform: (A) -> B) -> B { transform(value) }

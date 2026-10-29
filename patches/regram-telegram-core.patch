@@ -2373,7 +2373,7 @@ index 5d933383fcc00786e733ad88cf6af28c58b4bb24..b406ed3174108cb3064363663d680579
                                          }
                                      default:
 diff --git a/submodules/TelegramCore/Sources/State/AccountStateManagementUtils.swift b/submodules/TelegramCore/Sources/State/AccountStateManagementUtils.swift
-index 3d99e59d34c32b44e03410836815207bab277747..7a6b8188bd418e8585dc608ba8002649d9e85299 100644
+index 3d99e59d34c32b44e03410836815207bab277747..ed753510d81d126e5bec6ed9932e519c6012ed39 100644
 --- a/submodules/TelegramCore/Sources/State/AccountStateManagementUtils.swift
 +++ b/submodules/TelegramCore/Sources/State/AccountStateManagementUtils.swift
 @@ -4621,7 +4621,22 @@ func replayFinalState(
@@ -2386,7 +2386,7 @@ index 3d99e59d34c32b44e03410836815207bab277747..7a6b8188bd418e8585dc608ba8002649
 +                #if os(macOS)
 +                ids = allIds.filter { globalId in
 +                    let messageIds = transaction.messageIdsForGlobalIds([globalId])
-+                    let retainedIds = messageIds.filter { rgShouldRetainRevokedMessage(accountId: accountPeerId.toInt64(), peerId: $0.peerId) }
++                    let retainedIds = messageIds.filter { rgShouldRetainRevokedMessage(accountId: accountPeerId.toInt64(), transaction: transaction, id: $0) }
 +                    guard !retainedIds.isEmpty else { return true }
 +                    for id in retainedIds {
 +                        rgMarkMessageRevoked(transaction: transaction, id: id)
@@ -2409,7 +2409,7 @@ index 3d99e59d34c32b44e03410836815207bab277747..7a6b8188bd418e8585dc608ba8002649
 +                var ids = allIds
 +                #if os(macOS)
 +                ids = allIds.filter { id in
-+                    guard rgShouldRetainRevokedMessage(accountId: accountPeerId.toInt64(), peerId: id.peerId) else { return true }
++                    guard rgShouldRetainRevokedMessage(accountId: accountPeerId.toInt64(), transaction: transaction, id: id) else { return true }
 +                    rgMarkMessageRevoked(transaction: transaction, id: id)
 +                    return false
 +                }
@@ -2715,7 +2715,7 @@ index e38c0f96c77041c97293f8cc2c0386ebf62274ed..b875edf9b7def7decb627ee601fc3e1c
      }
 diff --git a/submodules/TelegramCore/Sources/State/RegramMessageRetention.swift b/submodules/TelegramCore/Sources/State/RegramMessageRetention.swift
 new file mode 100644
-index 0000000000000000000000000000000000000000..5efc2b65c56524f695315c0f13367f4f363abf2e
+index 0000000000000000000000000000000000000000..9b67f48eed71fcfcc01180e153138a9ed6d5d8c3
 --- /dev/null
 +++ b/submodules/TelegramCore/Sources/State/RegramMessageRetention.swift
 @@ -0,0 +1,32 @@
@@ -2724,9 +2724,9 @@ index 0000000000000000000000000000000000000000..5efc2b65c56524f695315c0f13367f4f
 +import Postbox
 +import RegramCore
 +
-+func rgShouldRetainRevokedMessage(accountId: Int64, peerId: PeerId) -> Bool {
++func rgShouldRetainRevokedMessage(accountId: Int64, transaction: Transaction, id: MessageId) -> Bool {
 +    let settings = RegramPreferences.shared.settings(accountId: accountId)
-+    return settings["antiRevoke"].bool || settings["antiRevokePeerIds"].strings.contains(String(peerId.toInt64()))
++    return settings.shouldRetainRevokedMessage(peerId: id.peerId.toInt64(), authorIsBot: (transaction.getMessage(id)?.author as? TelegramUser)?.botInfo != nil)
 +}
 +
 +func rgRevokedMessageAttributes(message: Message, clearTimers: Bool, date: Int32) -> [MessageAttribute] {

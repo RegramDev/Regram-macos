@@ -11,6 +11,7 @@
 "AntiFeatures.SaveProtectedStories" = "允许保存受保护的快拍";
 "AntiFeatures.Screenshot" = "截图时不通知对方";
 "AntiFeatures.SelfDestruct" = "忽略阅后即焚计时";
+"AntiFeatures.SkipBots" = "不保留机器人消息";
 "AntiRevoke.Chats.Empty" = "还没有添加任何对话。打开对话的资料页，开启「防撤回」即可。";
 "AntiRevoke.Chats.Notice" = "这些对话中被撤回的消息会保留下来，并标记为已删除。左滑可移除，点击可查看资料。";
 "AntiRevoke.Chats.Title" = "防撤回的对话";
@@ -432,6 +433,7 @@
 "Ghost.DontSendTyping" = "不发送输入状态";
 "Ghost.Header" = "幽灵模式";
 "Ghost.Notice" = "让本机不再上报你浏览了哪些快拍、你的在线状态和输入状态。你这边不受影响：快拍照常消除圆环。发送消息仍会让你显示在线 —— 这是服务端决定的，App 无法绕过。";
+"GroupAdmins.Show" = "显示群组管理员";
 "GroupInfo.Location" = "位置";
 "GroupRemark.NotSet" = "未设置";
 "GroupRemark.Notice" = "仅当前账号在本机可见，显示于聊天列表、聊天标题和本地搜索。留空并保存即可恢复原群名。";

@@ -266,6 +266,10 @@ final class RegramChatTranslationScheduler {
     }
 }
 
+private func makeChatTranslationQueue() -> Queue {
+    return Queue(name: "chatTranslation", qos: .userInitiated)
+}
+
 public final class ChatLiveTranslateContext {
 
     public struct State : Equatable {
@@ -401,6 +405,7 @@ public final class ChatLiveTranslateContext {
     
     private let peerId: PeerId
     private let context: any AccountContextProtocol
+    private let queue = makeChatTranslationQueue()
     
     
     
@@ -434,7 +439,7 @@ public final class ChatLiveTranslateContext {
     public init(peerId: PeerId, context: any AccountContextProtocol) {
         self.peerId = peerId
         self.context = context
-        self.translationScheduler = RegramChatTranslationScheduler(queue: prepareQueue, request: { [weak self] messages, generation in
+        self.translationScheduler = RegramChatTranslationScheduler(queue: self.queue, request: { [weak self] messages, generation in
             guard let self else { return .fail(.outdated) }
             let state = self.stateValue.with { $0 }
             guard state.regramGeneration == generation, self.isCurrentTranslation(state) else { return .fail(.outdated) }
@@ -475,7 +480,7 @@ public final class ChatLiveTranslateContext {
 
 
         
-        let should: Signal<(ChatTranslationState?, Appearance, Bool, Bool, String, Bool), NoError> = combineLatest(queue: prepareQueue, cachedData, translationState, baseAppSettings(accountManager: context.sharedContext.accountManager), appearanceSignal, getPeerView(peerId: context.peerId, postbox: context.account.postbox), autoTranslate, regramPreferenceChanges(accountId: context.peerId.toInt64())) |> map { cachedData, translationState, settings, appearance, peer, autoTranslate, regramSettings in
+        let should: Signal<(ChatTranslationState?, Appearance, Bool, Bool, String, Bool), NoError> = combineLatest(queue: self.queue, cachedData, translationState, baseAppSettings(accountManager: context.sharedContext.accountManager), appearanceSignal, getPeerView(peerId: context.peerId, postbox: context.account.postbox), autoTranslate, regramPreferenceChanges(accountId: context.peerId.toInt64())) |> map { cachedData, translationState, settings, appearance, peer, autoTranslate, regramSettings in
             let customBackend = regramSettings["translationBackend"].string != "default"
             
             var isHidden: Bool
@@ -507,7 +512,7 @@ public final class ChatLiveTranslateContext {
                 return (nil, appearance, canUseTranslation, autoTranslate, regramSettings.translationIdentity, hasTelegramPremium)
             }
             
-        } |> deliverOnPrepareQueue
+        } |> deliverOn(self.queue)
         
         shouldDisposable.set(should.start(next: { [weak self] state, appearance, canUseTranslation, autoTranslate, regramConfiguration, hasTelegramPremium in
             guard let self else { return }
@@ -552,7 +557,7 @@ public final class ChatLiveTranslateContext {
             }
         }))
         actionsDisposable.add(state.start(next: { [weak self] state in
-            prepareQueue.justDispatch {
+            self?.queue.justDispatch { [weak self] in
                 if !state.queuedTranscriptions.isEmpty {
                     let transcriptions = state.queuedTranscriptions.filter { state.transcriptionResult[.Key(id: $0.messageId, toLang: state.to)] == nil }
                     for transcription in transcriptions {
@@ -587,7 +592,7 @@ public final class ChatLiveTranslateContext {
                     return message.hasTranslationAttribute(toLang: state.to) && regramTranslationMatches(message, settings: settings, tone: state.tone)
                 })
             } |> castError(TranslateFetchError.self)
-        } |> deliverOnPrepareQueue
+        } |> deliverOn(self.queue)
     }
 
     private func activateTranscriptionTranslation(for messageId: MessageId, text: String, state: State) -> Void {
@@ -622,7 +627,7 @@ public final class ChatLiveTranslateContext {
                     allowed ? .single(result.text) : .fail(.outdated)
                 }
             }
-        } |> deliverOnPrepareQueue
+        } |> deliverOn(self.queue)
         self.updateState { current in
             var current = current
             current.queuedTranscriptions.removeAll(where: { $0.messageId == messageId })
@@ -650,7 +655,7 @@ public final class ChatLiveTranslateContext {
         let toLang: String? = state.to
         let context = self.context
         let signal = context.engine.messages.summarizeMessage(messageId: message.id, translateToLang: toLang)
-        |> deliverOn(prepareQueue)
+        |> deliverOn(self.queue)
 
         actionsDisposable.add(signal.start(error: { [weak self] error in
             self?.updateState { current in
@@ -692,7 +697,7 @@ public final class ChatLiveTranslateContext {
     }
 
     public func summarize(_ message: Message) {
-        prepareQueue.justDispatch { [weak self] in
+        self.queue.justDispatch { [weak self] in
             guard let self = self else {
                 return
             }
@@ -724,7 +729,7 @@ public final class ChatLiveTranslateContext {
     }
 
     public func clearSummarize(_ messageId: MessageId) {
-        prepareQueue.justDispatch { [weak self] in
+        self.queue.justDispatch { [weak self] in
             self?.updateState { current in
                 var current = current
                 current.summarizeResult.removeValue(forKey: .Key(id: messageId))
@@ -755,7 +760,7 @@ public final class ChatLiveTranslateContext {
     }
     
     public func translate(_ message: [Message]) {
-        prepareQueue.justDispatch { [weak self] in
+        self.queue.justDispatch { [weak self] in
             guard let self else { return }
             self.translationMessages = message
             let state = self.stateValue.with { $0 }
@@ -804,7 +809,7 @@ public final class ChatLiveTranslateContext {
     }
 
     public func translateTranscription(_ messages: [Message]) {
-        prepareQueue.justDispatch { [weak self] in
+        self.queue.justDispatch { [weak self] in
             guard let `self` = self else {
                 return
             }

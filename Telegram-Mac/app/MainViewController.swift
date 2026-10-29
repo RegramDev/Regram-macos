@@ -518,7 +518,7 @@ class MainViewController: TelegramGenericViewController<MainController_View> {
 
         updateTabAccessibility()
 
-        self.ready.set(combineLatest(queue: prepareQueue, self.chatList.ready.get(), self.settings.ready.get()) |> map { $0 && $1 })
+        self.ready.set(combineLatest(queue: .mainQueue(), self.chatList.ready.get(), self.settings.ready.get()) |> map { $0 && $1 })
         
         
         

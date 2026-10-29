@@ -6,13 +6,12 @@ enum Flag: Hashable { case translationHidden }
 class CachedChannelData { var flags: Set<Flag> = [] }
 class CachedGroupData { var flags: Set<Flag> = [] }
 class CachedUserData { var flags: Set<Flag> = [] }
-struct Peer { var isPremium: Bool }
-struct Settings { var paywall: TranslatePaywall? }
+enum Namespaces { enum Peer { static let SecretChat = 1 } }
+struct PeerId { let namespace: Int }
 struct TranslationState { var paywall = false }
 
-func visibility(_ cachedData: Any?, premium: Bool, paywall: TranslatePaywall?) -> (hidden: Bool, paywall: Bool?) {
-    let peer: Peer? = Peer(isPremium: premium)
-    let settings = Settings(paywall: paywall)
+func visibility(_ cachedData: Any?, secret: Bool = false) -> (hidden: Bool, paywall: Bool?) {
+    let peerId = PeerId(namespace: secret ? Namespaces.Peer.SecretChat : 0)
     let translationState: TranslationState? = TranslationState()
     do {
         __VISIBILITY__
@@ -33,21 +32,15 @@ let expired = TranslatePaywall(timestamp: now - 1, count: dismissed.count + 2)
 
 for cachedData: Any in [CachedChannelData(), CachedGroupData(), CachedUserData()] {
     let kind = String(describing: type(of: cachedData))
-    let before = visibility(cachedData, premium: false, paywall: eligible)
-    check(!before.hidden && before.paywall == true, "\(kind): eligible non-Premium prompt appears")
-    check(visibility(cachedData, premium: false, paywall: nil).hidden == false, "\(kind): initial prompt remains available")
-    check(visibility(cachedData, premium: false, paywall: dismissed).hidden, "\(kind): Hide translation dismisses prompt")
-    check(visibility(cachedData, premium: false, paywall: dismissed).hidden, "\(kind): reopening respects dismissal")
-    let increased = dismissed.increase().increase().increase()
-    check(visibility(cachedData, premium: false, paywall: increased).hidden, "\(kind): activity cannot bypass cooldown")
-    check(!visibility(cachedData, premium: false, paywall: expired).hidden, "\(kind): eligible prompt returns after cooldown")
-    let premium = visibility(cachedData, premium: true, paywall: dismissed)
-    check(!premium.hidden && premium.paywall == false, "\(kind): Premium translation remains available")
+    let result = visibility(cachedData)
+    check(!result.hidden, "\(kind): available translation stays visible")
+    check(result.paywall == false, "\(kind): Regram does not show the old translation paywall")
+    check(visibility(cachedData, secret: true).hidden, "\(kind): secret chat translation remains hidden")
 }
 
 let hiddenChannel = CachedChannelData()
 hiddenChannel.flags.insert(.translationHidden)
-check(visibility(hiddenChannel, premium: false, paywall: eligible).hidden, "chat translation hidden flag remains respected")
-check(visibility(nil, premium: false, paywall: eligible).hidden, "missing chat data stays hidden")
+check(visibility(hiddenChannel).hidden, "chat translation hidden flag remains respected")
+check(visibility(nil).hidden, "missing chat data stays hidden")
 check(dismissed.timestamp >= now + 7 * 24 * 60 * 60, "dismissal retains seven-day cooldown")
 if failures > 0 { exit(1) }

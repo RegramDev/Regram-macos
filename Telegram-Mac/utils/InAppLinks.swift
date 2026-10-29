@@ -27,6 +27,50 @@ import WalletContext
 
 private let inapp:String = "chat://"
 
+private final class LinkHoverPreview: Disposable {
+    private weak var view: NSView?
+    private weak var window: NSWindow?
+    private let event: NSEvent
+    private let request = MetaDisposable()
+    private var popup: AppMenu?
+    private(set) var isDisposed = false
+
+    init(view: NSView, event: NSEvent) {
+        self.view = view
+        self.window = view.window
+        self.event = event
+    }
+
+    func setRequest(_ disposable: Disposable) {
+        request.set(disposable)
+    }
+
+    func present(_ menu: ContextMenu) {
+        guard !isDisposed, let view, let window, view.window === window,
+              window.isKeyWindow, !contextMenuOnScreen(),
+              view.bounds.contains(view.convert(window.mouseLocationOutsideOfEventStream, from: nil)) else { return }
+        view.removeAllToolTips()
+        let popup = AppMenu(menu: menu, appearMode: .hover)
+        self.popup = popup
+        menu.onClose = { [weak self] in
+            self?.popup = nil
+            self?.dispose()
+        }
+        popup.show(event: event, view: view)
+    }
+
+    func dispose() {
+        guard !isDisposed else { return }
+        isDisposed = true
+        let popup = self.popup
+        self.popup = nil
+        request.dispose()
+        popup?.close()
+    }
+
+    deinit { dispose() }
+}
+
 
 
 private struct UrlHandlingConfiguration {
@@ -258,7 +302,9 @@ var globalLinkExecutor:TextViewInteractions {
 
             switch link {
             case let .followResolvedName(_, username, _, _, _, _, _):
-                return (context.engine.peers.resolvePeerByName(name: username, referrer: nil) |> deliverOnMainQueue).start(next: { result in
+                let preview = LinkHoverPreview(view: view, event: event)
+                preview.setRequest((context.engine.peers.resolvePeerByName(name: username, referrer: nil) |> deliverOnMainQueue).start(next: { result in
+                    guard !preview.isDisposed else { return }
                     switch result {
                     case let .result(peer):
                         guard let peer = peer else { return }
@@ -270,28 +316,23 @@ var globalLinkExecutor:TextViewInteractions {
                             title += " (@\(address))"
                         }
 
-                        view.removeAllToolTips()
-
                         let nameItem = ContextMenuItem(title, handler: {
                             execute(inapp: link)
                         }, image: NSImage(resource: .menuAtsign), removeTail: false)
                         ContextMenuItem.makeItemAvatar(nameItem, account: context.account, peer: p, source: .peer(p, p.smallProfileImage, p.namePeerColor, p.displayLetters, nil, nil))
                         menu.addItem(nameItem)
 
-                        let mouseLocation = view.window?.mouseLocationOutsideOfEventStream ?? .zero
-                        let localPoint = view.convert(mouseLocation, from: nil)
-                        if !contextMenuOnScreen(), view.window?.isKeyWindow == true, view.bounds.contains(localPoint) {
-                            let appMenu = AppMenu(menu: menu)
-                            appMenu.show(event: event, view: view)
-                        }
+                        preview.present(menu)
                     case .progress:
                         break
                     }
-                })
+                }))
+                return preview
             case let .joinchat(_, hash, _, _):
-                return (context.engine.peers.joinLinkInformation(hash) |> deliverOnMainQueue).start(next: { result in
+                let preview = LinkHoverPreview(view: view, event: event)
+                preview.setRequest((context.engine.peers.joinLinkInformation(hash) |> deliverOnMainQueue).start(next: { result in
+                    guard !preview.isDisposed else { return }
                     let menu = ContextMenu()
-                    view.removeAllToolTips()
 
                     switch result {
                     case let .alreadyJoined(peer):
@@ -332,13 +373,9 @@ var globalLinkExecutor:TextViewInteractions {
                     case .invalidHash:
                         return
                     }
-                    let mouseLocation = view.window?.mouseLocationOutsideOfEventStream ?? .zero
-                    let localPoint = view.convert(mouseLocation, from: nil)
-                    if !contextMenuOnScreen(), view.window?.isKeyWindow == true, view.bounds.contains(localPoint) {
-                        let appMenu = AppMenu(menu: menu)
-                        appMenu.show(event: event, view: view)
-                    }
-                })
+                    preview.present(menu)
+                }))
+                return preview
             default:
                 return nil
             }

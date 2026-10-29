@@ -2511,6 +2511,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
     private let queue: Queue = .init(name: "messagesViewQueue", qos: .userInitiated)
 
     private var heavyScrollWorkItem: DispatchWorkItem?
+    private var visibleMessageWorkEnabled = false
 
     private let historyDisposable:MetaDisposable = MetaDisposable()
     private let peerDisposable:MetaDisposable = MetaDisposable()
@@ -2697,6 +2698,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
     private var selectTextController:ChatSelectText!
     
     private let visibility = ValuePromise(true, ignoreRepeated: true)
+    private let historyRenderGate = ChatHistoryRenderGate()
     
     private var contextQueryState: (ChatPresentationInputQuery?, Disposable)?
     private var urlPreviewQueryState: (String?, Disposable)?
@@ -4115,8 +4117,10 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         })
 
         let previousHistoryViewUpdateId = Atomic<Int?>(value: nil)
+        let historyRenderGate = self.historyRenderGate
+        let renderingHistory = chatHistoryRenderingUpdates(combineLatest(historyViewUpdate, combineLatest(regramContentPreferenceChanges(accountId: context.peerId.toInt64()), regramQuickTranslationChanges(accountId: context.peerId.toInt64()))) |> map { update, _ in update }, visibility: self.visibility.get(), gate: historyRenderGate)
         let historyViewTransition = combineLatest(queue: queue,
-                                                  combineLatest(historyViewUpdate, combineLatest(regramContentPreferenceChanges(accountId: context.peerId.toInt64()), regramQuickTranslationChanges(accountId: context.peerId.toInt64()))) |> map { update, _ in update },
+                                                  renderingHistory,
                                                   appearanceSignal,
                                                   maxReadIndex.get(),
                                                   searchState.get(),
@@ -4131,7 +4135,8 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                                                   historyUiState,
                                                   historyPeerView,
                                                   recommendedChannels
-    ) |> mapToQueue { update, appearance, maxReadIndex, searchState, animatedEmojiStickers, messageEffects, savedMessageTags, customChannelDiscussionReadState, customThreadOutgoingReadState, updatingMedia, adMessages, reactions, uiState, peerView, recommendedChannels -> Signal<(TableUpdateTransition, MessageHistoryView?, ChatHistoryCombinedInitialData, Bool, ChatHistoryView), NoError> in
+    ) |> filter { historyRenderGate.isCurrent($0.0.version) } |> mapToQueue { [weak self] renderingUpdate, appearance, maxReadIndex, searchState, animatedEmojiStickers, messageEffects, savedMessageTags, customChannelDiscussionReadState, customThreadOutgoingReadState, updatingMedia, adMessages, reactions, uiState, peerView, recommendedChannels -> Signal<(TableUpdateTransition, MessageHistoryView?, ChatHistoryCombinedInitialData, Bool, ChatHistoryView), NoError> in
+            let update = renderingUpdate.value
                                     
             let pollAnswersLoading = uiState.pollAnswers
             let threadLoading = uiState.threadLoading
@@ -4206,7 +4211,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                     if case let .cacheEntry(id, data) = additionalEntry {
                         if id == cachedChannelAdminRanksEntryId(peerId: peerId), let data = data?.get(CachedChannelAdminRanks.self)  {
                             ranks = data
-                            self.currentRanks = data
+                            self?.currentRanks = data
                         }
                         break
                     }
@@ -8110,7 +8115,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                 return preloadedChatHistoryViewForLocation(.Initial(count: 100, scrollPosition: nil), context: context, chatLocation: chatLocation, chatLocationContextHolder: chatLocationContextHolder, tag: .tag(.pinned), additionalData: []) |> map { ($0, chatLocation) }
             }
             
-            return combineLatest(queue: prepareQueue, replyHistoryFirst |> then(ready |> mapToSignal { _ in
+            return combineLatest(queue: queue, replyHistoryFirst |> then(ready |> mapToSignal { _ in
                 return  replyHistory
             }), topVisibleMessageRange, dismissedPinnedIds)
                 |> map { update, topVisibleMessageRange, dismissed -> ChatPinnedMessage? in
@@ -9085,11 +9090,12 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         }))
         
         genericView.tableView.addScroll(listener: TableScrollListener { [weak self] position in
-            self?.heavyScrollWorkItem?.cancel()
+            guard let self, self.historyRenderGate.capture() != nil, self.visibleMessageWorkEnabled else { return }
+            self.heavyScrollWorkItem?.cancel()
             let work = DispatchWorkItem { [weak self] in
                 let tableView = self?.genericView.tableView
 
-                if let strongSelf = self, let tableView = tableView {
+                if let strongSelf = self, strongSelf.historyRenderGate.capture() != nil, strongSelf.visibleMessageWorkEnabled, let tableView = tableView {
             
                 if let row = tableView.topVisibleRow, let item = tableView.item(at: row) as? ChatRowItem, let id = item.message?.id {
                     strongSelf.historyState = strongSelf.historyState.withRemovingReplies(max: id)
@@ -9387,7 +9393,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
 
                 }
             }
-            self?.heavyScrollWorkItem = work
+            self.heavyScrollWorkItem = work
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: work)
         })
 
@@ -9559,6 +9565,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
     }
 
     public override func windowDidBecomeKey() {
+        guard visibleMessageWorkEnabled else { return }
         super.windowDidBecomeKey()
         updateInteractiveReading()
         chatInteraction.saveState(scrollState: immediateScrollState())
@@ -9567,6 +9574,8 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         setVisibleRefreshActive(true)
     }
     public override func windowDidResignKey() {
+        heavyScrollWorkItem?.cancel()
+        heavyScrollWorkItem = nil
         super.windowDidResignKey()
         updateInteractiveReading()
         chatInteraction.saveState(scrollState:immediateScrollState())
@@ -10151,6 +10160,17 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         var items: [ContextMenuItem] = []
         let peerId = chatLocation.peerId
 
+        let groupAdminsItem: ContextMenuItem?
+        if let peer = peerViewMainPeer(peerView), (peer.isGroup || peer.isSupergroup), !peer.isMonoForum {
+            groupAdminsItem = ContextMenuItem(regramLocalizedString("GroupAdmins.Show", languageCode: appCurrentLanguage.primaryLanguage.languageCode), handler: { [weak self] in
+                if let controller = FeatureNavigationHooks.shared.makeGroupAdminsController(context, peerId) {
+                    self?.navigationController?.push(controller)
+                }
+            }, itemImage: MenuAnimation.menu_create_group.value)
+        } else {
+            groupAdminsItem = nil
+        }
+
         switch mode {
         case .history, .thread:
             if peerId == context.peerId {
@@ -10201,6 +10221,10 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                     items.append(ContextMenuItem(strings().chatContextInfo, handler: { [weak self] in
                         self?.chatInteraction.openInfo(peerId, false, nil, nil)
                     }, itemImage: MenuAnimation.menu_show_info.value))
+                }
+
+                if let groupAdminsItem {
+                    items.append(groupAdminsItem)
                 }
 
 
@@ -10356,6 +10380,9 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
             items.append(ContextMenuItem(strings().chatContextEdit1, handler: { [weak self] in
                 self?.changeState()
             }, itemImage: MenuAnimation.menu_edit.value))
+            if let groupAdminsItem {
+                items.append(groupAdminsItem)
+            }
             let threadId = self.chatLocation.threadId
             if let threadId = threadId, let threadData = chatInteraction.presentation.threadInfo, let peer = chatInteraction.peer {
                 if threadData.isOwnedByMe || peer.isAdmin {
@@ -10712,6 +10739,8 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
             return
         }
         didCleanup = true
+        visibleMessageWorkEnabled = false
+        historyRenderGate.setActive(false)
         chatInteraction.invalidateDeferredSendActions()
 
         heavyScrollWorkItem?.cancel()
@@ -10810,6 +10839,10 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
 
     public override func viewWillDisappear(_ animated: Bool) {
         chatInteraction.invalidateDeferredSendActions()
+        visibleMessageWorkEnabled = false
+        historyRenderGate.setActive(false)
+        heavyScrollWorkItem?.cancel()
+        heavyScrollWorkItem = nil
         super.viewWillDisappear(animated)
         self.cancelMessageFocus()
         chatInteraction.dateHeaderActions.reset()
@@ -10890,6 +10923,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
     
     public override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        genericView.tableView.notifyScrollHandlers()
 
         isPushedGlobalBackground = true
         updateBubblesBackButton()
@@ -11388,6 +11422,8 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
     }
 
     public override func viewWillAppear(_ animated: Bool) {
+        visibleMessageWorkEnabled = true
+        historyRenderGate.setActive(true)
         super.viewWillAppear(animated)
         
 

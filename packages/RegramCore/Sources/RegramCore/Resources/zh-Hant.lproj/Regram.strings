@@ -11,6 +11,7 @@
 "AntiFeatures.SaveProtectedStories" = "允許儲存受保護的限時動態";
 "AntiFeatures.Screenshot" = "截圖時不通知對方";
 "AntiFeatures.SelfDestruct" = "忽略閱後即焚計時";
+"AntiFeatures.SkipBots" = "不保留機器人訊息";
 "AntiRevoke.Chats.Empty" = "尚未加入任何對話。打開對話的資料頁，開啟「防收回」即可。";
 "AntiRevoke.Chats.Notice" = "這些對話中被收回的訊息會保留下來，並標記為已刪除。左滑可移除，點擊可查看資料。";
 "AntiRevoke.Chats.Title" = "防收回的對話";
@@ -432,6 +433,7 @@
 "Ghost.DontSendTyping" = "不傳送輸入狀態";
 "Ghost.Header" = "幽靈模式";
 "Ghost.Notice" = "讓本機不再回報你瀏覽了哪些限時動態、你的在線狀態和輸入狀態。你這邊不受影響：限時動態照常消除圓環。傳送訊息仍會讓你顯示在線 —— 這是伺服器決定的,App 無法繞過。";
+"GroupAdmins.Show" = "顯示群組管理員";
 "GroupInfo.Location" = "位置";
 "GroupRemark.NotSet" = "未設定";
 "GroupRemark.Notice" = "僅目前帳號在本機可見，顯示於聊天列表、聊天標題及本機搜尋。留空並儲存即可恢復原群組名稱。";

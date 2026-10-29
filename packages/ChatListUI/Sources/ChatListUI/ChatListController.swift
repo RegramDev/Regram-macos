@@ -652,7 +652,7 @@ public struct FilterData : Equatable {
     public let badges: ChatListFilterBadges
     public let requestTimestamp: TimeInterval
     public var isTop: Bool
-    public init(filter: ChatListFilter = .allChats, tabs: [ChatListFilter] = [], sidebar: Bool = false, showTags: Bool = false, request: ChatListIndexRequest = .Initial(50, nil), badges: ChatListFilterBadges = .init(total: 0, filters: []), requestTimestamp: TimeInterval = CACurrentMediaTime(), isTop: Bool = true) {
+    public init(filter: ChatListFilter = .allChats, tabs: [ChatListFilter] = [], sidebar: Bool = false, showTags: Bool = false, request: ChatListIndexRequest = .Initial(100, nil), badges: ChatListFilterBadges = .init(total: 0, filters: []), requestTimestamp: TimeInterval = CACurrentMediaTime(), isTop: Bool = true) {
         self.filter = filter
         self.tabs = tabs
         self.sidebar = sidebar
@@ -700,6 +700,12 @@ public struct FilterData : Equatable {
 }
 
 
+private struct ChatListRenderedTransition {
+    let transition: TableUpdateTransition
+    let list: EngineChatList
+    let filterData: FilterData
+}
+
 public class ChatListController<Context: AccountContextProtocol> : PeersListController<Context>, ChatListControllerKind {
     
     private let folderUpdatesDisposable = MetaDisposable()
@@ -714,7 +720,9 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
 
     public func updateFilter(_ f:(FilterData)->FilterData) {
         
-        let data = f(stateValue.with { $0.filterData })
+        let previousData = stateValue.with { $0.filterData }
+        let data = f(previousData)
+        guard data != previousData else { return }
         
         if !context.isPremium {
             if let index = data.tabs.firstIndex(of: data.filter) {
@@ -731,7 +739,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
             var previous = previous
             var current = f(previous.filterData)
             if ChatListUIHooks.shared.chatListFilterId(previous.filterData.filter) != ChatListUIHooks.shared.chatListFilterId(current.filter) {
-                current = current.withUpdatedRequest(.Initial(max(Int(context.window.frame.height / 70) + 3, 12), nil), removeAnimation: false).withUpdatedIsTop(true)
+                current = current.withUpdatedRequest(.Initial(max(Int(context.window.frame.height / 70) + 3, 100), nil), removeAnimation: false).withUpdatedIsTop(true)
                 changedFolder = true
             }
             previous.filterData = current
@@ -746,16 +754,20 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
             self.genericView.searchView.change(state: .None,  true)
         }
 
-        setCenterTitle(self.defaultBarTitle)
+        if previousData.filter != data.filter {
+            setCenterTitle(self.defaultBarTitle)
+        }
     }
     
     private let previousChatList:Atomic<EngineChatList?> = Atomic(value: nil)
+    private let displayedFilterData = Atomic<FilterData?>(value: nil)
     private let first = Atomic(value:true)
     private let animated = Atomic(value: false)
     private let removePeerIdGroupDisposable = MetaDisposable()
     private let downloadsDisposable = MetaDisposable()
     private let removalUndoDisposable = MetaDisposable()
     private let disposable = MetaDisposable()
+    private let transitionQueue = makeChatListTransitionQueue()
     private let reorderDisposable = MetaDisposable()
     private let globalPeerDisposable = MetaDisposable()
     private let animateGroupNextTransition:Atomic<EngineChatList.Group?> = Atomic(value: nil)
@@ -770,6 +782,8 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
     private var regramAppliedLayout: RegramChatListLayoutPreferences?
     private var preloadStorySubscriptionsDisposable: Disposable?
     private var preloadStoryResourceDisposables: [MediaId: Disposable] = [:]
+    private let visibleStoryRefreshEvents = ValuePipe<Void>()
+    private let visibleStoryRefreshDisposable = MetaDisposable()
 
     private let subContext: StarsSubscriptionsContext?
 
@@ -788,9 +802,9 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         
         let initialSize = self.atomicSize
         let context = self.context
-        let regramPreviewCoordinator = RegramChatListPreviewCoordinator(account: context.account, accountId: context.peerId.toInt64())
+        let transitionQueue = self.transitionQueue
+        let regramPreviewCoordinator = RegramChatListPreviewCoordinator(account: context.account, accountId: context.peerId.toInt64(), queue: transitionQueue)
         self.regramPreviewCoordinator = regramPreviewCoordinator
-        let previousChatList = self.previousChatList
         let first = Atomic<(hasEarlier: Bool, hasLater: Bool)>(value: (hasEarlier: false, hasLater: false))
         let scrollUp:Atomic<Bool> = self.first
         let groupId = self.mode.groupId
@@ -817,13 +831,11 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         |> distinctUntilChanged
 
         
-        self.preloadStorySubscriptionsDisposable = (regramPreferenceChanges(accountId: context.peerId.toInt64())
+        self.preloadStorySubscriptionsDisposable = chatListVisibleStoryResources(visibility: self.viewOnStage, hidden: regramPreferenceChanges(accountId: context.peerId.toInt64())
                    |> map { $0["hideStories"].bool || $0["features.hideTopStories"].bool }
-                   |> distinctUntilChanged
-                   |> mapToSignal { hidden -> Signal<[EngineMedia.Id: StoryPreloadInfo], NoError> in
-                       hidden ? .single([:]) : context.engine.messages.preloadStorySubscriptions(isHidden: groupId == .archive, preferHighQuality: preferHighQualityStories)
-                   }
-                   |> deliverOnMainQueue).start(next: { [weak self] resources in
+                   |> distinctUntilChanged, empty: [EngineMedia.Id: StoryPreloadInfo](), load: {
+                       context.engine.messages.preloadStorySubscriptions(isHidden: groupId == .archive, preferHighQuality: preferHighQualityStories)
+                   }).start(next: { [weak self] resources in
                        guard let `self` = self else {
                            return
                        }
@@ -849,6 +861,20 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
                            self.preloadStoryResourceDisposables.removeValue(forKey: id)
                        }
                    })
+
+        visibleStoryRefreshDisposable.set(chatListSettledScrollUpdates(visibleStoryRefreshEvents.signal(), visibility: self.viewOnStage).start(next: { [weak self] in
+            guard let self else { return }
+            var peerIds: [PeerId] = []
+            self.genericView.tableView.enumerateVisibleItems(with: { item in
+                if let item = item as? ChatListRowItem, let peer = item.peer as? TelegramUser, !item.isContact {
+                    peerIds.append(peer.id)
+                }
+                return true
+            })
+            if !peerIds.isEmpty {
+                self.context.account.viewTracker.refreshStoryStatsForPeerIds(peerIds: peerIds)
+            }
+        }))
 
 
 
@@ -1013,11 +1039,15 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
             _ = regramRefreshRevision.modify { $0 &+ 1 }
             return appearance
         }
-        let list:Signal<TableUpdateTransition, NoError> = combineLatest(queue: prepareQueue, chatHistoryView, regramAppearance, stateUpdater |> map(ChatListStateProjection.init) |> distinctUntilChanged, appNotificationSettings(accountManager: context.sharedContext.accountManager), additionalSettings(accountManager: context.sharedContext.accountManager), storyState, suspiciousSession, suggestions, birthdays, myBirthday, subState, appConfiguration, context.giftAuctionsManager.state, PendingChatRemovals.get(context).hiddenPeerIds, regramArchiveGroup) |> mapToQueue { value, appearance, state, inAppSettings, additionalSettings, storyState, suspiciousSession, suggestionsAndCrashReport, birthdays, myBirthday, missingBalanceState, appConfiguration, activeAuctions, pendingRemovals, regramArchiveGroup -> Signal<TableUpdateTransition, NoError> in
+        let selectionState = self.stateValue
+        let list:Signal<ChatListRenderedTransition, NoError> = combineLatest(queue: transitionQueue, chatHistoryView, regramAppearance, stateUpdater |> map(ChatListStateProjection.init) |> distinctUntilChanged, appNotificationSettings(accountManager: context.sharedContext.accountManager), additionalSettings(accountManager: context.sharedContext.accountManager), storyState, suspiciousSession, suggestions, birthdays, myBirthday, subState, appConfiguration, context.giftAuctionsManager.state, PendingChatRemovals.get(context).hiddenPeerIds, regramArchiveGroup) |> filter { value in
+            let filterData = value.0.1
+            return selectionState.with { $0.filterData.filter == filterData.filter && $0.filterData.request == filterData.request }
+        } |> mapToQueue { value, appearance, state, inAppSettings, additionalSettings, storyState, suspiciousSession, suggestionsAndCrashReport, birthdays, myBirthday, missingBalanceState, appConfiguration, activeAuctions, pendingRemovals, regramArchiveGroup -> Signal<ChatListRenderedTransition, NoError> in
             let (suggestions, crashReportCard) = suggestionsAndCrashReport
                                 
             let filterData = value.1
-            let rowFolders = FilterData(filter: .allChats, tabs: state.filterData.tabs, sidebar: false, showTags: state.filterData.showTags, request: .Initial(50, nil), badges: .init(total: 0, filters: []), requestTimestamp: 0, isTop: true)
+            let rowFolders = FilterData(filter: .allChats, tabs: state.filterData.tabs, sidebar: false, showTags: state.filterData.showTags, request: .Initial(100, nil), badges: .init(total: 0, filters: []), requestTimestamp: 0, isTop: true)
             let folderUpdates = value.3
             let update = value.0
             let removeNextAnimation = update.removeNextAnimation
@@ -1031,7 +1061,6 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
             }
             
 
-            _ = previousChatList.swap(update.list)
             var prepare:[(EngineChatList.Item, UIChatAdditionalItem?)] = []
             for value in update.list.items {
                 prepare.append((value, nil))
@@ -1219,13 +1248,15 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
                 }
                 if hasNewChat, case .none = scroll { scroll = .up(false) }
             }
-            return prepareEntries(from: previousList, to: entries, adIndex: nil, arguments: arguments, initialSize: initialSize.with { $0 }, animated: animated, scrollState: scroll, groupId: groupId, listMode: mode, regramPreviews: presentation.previews, layoutPreferences: RegramChatListLayoutPreferences(settings: regramSettings))
+            return prepareEntries(from: previousList, to: entries, adIndex: nil, arguments: arguments, initialSize: initialSize.with { $0 }, animated: animated, scrollState: scroll, groupId: groupId, listMode: mode, regramPreviews: presentation.previews, layoutPreferences: RegramChatListLayoutPreferences(settings: regramSettings)) |> map { transition in
+                return ChatListRenderedTransition(transition: transition, list: update.list, filterData: filterData)
+            }
         }
         
         
         
-        let appliedTransition = list |> deliverOnMainQueue |> mapToQueue { [weak self] transition -> Signal<Void, NoError> in
-            self?.enqueueTransition(transition)
+        let appliedTransition = list |> deliverOnMainQueue |> mapToQueue { [weak self] result -> Signal<Void, NoError> in
+            self?.enqueueTransition(result)
             return .complete()
         }
         
@@ -1259,17 +1290,8 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         }))
         
         
-        genericView.tableView.addScroll(listener: TableScrollListener(dispatchWhenVisibleRangeUpdated: true, { [weak self] scroll in
-           
-            var refreshStoryPeerIds:[PeerId] = []
-            self?.genericView.tableView.enumerateVisibleItems(with: { item in
-                if let item = item as? ChatListRowItem, let peer = item.peer as? TelegramUser, !item.isContact {
-                    refreshStoryPeerIds.append(peer.id)
-                }
-                return true
-            })
-            context.account.viewTracker.refreshStoryStatsForPeerIds(peerIds: refreshStoryPeerIds)
-
+        genericView.tableView.addScroll(listener: TableScrollListener(dispatchWhenVisibleRangeUpdated: true, { [weak self] _ in
+            self?.visibleStoryRefreshEvents.putNext(())
         }))
         
         genericView.tableView.set(stickClass: ChatListRevealItem.self, handler: { _ in
@@ -1287,10 +1309,9 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
                 _ = regramRestingNearTop.swap(!isTracking && self.genericView.tableView.documentOffset.y >= 0 && self.genericView.tableView.documentOffset.y <= self.genericView.navigationHeight + 1)
             }
             
-            let view = previousChatList.modify({$0})
             self?.removeRevealStateIfNeeded(nil)
 
-            if let strongSelf = self, let view = view {
+            if let strongSelf = self, let view = strongSelf.paginationView() {
                 var messageIndex:EngineChatList.Item.Index?
                 
                 let isTop: Bool
@@ -1314,6 +1335,8 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
                     isTop = true
                 }
                 if let messageIndex = messageIndex {
+                    let request = ChatListIndexRequest.Index(messageIndex, nil)
+                    guard request != strongSelf.filterValue.request else { return }
                     _ = animated.swap(false)
                     if let timestamp = strongSelf.state?.filterData.requestTimestamp {
                         if timestamp + 0.5 > CACurrentMediaTime() {
@@ -1321,7 +1344,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
                         }
                     }
                     strongSelf.updateFilter {
-                        $0.withUpdatedRequest(.Index(messageIndex, nil), removeAnimation: true).withUpdatedIsTop(isTop)
+                        $0.withUpdatedRequest(request, removeAnimation: true).withUpdatedIsTop(isTop)
                     }
                 } else {
                     strongSelf.updateFilter {
@@ -1458,7 +1481,18 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
     }
     
     
-    private func enqueueTransition(_ transition: TableUpdateTransition) {
+    private func paginationView() -> EngineChatList? {
+        let selected = filterValue
+        guard let displayed = displayedFilterData.with({ $0 }), displayed.filter == selected.filter, displayed.request == selected.request else {
+            return nil
+        }
+        return previousChatList.with { $0 }
+    }
+
+    private func enqueueTransition(_ result: ChatListRenderedTransition) {
+        let transition = result.transition
+        _ = previousChatList.swap(result.list)
+        _ = displayedFilterData.swap(result.filterData)
         let layout = (transition.updated + transition.inserted).compactMap { ($0.1 as? ChatListRowItem)?.regramLayoutPreferences }.first
         let applied = self.genericView.tableView.merge(with: transition)
         self.readyOnce()
@@ -1694,7 +1728,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
             if view?.hasLater == true {
                 _ = self.first.swap(true)
                 self.updateFilter {
-                    $0.withUpdatedRequest(.Initial(50, .up(true)), removeAnimation: true).withUpdatedIsTop(true)
+                    $0.withUpdatedRequest(.Initial(100, .up(true)), removeAnimation: true).withUpdatedIsTop(true)
                 }
             } else {
                 if self.genericView.tableView.documentOffset.y == 0 {
@@ -2059,6 +2093,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         removalUndoDisposable.dispose()
         folderUpdatesDisposable.dispose()
         preloadStorySubscriptionsDisposable?.dispose()
+        visibleStoryRefreshDisposable.dispose()
         for (_, disposable) in preloadStoryResourceDisposables {
             disposable.dispose()
         }

@@ -11,6 +11,7 @@ import TelegramTheme
 import TelegramUtils
 import Localization
 import MessageUtils
+import RegramCore
 public struct SelectContainer {
     public let text:NSAttributedString
     public let range:NSRange
@@ -294,7 +295,10 @@ public class SelectManager : NSResponder {
 
     @objc public func copy(_ sender:Any) {
         
-        if let window = self.chatInteraction?.interactionContext.window, let peer = self.chatInteraction?.peer, peer.isCopyProtected(cachedData: self.chatInteraction?.presentation.cachedData) {
+        if let interaction = self.chatInteraction, let peer = interaction.peer,
+           peer.isCopyProtected(cachedData: interaction.presentation.cachedData),
+           peer.id.namespace == Namespaces.Peer.SecretChat || !RegramPreferences.shared.settings(accountId: interaction.interactionContext.peerId.toInt64())["allowSavingProtectedContent"].bool {
+            let window = interaction.interactionContext.window
             showProtectedCopyAlert(peer, for: window)
             return
         }

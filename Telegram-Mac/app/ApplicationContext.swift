@@ -26,17 +26,55 @@ func openCommunity(_ communityId: PeerId, context: AccountContext) {
 }
 
 
+private final class ChatNavigationRequest {
+    private let disposable = MetaDisposable()
+    private var version: UInt64 = 0
+
+    func begin() -> UInt64 {
+        version &+= 1
+        let version = self.version
+        disposable.set(nil)
+        return version
+    }
+
+    func isCurrent(_ version: UInt64) -> Bool {
+        return self.version == version
+    }
+
+    func set(_ disposable: Disposable, version: UInt64) {
+        guard isCurrent(version) else {
+            disposable.dispose()
+            return
+        }
+        self.disposable.set(disposable)
+    }
+
+    deinit { disposable.dispose() }
+}
+
+private let chatNavigationRequests = NSMapTable<NavigationViewController, ChatNavigationRequest>.weakToStrongObjects()
+
 func navigateToChat(navigation: NavigationViewController?, context: AccountContext, chatLocation:ChatLocation, mode: ChatMode = .history, focusTarget:ChatFocusTarget? = nil, initialAction: ChatInitialAction? = nil, chatLocationContextHolder: Atomic<ChatLocationContextHolder?>? = nil, additional: Bool = false, animated: Bool = true, navigationStyle: ViewControllerStyle? = nil, callback:@escaping(ChatController)->Void = { _ in }) {
         
     let context = appDelegate?.supportAccountContextValue?.getExternalContext(peerId: chatLocation.peerId, accountId: context.account.id) ?? context
     
-    let navigation = context.isExternal ? context.bindings.rootNavigation() : navigation
+    guard let navigation = context.isExternal ? context.bindings.rootNavigation() : navigation else { return }
+    let request: ChatNavigationRequest
+    if let current = chatNavigationRequests.object(forKey: navigation) {
+        request = current
+    } else {
+        request = ChatNavigationRequest()
+        chatNavigationRequests.setObject(request, forKey: navigation)
+    }
+    let version = request.begin()
+    navigation.cancelPendingPush()
+    weak var expectedController = navigation.controller
     
     context.window.makeKeyAndOrderFront(nil)
     
     let open:(ChatLocation, ChatInitialAction?, ChatMode)->Void = { [weak navigation] location, initialAction, mode in
         
-        guard let navigation else { return }
+        guard let navigation, request.isCurrent(version), navigation.controller === expectedController else { return }
         let current = navigation.controller as? ChatController
         
         if current?.chatLocation == location, additional {
@@ -60,7 +98,9 @@ func navigateToChat(navigation: NavigationViewController?, context: AccountConte
     
     let signal = context.engine.data.get(TelegramEngine.EngineData.Item.Peer.Peer(id: chatLocation.peerId)) |> take(1) |> deliverOnMainQueue
     
-    _ = signal.start(next: { peer in
+    guard request.isCurrent(version) else { return }
+    let disposable = signal.start(next: { [weak navigation] peer in
+        guard let navigation, request.isCurrent(version), navigation.controller === expectedController else { return }
         
         let checkNext:(Peer)->Void = { peer in
             open(chatLocation, initialAction, mode)
@@ -92,6 +132,7 @@ func navigateToChat(navigation: NavigationViewController?, context: AccountConte
                     let consent = ChatNavigationConsent()
                     verifyAlert(for: context.window, header: strings().chatSensitiveContent, information: strings().chatSensitiveContentConfirm, ok: strings().chatSensitiveContentConfirmOk, option: context.contentConfig.canAdjustSensitiveContent ? strings().chatSensitiveContentConfirmThird : nil, optionIsSelected: false, successHandler: { result in
                         consent.resolve {
+                            guard request.isCurrent(version), navigation.controller === expectedController else { return }
                             if result == .thrid {
                                 let _ = updateRemoteContentSettingsConfiguration(postbox: context.account.postbox, network: context.account.network, sensitiveContentEnabled: true).start()
                             }
@@ -108,6 +149,7 @@ func navigateToChat(navigation: NavigationViewController?, context: AccountConte
             }
         }
     })
+    request.set(disposable, version: version)
 }
 
 private func chatNavigationChild<T: ViewController>( create: () -> T) -> T {

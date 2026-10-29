@@ -423,6 +423,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
         let appConfiguration = data.chatInteraction.interactionContext.appConfiguration
         let context = data.chatInteraction.interactionContext
         let account = context.account
+        let canCopyText = !data.message.containsSecretMedia && regramCanCopyMessageText(data.message, accountId: context.peerId.toInt64(), cachedData: chatInteraction.presentation.cachedData)
         let mode = chatInteraction.mode
         let isIncoming = data.message.isIncoming(context.account, false)
         let translateConfig = AppConfigTranslateState(rawValue: context.appConfiguration.getStringValue("translations_manual_enabled", orElse: "enabled")) ?? .disabled
@@ -988,7 +989,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                 }
                 
                 
-                if !protected {
+                if canCopyText {
                     if message.attributes.contains(where: { $0 is RichTextMessageAttribute }), selectManager.richSelectedText(for: message.id) != nil {
                         thirdBlock.append(ContextMenuItem(strings().chatCopySelectedText, handler: {
                             selectManager.copy(selectManager)
@@ -1003,11 +1004,13 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                         if !richText.isEmpty {
                             let isTranslated = translatedPage != nil
                             thirdBlock.append(ContextMenuItem(strings().chatContextCopyText, handler: {
+                                guard regramCanCopyMessageText(message, accountId: context.peerId.toInt64(), cachedData: chatInteraction.presentation.cachedData) else { return }
                                 copyRichTextMessage(message, text: richText, page: page, isTranslated: isTranslated)
                             }, itemImage: MenuAnimation.menu_copy.value, keyEquivalent: .cmdc).regramAction(.copy))
                         }
                     } else {
                         thirdBlock.append(ContextMenuItem(strings().chatContextCopyText, handler: { [weak textLayout] in
+                            guard regramCanCopyMessageText(message, accountId: context.peerId.toInt64(), cachedData: chatInteraction.presentation.cachedData) else { return }
                             if let textLayout = textLayout {
                                 if !LinkHooks.shared.globalLinkExecutor().copyAttributedString(textLayout.attributedString) {
                                     copyToClipboard(textLayout.attributedString.string)
@@ -1020,9 +1023,10 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                 
             } else {
                 let text: String
-                if let linkType = data.textLayout?.1, !protected {
+                if let linkType = data.textLayout?.1, canCopyText {
                     text = ChatHistoryLink.copyContextText(from: linkType)
                     thirdBlock.append(ContextMenuItem(text, handler: { [weak textLayout] in
+                        guard regramCanCopyMessageText(message, accountId: context.peerId.toInt64(), cachedData: chatInteraction.presentation.cachedData) else { return }
                         if let textLayout = textLayout {
                             let attr = textLayout.attributedString.mutableCopy() as! NSMutableAttributedString
 
@@ -1041,7 +1045,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                         }
                         
                     }, itemImage: MenuAnimation.menu_copy.value).regramAction(.copy))
-                } else if !protected {
+                } else if canCopyText {
                     let attr = textLayout.attributedString.mutableCopy() as! NSMutableAttributedString
                     attr.enumerateAttributes(in: attr.range, options: [], using: { data, range, _ in
                         if let value = data[TextInputAttributes.embedded] as? InlineStickerItem {
@@ -1064,7 +1068,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                         let toLang = context.sharedContext.baseSettings.doNotTranslate.union([appAppearance.languageCode])
                         
                         
-                        if language == nil || !toLang.contains(language!), !muteTranslate, !isService, canShowTranslation {
+                        if !protected, language == nil || !toLang.contains(language!), !muteTranslate, !isService, canShowTranslation {
                             _ = peer?.canSendMessage(data.chatMode.isThreadMode) == true
                             thirdBlock.append(ContextMenuItem(strings().chatContextTranslate, handler: {
                                 showModal(with: ChatHistoryUIHooks.shared.makeTranslateModalObserved(context, language, appAppearance.languageCode, text, entities, source: .selectedText, onToneChanged: { tone in
@@ -1076,6 +1080,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                             }, itemImage: MenuAnimation.menu_translate.value).regramAction(.translate))
                         }
                         thirdBlock.append(ContextMenuItem(strings().chatCopySelectedText, handler: { [weak textLayout] in
+                            guard regramCanCopyMessageText(message, accountId: context.peerId.toInt64(), cachedData: chatInteraction.presentation.cachedData) else { return }
                             if let textLayout = textLayout {
                                 let attr = textLayout.attributedString
                                 let pb = NSPasteboard.general

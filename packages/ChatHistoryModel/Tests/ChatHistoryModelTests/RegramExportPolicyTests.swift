@@ -1,6 +1,7 @@
 import XCTest
 import Postbox
 import TelegramCore
+import RegramCore
 @testable import ChatHistoryModel
 
 final class RegramExportPolicyTests: XCTestCase {
@@ -48,5 +49,39 @@ final class RegramExportPolicyTests: XCTestCase {
         }
         let secret = PeerId(namespace: Namespaces.Peer.SecretChat, id: ._internalFromInt64Value(1))
         XCTAssertFalse(regramBookmarkCanFetchFromCloud(MessageId(peerId: secret, namespace: Namespaces.Message.Cloud, id: 1)))
+    }
+
+    func testProtectedTextSelectionFollowsCurrentAccountSetting() {
+        let selectionAccountId = accountId + 1
+        let otherAccountId = accountId + 2
+        defer {
+            RegramPreferences.shared.removeAccount(selectionAccountId)
+            RegramPreferences.shared.removeAccount(otherAccountId)
+        }
+        for namespace in [Namespaces.Peer.CloudGroup, Namespaces.Peer.CloudChannel] {
+            let peerId = PeerId(namespace: namespace, id: ._internalFromInt64Value(1))
+            let protected = message(peerId: peerId, media: [], flags: [.Incoming, .CopyProtected])
+            RegramPreferences.shared.reset(accountId: selectionAccountId)
+            XCTAssertFalse(regramCanCopyMessageText(protected, accountId: selectionAccountId))
+            RegramPreferences.shared.update(accountId: selectionAccountId) { $0.values["allowSavingProtectedContent"] = .bool(true) }
+            XCTAssertTrue(regramCanCopyMessageText(protected, accountId: selectionAccountId))
+            XCTAssertFalse(regramCanCopyMessageText(protected, accountId: otherAccountId))
+            RegramPreferences.shared.update(accountId: selectionAccountId) { $0.values["allowSavingProtectedContent"] = .bool(false) }
+            XCTAssertFalse(regramCanCopyMessageText(protected, accountId: selectionAccountId))
+        }
+    }
+
+    func testProtectedTextSelectionKeepsSecretExpiredAndPaidRestrictions() {
+        let selectionAccountId = accountId + 3
+        defer { RegramPreferences.shared.removeAccount(selectionAccountId) }
+        RegramPreferences.shared.update(accountId: selectionAccountId) { $0.values["allowSavingProtectedContent"] = .bool(true) }
+        let secret = PeerId(namespace: Namespaces.Peer.SecretChat, id: ._internalFromInt64Value(1))
+        let user = PeerId(namespace: Namespaces.Peer.CloudUser, id: ._internalFromInt64Value(1))
+        XCTAssertFalse(regramCanCopyMessageText(message(peerId: secret, media: [], flags: [.Incoming, .CopyProtected]), accountId: selectionAccountId))
+        XCTAssertFalse(regramCanCopyMessageText(message(peerId: user, media: [TelegramMediaExpiredContent(data: .image)], flags: [.Incoming, .CopyProtected]), accountId: selectionAccountId))
+        XCTAssertFalse(regramCanCopyMessageText(message(peerId: user, media: [TelegramMediaPaidContent(amount: 1, extendedMedia: [])], flags: [.Incoming, .CopyProtected]), accountId: selectionAccountId))
+        XCTAssertTrue(regramCanCopyMessageText(message(peerId: secret, media: []), accountId: selectionAccountId))
+        RegramPreferences.shared.reset(accountId: selectionAccountId)
+        XCTAssertTrue(regramCanCopyMessageText(message(peerId: user, media: []), accountId: selectionAccountId))
     }
 }

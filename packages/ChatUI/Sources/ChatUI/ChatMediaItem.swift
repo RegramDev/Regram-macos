@@ -331,7 +331,7 @@ public class ChatMediaItem: ChatRowItem {
                 let isSpoilerRevealed = chatInteraction.presentation.interfaceState.revealedSpoilers.contains(message.id)
                 
                 let textLayout = FoldingTextLayout.make(caption, context: context, revealed: object.additionalData.quoteRevealed, takeLayout: { [chatInteraction] string in
-                    let textLayout = TextViewLayout(string, alignment: .left, selectText: theme.chat.selectText(isIncoming, object.renderType == .bubble), strokeLinks: object.renderType == .bubble, alwaysStaticItems: true, disableTooltips: false, mayItems: !message.isCopyProtected(cachedData: chatInteraction.presentation.cachedData), spoilerColor: spoilerColor, isSpoilerRevealed: isSpoilerRevealed, onSpoilerReveal: { [weak chatInteraction] in
+                    let textLayout = TextViewLayout(string, alignment: .left, selectText: theme.chat.selectText(isIncoming, object.renderType == .bubble), strokeLinks: object.renderType == .bubble, alwaysStaticItems: true, disableTooltips: false, mayItems: regramCanCopyMessageText(message, accountId: context.peerId.toInt64(), cachedData: chatInteraction.presentation.cachedData), spoilerColor: spoilerColor, isSpoilerRevealed: isSpoilerRevealed, onSpoilerReveal: { [weak chatInteraction] in
                         chatInteraction?.update({
                             $0.updatedInterfaceState({
                                 $0.withRevealedSpoiler(message.id)
@@ -354,7 +354,10 @@ public class ChatMediaItem: ChatRowItem {
             
             let interactions = LinkHooks.shared.globalLinkExecutor()
             
-            interactions.copyToClipboard = { text in
+            interactions.copyToClipboard = { [weak self] text in
+                guard let self, self.captionLayouts.allSatisfy({ regramCanCopyMessageText($0.message, accountId: context.peerId.toInt64(), cachedData: chatInteraction.presentation.cachedData) }) else {
+                    return
+                }
                 copyToClipboard(text)
                 showModalText(for: context.window, text: strings().shareLinkCopied)
             }

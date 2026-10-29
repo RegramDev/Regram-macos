@@ -172,6 +172,7 @@ public struct RegramSetting: Equatable {
         .init("blockedPeerIds", .privacy, .strings([])),
         .init("messageFilterDisabledPeerIds", .privacy, .strings([])),
         .init("antiRevoke", .privacy, .bool(false)),
+        .init("antiRevokeSkipBots", .privacy, .bool(false)),
         .init("antiRevokePeerIds", .privacy, .strings([])),
         .init("saveEditHistory", .privacy, .bool(true)),
         .init("antiAutoDelete", .privacy, .bool(false)),
@@ -240,6 +241,7 @@ public struct RegramSetting: Equatable {
         "antiAutoDelete",
         "antiRevoke",
         "antiRevokePeerIds",
+        "antiRevokeSkipBots",
         "antiSelfDestruct",
         "automaticallyRevealSpoilers",
         "blockedPeerIds",
@@ -417,6 +419,11 @@ public struct RegramAccountSettings: Codable, Equatable {
         if let authorId, self["blockedPeerIds"].strings.contains(String(authorId)) { return true }
         guard !self["messageFilterDisabledPeerIds"].strings.contains(String(peerId)) else { return false }
         return RGMessageFilter.shouldHide(text: text, peerId: peerId, rules: filterRules)
+    }
+
+    public func shouldRetainRevokedMessage(peerId: Int64, authorIsBot: @autoclosure () -> Bool) -> Bool {
+        guard self["antiRevoke"].bool || self["antiRevokePeerIds"].strings.contains(String(peerId)) else { return false }
+        return !self["antiRevokeSkipBots"].bool || !authorIsBot()
     }
 
     public var translationIdentity: String {

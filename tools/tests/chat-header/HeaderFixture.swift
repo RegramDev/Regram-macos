@@ -36,7 +36,37 @@ struct PeerView {
     var peer: ChatPresentationInterfaceState.PeerFixture?
 }
 func peerViewMainPeer(_ view: PeerView) -> ChatPresentationInterfaceState.PeerFixture? { view.peer }
-final class Context {}
+struct ContextPeerId { func toInt64() -> Int64 { 1 } }
+final class FixtureNavigation {
+    var pages: [String] = []
+    func push(_ page: String) { pages.append(page) }
+}
+final class FixtureBindings {
+    let navigation = FixtureNavigation()
+    func rootNavigation() -> FixtureNavigation { navigation }
+}
+final class Context {
+    let peerId = ContextPeerId()
+    let bindings = FixtureBindings()
+}
+struct FixtureSetting { let string: String }
+struct FixtureSettings {
+    subscript(_ key: String) -> FixtureSetting { FixtureSetting(string: "google") }
+}
+struct RegramPreferences {
+    static let shared = RegramPreferences()
+    func settings(accountId: Int64) -> FixtureSettings { FixtureSettings() }
+}
+struct FixtureLanguage { let languageCode = "en" }
+struct FixtureLocalization { let primaryLanguage = FixtureLanguage() }
+let appCurrentLanguage = FixtureLocalization()
+func regramLocalizedString(_ key: String, languageCode: String) -> String {
+    key == "Settings.Translation.Backend" ? "Provider" : "Google"
+}
+struct FeatureNavigationHooks {
+    static let shared = FeatureNavigationHooks()
+    func makeRegramController(_ context: Context, _ page: String) -> String? { page }
+}
 final class ChatInteraction {
     var mode: Mode = .history
     var presentation = ChatPresentationInterfaceState()

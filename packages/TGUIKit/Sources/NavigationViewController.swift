@@ -878,6 +878,10 @@ open class NavigationViewController: ViewController, CALayerDelegate,CAAnimation
         stack.insert(controller, at: at)
     }
     
+    public func cancelPendingPush() {
+        pushDisposable.set(nil)
+    }
+
     open func push(_ controller:ViewController, _ animated:Bool = true, style: ViewControllerStyle? = nil, clearStack: Bool = false) -> Void {
         
 //        if isLocked {

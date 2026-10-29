@@ -147,6 +147,20 @@ public final class AppMenu {
         
         
     }
+    public func close() {
+        observation?.invalidate()
+        observation = nil
+        timerDisposable?.dispose()
+        timerDisposable = nil
+        let controller = self.controller
+        self.controller = nil
+        if let controller {
+            controller.close()
+        } else {
+            menu.cancelTracking()
+        }
+    }
+
     private func presentIfNeeded(event: NSEvent, view: NSView) {
         self.controller?.present(event: event, view: view)
     }

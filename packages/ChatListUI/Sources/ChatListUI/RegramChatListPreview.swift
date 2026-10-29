@@ -76,6 +76,7 @@ final class RegramChatListPreviewCoordinator {
     private let account: Account
     private let postbox: Postbox
     private let accountId: Int64
+    private let queue: Queue
     private let scanDisposable = MetaDisposable()
     private let disposed = Atomic(value: false)
     private var generation: UInt64 = 0
@@ -110,10 +111,11 @@ final class RegramChatListPreviewCoordinator {
     private var revision: Int64 = 0
     let changes = ValuePromise<Int64>(0, ignoreRepeated: true)
 
-    init(account: Account, accountId: Int64) {
+    init(account: Account, accountId: Int64, queue: Queue = prepareQueue) {
         self.account = account
         self.postbox = account.postbox
         self.accountId = accountId
+        self.queue = queue
     }
 
     private func streams(key: SourceKey, upperBound: MessageIndex) -> [MessageId.Namespace: Stream] {
@@ -343,7 +345,7 @@ final class RegramChatListPreviewCoordinator {
         let cachedKey = PostboxViewKey.cachedPeerData(peerId: key.peerId)
         var keys: [PostboxViewKey] = [historyKey, cachedKey, .combinedReadState(peerId: key.peerId, handleThreads: false), .basicPeer(key.peerId)]
         if let associatedPeerId, associatedPeerId != key.peerId { keys.append(.combinedReadState(peerId: associatedPeerId, handleThreads: false)) }
-        disposable.set((postbox.combinedView(keys: keys) |> deliverOn(prepareQueue)).start(next: { [weak self] view in
+        disposable.set((postbox.combinedView(keys: keys) |> deliverOn(self.queue)).start(next: { [weak self] view in
             guard let self, !self.disposed.with({ $0 }), self.unreadObservations[key]?.token == token,
                   let current = self.currentUnreadRequests[key], current.source == request.source else { return }
             let currentAssociated = (view.views[cachedKey] as? CachedPeerDataView)?.cachedPeerData?.associatedHistoryMessageId?.peerId
@@ -359,7 +361,7 @@ final class RegramChatListPreviewCoordinator {
                 if !unreadContinuationScheduled {
                     unreadContinuationScheduled = true
                     let generation = unreadQueueGeneration
-                    prepareQueue.justDispatch { [weak self] in
+                    self.queue.justDispatch { [weak self] in
                         guard let self, !self.disposed.with({ $0 }), self.unreadQueueGeneration == generation else { return }
                         self.unreadContinuationScheduled = false
                         self.unreadStartedInBatch = 0
@@ -390,7 +392,7 @@ final class RegramChatListPreviewCoordinator {
                 guard let messages = regramChatListUnreadMessages(transaction: transaction, snapshot: request.snapshot) else { return nil }
                 _ = associatedPeer.swap(transaction.getPeerCachedData(peerId: request.snapshot.sourceTop.id.peerId)?.associatedHistoryMessageId?.peerId)
                 return messages
-            } |> deliverOn(prepareQueue) |> mapToSignal { messages -> Signal<Bool, NoError> in
+            } |> deliverOn(self.queue) |> mapToSignal { messages -> Signal<Bool, NoError> in
                 guard lease.with({ $0?[request.id] == request }), let messages else { return .single(false) }
                 _ = retryable.swap(true)
                 let visibility = RegramChatListPreparedVisibility(messages: messages, accountId: request.source.accountId, filter: filter, revision: request.source.preferencesRevision)
@@ -404,7 +406,7 @@ final class RegramChatListPreviewCoordinator {
                         }
                     }
                 })
-            }) |> deliverOn(prepareQueue)
+            }) |> deliverOn(self.queue)
             disposable.set(result.start(next: { [weak self] applied in
                 guard let self, !self.disposed.with({ $0 }), self.unreadDisposables[request.id]?.0 == request else { return }
                 if !applied, retryable.with({ $0 }) {
@@ -419,7 +421,7 @@ final class RegramChatListPreviewCoordinator {
     }
 
     func refreshExhaustedEmpty() {
-        prepareQueue.async { [weak self] in
+        self.queue.async { [weak self] in
             guard let self, !self.disposed.with({ $0 }) else { return }
             let ids = self.states.compactMap { id, state in self.activePreviewKeys.contains(id) && state.completed && state.messages.isEmpty ? id : nil }
             for id in ids {
@@ -462,7 +464,7 @@ final class RegramChatListPreviewCoordinator {
                 }
                 return Result(request: request, pages: pages)
             }
-        } |> deliverOn(prepareQueue)).start(next: { [weak self] results in
+        } |> deliverOn(self.queue)).start(next: { [weak self] results in
             guard let self, !self.disposed.with({ $0 }), self.generation == generation else { return }
             self.running = false
             self.inFlight.removeAll()
@@ -507,7 +509,7 @@ final class RegramChatListPreviewCoordinator {
             for (id, state, candidate) in found { self.observeCandidate(id: id, state: state, candidate: candidate) }
             if changed, results.contains(where: { self.activePreviewKeys.contains($0.request.id) }) { self.emitChange() }
             self.loadNextRemote()
-            prepareQueue.after(0.005) { [weak self] in
+            self.queue.after(0.005) { [weak self] in
                 guard let self, self.generation == generation else { return }
                 self.loadNext()
             }
@@ -541,20 +543,24 @@ final class RegramChatListPreviewCoordinator {
         loadNextRemote()
     }
 
+    private func isCurrentRemoteRequest(_ request: Request, disposable: MetaDisposable) -> Bool {
+        return !disposed.with({ $0 }) && activePreviewKeys.contains(request.id) && states[request.id]?.key == request.key && remoteDisposables[request.id] === disposable
+    }
+
     private func loadRemotePage(_ request: Request, offsetId: Int32, number: Int, disposable: MetaDisposable) {
-        guard !disposed.with({ $0 }), states[request.id]?.key == request.key else { return }
+        guard isCurrentRemoteRequest(request, disposable: disposable) else { return }
         let result: Signal<RegramMessageHistoryPage?, NoError> = regramMessageHistoryPage(account: account, peerId: request.key.messageId.peerId, threadId: request.key.threadId, offsetId: offsetId, offsetDate: 0, limit: 50)
         |> map(Optional.init) |> `catch` { _ in .single(nil) }
-        |> timeout(15, queue: prepareQueue, alternate: .single(nil)) |> deliverOn(prepareQueue)
+        |> timeout(15, queue: queue, alternate: .single(nil)) |> deliverOn(self.queue)
         disposable.set(result.start(next: { [weak self] response in
-            guard let self, !self.disposed.with({ $0 }), self.states[request.id]?.key == request.key else { return }
+            guard let self, self.isCurrentRemoteRequest(request, disposable: disposable) else { return }
             guard let response else { self.finishRemote(request, candidate: nil); return }
             let candidate = response.messages.sorted { $0.index > $1.index }.first { message in
                 message.index < request.upperBound && !regramShouldHideMessage(message, accountId: self.accountId, filter: request.filter, revision: request.key.preferencesRevision)
             }
             if let candidate { self.finishRemote(request, candidate: candidate) }
             else if let offset = response.nextOffsetId, offset > 0, offset != offsetId, number < 20 {
-                prepareQueue.after(0.05) { [weak self] in self?.loadRemotePage(request, offsetId: offset, number: number + 1, disposable: disposable) }
+                self.queue.after(0.05) { [weak self] in self?.loadRemotePage(request, offsetId: offset, number: number + 1, disposable: disposable) }
             } else { self.finishRemote(request, candidate: nil) }
         }))
     }
@@ -566,7 +572,7 @@ final class RegramChatListPreviewCoordinator {
         nextCandidateToken &+= 1
         let token = nextCandidateToken
         sourceTokens[id] = token
-        disposable.set((combineLatest(messages.map { postbox.messageView($0.id) }) |> deliverOn(prepareQueue)).start(next: { [weak self] views in
+        disposable.set((combineLatest(messages.map { postbox.messageView($0.id) }) |> deliverOn(self.queue)).start(next: { [weak self] views in
             guard let self, !self.disposed.with({ $0 }), self.sourceTokens[id] == token, var current = self.states[id], current.key == state.key else { return }
             let visible = views.compactMap(\.message).filter { !regramShouldHideMessage($0, accountId: self.accountId, filter: current.filter, revision: current.key.preferencesRevision) }
             if !visible.isEmpty {
@@ -605,7 +611,7 @@ final class RegramChatListPreviewCoordinator {
         nextCandidateToken &+= 1
         let token = nextCandidateToken
         candidateTokens[id] = token
-        disposable.set((postbox.messageView(candidate.id) |> deliverOn(prepareQueue)).start(next: { [weak self] view in
+        disposable.set((postbox.messageView(candidate.id) |> deliverOn(self.queue)).start(next: { [weak self] view in
             guard let self, !self.disposed.with({ $0 }), self.candidateTokens[id] == token, var current = self.states[id], current.key == state.key else { return }
             if let message = view.message, message.index < current.upperBound, !regramShouldHideMessage(message, accountId: self.accountId, filter: current.filter, revision: current.key.preferencesRevision) {
                 guard current.messages.first?.id != message.id || current.messages.first?.stableVersion != message.stableVersion || current.previewPayloads != [RegramMessageFilterPayload(message)] else { return }
@@ -663,7 +669,7 @@ final class RegramChatListPreviewCoordinator {
         _ = unreadLease.swap(nil)
         guard !disposed.swap(true) else { return }
         scanDisposable.dispose()
-        prepareQueue.async { [self] in
+        self.queue.async { [self] in
             candidateDisposables.values.forEach { $0.dispose() }
             candidateDisposables.removeAll()
             candidateTokens.removeAll()

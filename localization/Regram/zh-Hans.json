@@ -1698,6 +1698,14 @@
     "Bookmarks.LocalNotice": "书签和标签保存在这台 Mac 上。点击消息可在原会话中查看。"
   },
   "macos": {
+    "AntiFeatures.SkipBots": "不保留机器人消息",
+    "ios.RG.BottomBarLayout": "底栏布局",
+    "ios.Settings.Editor.bottomBarLayout.Description": "显示项目、顺序、标签与宽度",
+    "ios.Settings.Tabs.Customize": "底栏布局",
+    "RG.BottomBarLayout": "底栏",
+    "Settings.Editor.bottomBarLayout.Description": "Telegram 原生底栏，可隐藏联系人",
+    "Settings.Tabs.Customize": "底栏",
+    "GroupAdmins.Show": "显示群组管理员",
     "Browser.Translation.SystemUnavailable": "当前 Mac 无法使用 Apple 网页翻译，请选择其他翻译服务。",
     "Common.UpdateOS": "需要更新 macOS",
     "EraseData.Notice": "退出所有账号，删除这台 Mac 上 Regram 的本地数据、缓存和设置。清除后需要重新登录。",

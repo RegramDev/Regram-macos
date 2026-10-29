@@ -9,6 +9,10 @@ public func regramCanSaveMessage(_ message: Message, accountId: Int64, cachedDat
     return !message.isCopyProtected(cachedData: cachedData) || RegramPreferences.shared.settings(accountId: accountId)["allowSavingProtectedContent"].bool
 }
 
+public func regramCanCopyMessageText(_ message: Message, accountId: Int64, cachedData: CachedPeerData? = nil) -> Bool {
+    return !message.isCopyProtected(cachedData: cachedData) || regramCanSaveMessage(message, accountId: accountId, cachedData: cachedData)
+}
+
 public func regramBookmarkCanFetchFromCloud(_ id: MessageId) -> Bool {
     id.namespace == Namespaces.Message.Cloud && [Namespaces.Peer.CloudUser, Namespaces.Peer.CloudGroup, Namespaces.Peer.CloudChannel].contains(id.peerId.namespace)
 }

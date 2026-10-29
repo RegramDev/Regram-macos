@@ -18,11 +18,12 @@ final class FixtureNavigation { var backs = 0; var closes = 0; func back() { bac
 enum FixtureScroll: Equatable { case up(Bool) }
 final class FixtureTable {
     var scrolls: [(FixtureScroll, Bool)] = []
+    var documentOffset = NSPoint.zero
     func scroll(to: FixtureScroll, ignoreLayerAnimation: Bool = false) { scrolls.append((to, ignoreLayerAnimation)) }
 }
 enum FixtureSearchState { case None }
 final class FixtureSearch { var clears = 0; func change(state: FixtureSearchState, _ animated: Bool) { clears += 1 } }
-final class FixtureGenericView { let tableView = FixtureTable(); let searchView = FixtureSearch() }
+final class FixtureGenericView { let tableView = FixtureTable(); let searchView = FixtureSearch(); let navigationHeight: CGFloat = 0 }
 final class FixturePeers {
     var polls: [Int32] = []
     var activePolls = 0
@@ -76,6 +77,7 @@ class PeersListController {
     let genericView = FixtureGenericView()
     var filterSignal: Signal<FilterData, NoError> { stateSignal.get() |> map { $0.filterData } }
     var filterValue: FilterData { stateValue.with { $0.filterData } }
+    var state: PeerListState? { stateValue.with { $0 } }
     init(_ context: AccountContext, _ data: FilterData) {
         self.context = context
         stateValue = Atomic(value: PeerListState(filterData: data))
@@ -98,6 +100,13 @@ final class ChatListController: PeersListController {
     let defaultBarTitle = "fixture"
     func removeRevealStateIfNeeded(_ value: Int?) { revealClears += 1 }
     func setCenterTitle(_ value: String) { titleSets += 1 }
+    var page: FixturePaginationView?
+    func paginationView() -> FixturePaginationView? { page }
+    func scrollAction() -> (FixtureScrollPosition) -> Void {
+        let regramRestingNearTop = Atomic(value: true)
+        let animated = Atomic(value: false)
+        return PRODUCTION_CHAT_SCROLL
+    }
     PRODUCTION_CHAT_SELECT
     PRODUCTION_CHAT_UPDATE
     deinit { folderUpdatesDisposable.dispose() }
@@ -124,7 +133,11 @@ func regramPreferenceChanges(accountId: Int64) -> Signal<FixtureSettings, NoErro
 enum EngineChatList {
     enum Group: Equatable { case archive }
     struct GroupItem: Equatable { let id: Group; let version: Int }
+    struct Item { typealias Index = Int; let index: Index }
 }
+struct FixturePaginationView { let items: [EngineChatList.Item]; let hasEarlier: Bool; let hasLater: Bool }
+struct FixtureScrollPosition { let direction: ScrollDirection }
+let nativePagingCount = NATIVE_PAGING_COUNT
 struct FixtureList { let groupItems: [EngineChatList.GroupItem] }
 struct FixtureUpdate { let list: FixtureList }
 enum FixtureLocation { case chatList(groupId: FixtureGroup) }
@@ -237,7 +250,7 @@ struct FolderSwitchChecks {
         top.topAction()(.folder(2))
         check(snapshots.count == 1, "top changed folder emits one state")
         check(snapshots.first?.filter == .folder(2), "first state already selects B")
-        check(snapshots.first?.request == .Initial(13, nil), "first B request resets to viewport tail")
+        check(snapshots.first?.request == .Initial(nativePagingCount, nil), "first B request uses native paging capacity")
         check(snapshots.first?.isTop == true, "B isTop resets with request")
         check(top.context.engine.peers.polls == [2] && top.context.engine.peers.activePolls == 1, "top starts one target folder poll")
         check(RegramChatListPolicy.selected.map { $0.0 } == [2], "top remembers chosen folder")
@@ -265,11 +278,87 @@ struct FolderSwitchChecks {
         check(denied.context.premiumPrompts == 1 && deniedSnapshots == 0, "top obeys native premium gate before data mutation")
         check(denied.context.engine.peers.polls.isEmpty && denied.genericView.tableView.scrolls.isEmpty, "denied selection has no query/poll/scroll effects")
         top.topAction()(.folder(3)); top.topAction()(.folder(1))
-        check(top.filterValue.filter == .folder(1) && top.filterValue.request == .Initial(13, nil), "rapid changes settle on latest folder and tail")
+        check(top.filterValue.filter == .folder(1) && top.filterValue.request == .Initial(nativePagingCount, nil), "rapid changes settle on latest folder and tail")
         check(top.context.engine.peers.activePolls == 1, "rapid changes cancel previous folder poll")
         top.topAction()(.allChats)
         check(top.context.engine.peers.polls.last == -1 && RegramChatListPolicy.selected.last?.0 == -1, "All Chats uses canonical saved/poll id")
         observation.dispose(); deniedObservation.dispose()
+    }
+    static func scrollChecks() {
+        check(FilterData().request == .Initial(nativePagingCount, nil), "startup uses native paging capacity")
+        for height in [350, 700, 1400, 2800] {
+            let controller = make(Int64(100 + height))
+            controller.context.window.frame.size.height = CGFloat(height)
+            controller.selectFilter(.folder(2))
+            check(controller.filterValue.request == .Initial(nativePagingCount, nil), "folder initial capacity is stable at height \(height)")
+        }
+        let idle = make(51)
+        var transforms = 0
+        var emissions = 0
+        let observation = idle.filterSignal.start(next: { _ in emissions += 1 })
+        emissions = 0
+        for _ in 0..<500 {
+            idle.updateFilter { transforms += 1; return $0.withUpdatedIsTop(false) }
+        }
+        check(transforms == 500, "unchanged scroll state avoids a second transform")
+        check(emissions == 0 && idle.titleSets == 0, "unchanged scroll state avoids title and signal work")
+        idle.updateFilter { $0.withUpdatedBadges(.init(total: 10, filters: [1])) }
+        check(emissions == 1 && idle.titleSets == 0, "changed badges still publish without rebuilding title")
+        observation.dispose()
+
+        let duplicate = make(52)
+        duplicate.page = FixturePaginationView(items: [.init(index: 900)], hasEarlier: true, hasLater: false)
+        let samePage = duplicate.scrollAction()
+        var duplicateEmissions = 0
+        let duplicateObservation = duplicate.filterSignal.start(next: { _ in duplicateEmissions += 1 })
+        duplicateEmissions = 0
+        for _ in 0..<500 { samePage(FixtureScrollPosition(direction: .bottom)) }
+        check(duplicateEmissions == 0 && duplicate.titleSets == 0, "same page cursor does not trigger repeated list preparation")
+        duplicateObservation.dispose()
+        let next = make(53)
+        next.page = FixturePaginationView(items: [.init(index: 800)], hasEarlier: true, hasLater: false)
+        next.scrollAction()(FixtureScrollPosition(direction: .bottom))
+        check(next.filterValue.request == .Index(800, nil), "new page cursor still loads immediately")
+        check(!next.filterValue.isTop && next.titleSets == 0, "pagination preserves state without rebuilding unchanged title")
+
+        for available in [0, 5, 80, 500] {
+            let controller = make(Int64(200 + available))
+            controller.selectFilter(.folder(2))
+            guard case let .Initial(capacity, _) = controller.filterValue.request else {
+                check(false, "expected initial folder request")
+                continue
+            }
+            var loaded = min(available, capacity)
+            let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 300, height: 640))
+            scroll.hasVerticalScroller = true
+            scroll.hasHorizontalScroller = false
+            scroll.scrollerStyle = .legacy
+            let document = NSView(frame: NSRect(x: 0, y: 0, width: 280, height: loaded * 70))
+            scroll.documentView = document
+            scroll.tile()
+            scroll.reflectScrolledClipView(scroll.contentView)
+            let before = scroll.verticalScroller!.knobProportion
+            let offset = min(CGFloat(420), max(0, document.frame.height - scroll.contentSize.height))
+            let bounds = scroll.contentView.bounds.offsetBy(dx: 0, dy: offset)
+            scroll.contentView.scroll(to: scroll.contentView.constrainBoundsRect(bounds).origin)
+            let visibleEnd = min(loaded, Int(ceil((offset + scroll.contentSize.height) / 70)))
+            if loaded > 0, loaded - visibleEnd <= loaded / 6, loaded < available {
+                controller.page = FixturePaginationView(items: [.init(index: 1)], hasEarlier: true, hasLater: false)
+                controller.scrollAction()(FixtureScrollPosition(direction: .bottom))
+                if case .Index = controller.filterValue.request {
+                    loaded = min(available, loaded + nativePagingCount)
+                    document.setFrameSize(NSSize(width: 280, height: loaded * 70))
+                }
+            }
+            scroll.reflectScrolledClipView(scroll.contentView)
+            let after = scroll.verticalScroller!.knobProportion
+            check(abs(before - after) < 0.0001, "native scrollbar is stable on first short scroll for \(available) chats")
+            check(loaded == min(available, nativePagingCount), "first short scroll does not expand initial page for \(available) chats")
+            if available >= 80 {
+                check(before > 0 && before < 0.3, "native scrollbar starts small for \(available) chats")
+            }
+            observations.append(["stage": "first folder scroll", "available": available, "initialCapacity": capacity, "beforeKnob": before, "afterKnob": after, "loadedAfterScroll": loaded])
+        }
     }
     static func archiveChecks() {
         let controller = make(21)
@@ -372,7 +461,7 @@ struct FolderSwitchChecks {
     static func main() throws {
         _ = NSApplication.shared
         NSApp.setActivationPolicy(.prohibited)
-        routeChecks(); archiveChecks(); headerChecks()
+        routeChecks(); scrollChecks(); archiveChecks(); headerChecks()
         let output = URL(fileURLWithPath: CommandLine.arguments[1])
         let report: [String: Any] = ["checks": count, "failures": failures, "observations": observations, "productionCallbacks": true, "nativeScrollableSegmentView": true, "visibleWindows": NSApp.windows.filter { $0.isVisible }.count]
         try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]).write(to: output.appendingPathComponent("report.json"))

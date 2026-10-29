@@ -394,7 +394,7 @@ public class ChatMessageItem: ChatRowItem {
              }
 
              textLayout = FoldingTextLayout.make(self.messageText, context: context, revealed: entry.additionalData.quoteRevealed, takeLayout: { [chatInteraction] string in
-                 let textLayout = TextViewLayout(string, selectText: theme.chat.selectText(isIncoming, entry.renderType == .bubble), strokeLinks: entry.renderType == .bubble && !containsBigEmoji, alwaysStaticItems: true, disableTooltips: false, mayItems: !message.isCopyProtected(cachedData: chatInteraction.presentation.cachedData), spoilerColor: spoilerColor, isSpoilerRevealed: isSpoilerRevealed, onSpoilerReveal: { [weak chatInteraction] in
+                 let textLayout = TextViewLayout(string, selectText: theme.chat.selectText(isIncoming, entry.renderType == .bubble), strokeLinks: entry.renderType == .bubble && !containsBigEmoji, alwaysStaticItems: true, disableTooltips: false, mayItems: regramCanCopyMessageText(message, accountId: context.peerId.toInt64(), cachedData: chatInteraction.presentation.cachedData), spoilerColor: spoilerColor, isSpoilerRevealed: isSpoilerRevealed, onSpoilerReveal: { [weak chatInteraction] in
                      chatInteraction?.update({
                          $0.updatedInterfaceState({
                              $0.withRevealedSpoiler(message.id)
@@ -498,9 +498,9 @@ public class ChatMessageItem: ChatRowItem {
                      }
                      
                      if content.file == nil || forceArticle, content.story == nil, uniqueGift == nil {
-                         webpageLayout = WPArticleLayout(with: content, context: context, chatInteraction: chatInteraction, parent:message, fontSize: theme.fontSize, presentation: wpPresentation, approximateSynchronousValue: false, downloadSettings: downloadSettings, autoplayMedia: entry.autoplayMedia, theme: theme, mayCopyText: !message.isCopyProtected(cachedData: chatInteraction.presentation.cachedData))
+                         webpageLayout = WPArticleLayout(with: content, context: context, chatInteraction: chatInteraction, parent:message, fontSize: theme.fontSize, presentation: wpPresentation, approximateSynchronousValue: false, downloadSettings: downloadSettings, autoplayMedia: entry.autoplayMedia, theme: theme, mayCopyText: regramCanCopyMessageText(message, accountId: context.peerId.toInt64(), cachedData: chatInteraction.presentation.cachedData))
                      } else if content.file != nil || content.image != nil || uniqueGift != nil {
-                         webpageLayout = WPMediaLayout(with: content, context: context, chatInteraction: chatInteraction, parent:message, fontSize: theme.fontSize, presentation: wpPresentation, approximateSynchronousValue: false, downloadSettings: downloadSettings, autoplayMedia: entry.autoplayMedia, theme: theme, mayCopyText: !message.isCopyProtected(cachedData: chatInteraction.presentation.cachedData), uniqueGift: uniqueGift)
+                         webpageLayout = WPMediaLayout(with: content, context: context, chatInteraction: chatInteraction, parent:message, fontSize: theme.fontSize, presentation: wpPresentation, approximateSynchronousValue: false, downloadSettings: downloadSettings, autoplayMedia: entry.autoplayMedia, theme: theme, mayCopyText: regramCanCopyMessageText(message, accountId: context.peerId.toInt64(), cachedData: chatInteraction.presentation.cachedData), uniqueGift: uniqueGift)
                      }
                  default:
                      break
@@ -591,7 +591,10 @@ public class ChatMessageItem: ChatRowItem {
                 selectManager.copy(selectManager)
                 return !selectManager.isEmpty
             }
-            interactions.copyToClipboard = { text in
+            interactions.copyToClipboard = { [weak chatInteraction] text in
+                guard let chatInteraction, regramCanCopyMessageText(message, accountId: context.peerId.toInt64(), cachedData: chatInteraction.presentation.cachedData) else {
+                    return
+                }
                 copyToClipboard(text)
             }
             interactions.topWindow = { [weak self] in

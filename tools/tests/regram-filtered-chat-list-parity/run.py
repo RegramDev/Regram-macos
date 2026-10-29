@@ -39,7 +39,8 @@ adapters = adapters.replace('ENGINE_ITEM_DECLARATION', declaration(engine, 'publ
 coordinator = (chat_list / 'RegramChatListPreview.swift').read_text()
 controller = (chat_list / 'ChatListController.swift').read_text()
 assert 'presentation.entries.sorted()' in controller
-assert 'previousChatList.swap(update.list)' in controller
+assert 'previousChatList.swap(result.list)' in controller
+assert 'let view = strongSelf.paginationView()' in controller
 assert 'previousChatList.with' in controller
 assert coordinator.index('regramChatListCanReadHiddenUnread(transaction:') < coordinator.index('lease.with { current') < coordinator.index('withCurrentRevision(accountId:') < coordinator.index('withUnrevealed(accountId:')
 assert 'isHidden: visibility.isHidden' in coordinator
@@ -96,6 +97,7 @@ dispose = declaration(coordinator, '    func dispose()')
 dispose = dispose[dispose.index('{') + 1:dispose.index('        scanDisposable.dispose()')]
 production += """
 final class SchedulingFixture {
+    private let queue = prepareQueue
     private typealias CacheId = RegramChatListPeerKey
     let account: Account
     let accountId: Int64

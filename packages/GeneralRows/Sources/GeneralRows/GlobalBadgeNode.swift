@@ -79,7 +79,7 @@ public class GlobalBadgeNode: Node {
     
     private let getColor: (Bool) -> NSColor
     
-    public init(_ account: Account, sharedContext: any SharedAccountContextProtocol, dockTile: Bool = false, collectAllAccounts: Bool = false, excludePeerId:PeerId? = nil, excludeGroupId: PeerGroupId? = nil, view: View? = nil, layoutChanged:(()->Void)? = nil, getColor: @escaping(Bool) -> NSColor = { _ in return theme.colors.redUI }, fontSize: CGFloat = .small, applyFilter: Bool = true, filter: ChatListFilter? = nil, removeWhenSidebar: Bool = false, sync: Bool = false) {
+    public init(_ account: Account, sharedContext: any SharedAccountContextProtocol, dockTile: Bool = false, collectAllAccounts: Bool = false, excludePeerId:PeerId? = nil, excludeGroupId: PeerGroupId? = nil, view: View? = nil, layoutChanged:(()->Void)? = nil, getColor: @escaping(Bool) -> NSColor = { _ in return theme.colors.redUI }, fontSize: CGFloat = .small, applyFilter: Bool = true, filter: ChatListFilter? = nil, removeWhenSidebar: Bool = false) {
         self.account = account
         self.excludePeerId = excludePeerId
         self.layoutChanged = layoutChanged
@@ -180,9 +180,6 @@ public class GlobalBadgeNode: Node {
             return Result(dockText: $0.dockText, total: $1.sidebar && removeWhenSidebar ? 0 : $0.total)
         } |> deliverOnMainQueue
         
-        let semaphore = DispatchSemaphore(value: 0)
-        
-        
         self.disposable.set(s.start(next: { [weak self] result in
             if let strongSelf = self {
                 strongSelf.unreadCount = result.total
@@ -199,14 +196,7 @@ public class GlobalBadgeNode: Node {
                     forceUpdateStatusBarIconByDockTile(sharedContext: sharedContext)
                 }
             }
-            if sync {
-                semaphore.signal()
-            }
         }))
-        
-        if sync {
-            semaphore.wait()
-        }
     }
     
     override public func draw(_ layer: CALayer, in ctx: CGContext) {

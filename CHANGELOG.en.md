@@ -2,6 +2,16 @@
 
 [简体中文](CHANGELOG.md) · **English**
 
+## 13.1.0 (283383) — 2026-10-29
+
+- Merge 13 upstream updates through `191789f8`, including device renaming, chat header search and topic actions, Stars price confirmation, and button styling.
+- Add “Show Group Admins” to the group menu. Allow text selection in copy-restricted groups when saving protected content is enabled.
+- Add “Don't retain bot messages” based on message authors. Place it with deleted-message retention in a separate group and enable it only while retention is on.
+- Reduce queued work during long sessions by cancelling stale navigation, hidden chat rendering, preloads, and preview tasks.
+- Correct stale folder snapshots, pagination, and bot category contents. Improve list refreshes and the scrollbar shrinking abruptly on the first scroll after switching folders.
+- Coalesce repeated Story status refreshes during fast scrolling to reduce auxiliary work.
+- Fix link hover previews remaining after the pointer leaves and menus extending beyond the screen.
+
 ## 13.1.0 (283382) — 2026-10-28
 
 - Merge nine upstream fixes through `78be930d`.

@@ -1,6 +1,6 @@
 # Regram 共享语言包
 
-`Regram/en.json`、`Regram/zh-Hans.json` 和 `Regram/zh-Hant.json` 是 iOS 与 macOS 的共同源文件。包含 1694 个共用键；`macos` 包含 19 个平台覆盖或 macOS 专用文案。`nativeMacos` 包含 37 个原生界面补充文案，例如聊天记录导出。
+`Regram/en.json`、`Regram/zh-Hans.json` 和 `Regram/zh-Hant.json` 是 iOS 与 macOS 的共同源文件。包含 1694 个共用键；`macos` 包含 27 个平台覆盖或 macOS 专用文案。`nativeMacos` 包含 37 个原生界面补充文案，例如聊天记录导出。
 
 生成两端资源：
 

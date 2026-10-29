@@ -11,6 +11,7 @@
 "AntiFeatures.SaveProtectedStories" = "Allow saving protected stories";
 "AntiFeatures.Screenshot" = "Don't notify on screenshot";
 "AntiFeatures.SelfDestruct" = "Ignore self-destruct timer";
+"AntiFeatures.SkipBots" = "Do Not Keep Bot Messages";
 "AntiRevoke.Chats.Empty" = "No chats yet. Open a chat's profile and turn on \"Keep Deleted Messages\".";
 "AntiRevoke.Chats.Notice" = "Messages deleted in these chats are kept and marked as deleted. Swipe left to remove; tap to open the profile.";
 "AntiRevoke.Chats.Title" = "Chats Keeping Deleted Messages";
@@ -432,6 +433,7 @@
 "Ghost.DontSendTyping" = "Don't send typing status";
 "Ghost.Header" = "GHOST MODE";
 "Ghost.Notice" = "Stops this device from reporting which stories you view, your online status and your typing. Nothing changes on your side: stories still clear. Sending a message still puts you online — that part is decided by the server, not by the app.";
+"GroupAdmins.Show" = "Show Group Administrators";
 "GroupInfo.Location" = "Location";
 "GroupRemark.NotSet" = "Not Set";
 "GroupRemark.Notice" = "Only visible to this account on this device. The name appears in the chat list, chat title and local search. Leave it empty and save to use the original group name.";

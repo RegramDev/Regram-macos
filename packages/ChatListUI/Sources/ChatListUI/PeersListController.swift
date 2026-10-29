@@ -2949,6 +2949,14 @@ open class PeersListController<Context: AccountContextProtocol>: TelegramGeneric
                     }, itemImage: MenuAnimation.menu_show_info.value))
                 }
 
+                if peer.peer.isSupergroup, !peer.peer.isMonoForum {
+                    items.append(ContextMenuItem(regramLocalizedString("GroupAdmins.Show", languageCode: appCurrentLanguage.primaryLanguage.languageCode), handler: {
+                        if let controller = FeatureNavigationHooks.shared.makeGroupAdminsController(context, peer.peer.id) {
+                            context.bindings.rootNavigation().push(controller)
+                        }
+                    }, itemImage: MenuAnimation.menu_create_group.value))
+                }
+
                 if chatController == nil || (chatController?.chatInteraction.chatLocation != .peer(peer.peer.id)) {
                     items.append(ContextMenuItem(strings().forumTopicContextShowAsMessages, handler: { [weak self] in
                         self?.open(with: .chatId(.chatList(peer.peer.id), peer.peer.id, -1), forceAnimated: true)

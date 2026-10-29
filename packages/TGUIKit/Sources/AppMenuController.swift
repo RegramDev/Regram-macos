@@ -3,6 +3,22 @@ import SwiftSignalKit
 import AppKit
 import KeyboardKey
 
+func appMenuAdjustedFrame(_ frame: NSRect, screenFrame: NSRect, ownerFrame: NSRect, parentFrame: NSRect?, betterInside: Bool) -> NSRect {
+    let ownerBounds = ownerFrame.intersection(screenFrame)
+    let fitsOwner = frame.width <= ownerBounds.width && frame.height <= ownerBounds.height
+    let visible = parentFrame == nil && betterInside && fitsOwner ? ownerBounds : screenFrame
+    var frame = frame
+
+    if frame.minX < visible.minX {
+        frame.origin.x = parentFrame.map { $0.maxX - 40 } ?? visible.minX + 40
+    } else if frame.maxX > visible.maxX {
+        frame.origin.x = parentFrame.map { $0.minX - frame.width + 45 } ?? frame.minX - frame.width + 40
+    }
+    frame.origin.x = max(visible.minX, min(frame.minX, visible.maxX - frame.width))
+    frame.origin.y = max(visible.minY, min(frame.minY, visible.maxY - frame.height))
+    return frame
+}
+
 private extension Window {
     var view: MenuView {
         return self.contentView!.subviews.first! as! MenuView
@@ -220,7 +236,7 @@ final class MenuView: Control, TableViewDelegate {
             return true
         })
         
-        self.setFrameSize(max, min(tableView.listHeight, min(maxHeight ?? appearMode.max, screen.visibleFrame.height - 200)))
+        self.setFrameSize(min(max, Swift.max(1, screen.visibleFrame.width - 40)), min(tableView.listHeight, min(maxHeight ?? appearMode.max, screen.visibleFrame.height - 200)))
         if presentation.colors.isDark {
             visualView.material = .dark
         } else {
@@ -980,30 +996,7 @@ final class AppMenuController : NSObject  {
         guard let owner = self.parent, let screen = owner.screen else {
             return rect
         }
-        var rect = rect
-        
-        let visible = (parent != nil || !self.betterInside) && !owner.isFullScreen  ? screen.visibleFrame : owner.frame
-        
-        if rect.minY < visible.minY {
-            rect.origin.y = visible.minY
-        } else if rect.maxY > visible.maxY, !owner.isFullScreen {
-            rect.origin.y = visible.maxY
-        }
-        
-        if rect.minX < visible.minX {
-            if let parent = parent {
-                rect.origin.x = parent.frame.maxX - 40
-            } else {
-                rect.origin.x = visible.minX + 40
-            }
-        } else if rect.maxX > visible.maxX {
-            if let parent = parent {
-                rect.origin.x = parent.frame.minX - rect.width + 40 + 5
-            } else {
-                rect.origin.x = rect.minX - rect.width + 40
-            }
-        }
-        return rect
+        return appMenuAdjustedFrame(rect, screenFrame: owner.isFullScreen ? screen.frame : screen.visibleFrame, ownerFrame: owner.frame, parentFrame: parent?.frame, betterInside: self.betterInside)
     }
     
     func present(event: NSEvent, view: NSView) {

@@ -113,8 +113,8 @@ for active in [false, true] {
     check(interaction.events.last == "exclude:ru", "language exclusion lost")
     menu.items.first { $0.title == "Hide translation" }!.invoke()
     check(interaction.events.last == "hide", "hide action lost")
-    menu.items.first { $0.title == "Cocoon" }!.invoke()
-    check(ChatUIHooks.shared.aboutCount > 0, "translation provider information lost")
+    menu.items.first { $0.title == "Provider: Google" }!.invoke()
+    check(interaction.interactionContext.bindings.navigation.pages.last == "settings.translation/translationBackend", "Regram translation provider settings lost")
 }
 interaction.presentation.translateState = .init(paywall: true)
 let paywall = chatTranslationMenuItem(chatInteraction: interaction)!.submenu!

@@ -130,7 +130,7 @@ struct ControllerGeometry {
         (sources / name).write_text(content)
     if args.fade_preview:
         shutil.copy2(fixtures / 'FadePreview.swift', sources / 'FadePreview.swift')
-    command = ['swift', 'run', '--package-path', str(directory), '--scratch-path', str(args.scratch_path.resolve()), '--disable-sandbox', '--jobs', '2', 'SearchIntegration']
+    command = ['swift', 'run', '--package-path', str(directory), '--scratch-path', str(args.scratch_path.resolve()), '--disable-sandbox', '--jobs', '2', '--configuration', 'release', '-Xswiftc', '-DSTABLE', 'SearchIntegration']
     if args.expect_regression:
         command.append('--expect-regression')
     if args.prepare_app:
