@@ -1309,6 +1309,10 @@ public class ChatInputView: View, Notifable {
             if value.effectiveInput != oldValue.effectiveInput || oldValue.state != value.state || textPermissionChanged {
                 updateInput(value, prevState: oldValue, animated: animated)
             }
+            if value.sendPaidMessageStars != oldValue.sendPaidMessageStars {
+                updatePlaceholder()
+            }
+
             updateAttachments(value,animated)
             
             var urlPreviewChanged:Bool
