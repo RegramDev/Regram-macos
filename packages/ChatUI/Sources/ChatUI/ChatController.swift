@@ -4602,15 +4602,18 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                 return
             }
 
+            let urlPreview = urlPreviewMatchesInput(presentation, context: context) ? presentation.urlPreview : nil
+            let disableUrlPreview = presentation.interfaceState.composeDisableUrlPreview != nil && (urlPreview == nil || urlPreview?.0 == presentation.interfaceState.composeDisableUrlPreview)
+
             self.urlPreviewQueryState?.1.dispose()
             
             
             let webpagePreviewAttribute: WebpagePreviewMessageAttribute?
             
             let media: RequestEditMessageMedia
-            if let webpreview = presentation.urlPreview?.1 {
+            if let webpreview = urlPreview?.1 {
                 webpagePreviewAttribute = .init(leadingPreview: !presentation.interfaceState.linkBelowMessage, forceLargeMedia: presentation.interfaceState.largeMedia, isManuallyAdded: false, isSafe: true)
-                if presentation.urlPreview?.0 == presentation.interfaceState.composeDisableUrlPreview {
+                if urlPreview?.0 == presentation.interfaceState.composeDisableUrlPreview {
                     media = .keep
                 } else {
                     media = .update(.webPage(webPage: WebpageReference(webpreview), media: webpreview))
@@ -4625,7 +4628,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
             
             let editSubmissionId = chatInteraction.beginMediaEditSubmission()
             if atDate == nil {
-                self.context.account.pendingUpdateMessageManager.add(messageId: state.message.id, text: inputState.inputText, media: media, entities: TextEntitiesMessageAttribute(entities: inputState.messageTextEntities(extractDates: state.message.id.peerId.namespace == Namespaces.Peer.CloudUser)), richText: nil, inlineStickers: inputState.inlineMedia, webpagePreviewAttribute: webpagePreviewAttribute, invertMediaAttribute: invertMediaAttribute, disableUrlPreview: presentation.interfaceState.composeDisableUrlPreview != nil)
+                self.context.account.pendingUpdateMessageManager.add(messageId: state.message.id, text: inputState.inputText, media: media, entities: TextEntitiesMessageAttribute(entities: inputState.messageTextEntities(extractDates: state.message.id.peerId.namespace == Namespaces.Peer.CloudUser)), richText: nil, inlineStickers: inputState.inlineMedia, webpagePreviewAttribute: webpagePreviewAttribute, invertMediaAttribute: invertMediaAttribute, disableUrlPreview: disableUrlPreview)
                 
                 self.chatInteraction.beginEditingMessage(nil)
                 self.chatInteraction.update({
@@ -4647,7 +4650,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                 }
                 
                 
-                self.chatInteraction.editDisposable.set((context.engine.messages.requestEditMessage(messageId: state.message.id, text: inputState.inputText, media: media, entities: TextEntitiesMessageAttribute(entities: inputState.messageTextEntities()), richText: nil, inlineStickers: inputState.inlineMedia, webpagePreviewAttribute: webpagePreviewAttribute, invertMediaAttribute: invertMediaAttribute, disableUrlPreview: presentation.interfaceState.composeDisableUrlPreview != nil, scheduleInfoAttribute: scheduleAttr) |> deliverOnMainQueue).start(next: { [weak self] progress in
+                self.chatInteraction.editDisposable.set((context.engine.messages.requestEditMessage(messageId: state.message.id, text: inputState.inputText, media: media, entities: TextEntitiesMessageAttribute(entities: inputState.messageTextEntities()), richText: nil, inlineStickers: inputState.inlineMedia, webpagePreviewAttribute: webpagePreviewAttribute, invertMediaAttribute: invertMediaAttribute, disableUrlPreview: disableUrlPreview, scheduleInfoAttribute: scheduleAttr) |> deliverOnMainQueue).start(next: { [weak self] progress in
                     guard let self, self.chatInteraction.isCurrentMediaEditSubmission(editSubmissionId), self.chatInteraction.presentation.interfaceState.editState?.message.id == state.message.id else { return }
                     switch progress {
                     case let .progress(progress):
