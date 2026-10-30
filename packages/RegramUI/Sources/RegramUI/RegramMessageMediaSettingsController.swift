@@ -37,11 +37,13 @@ private struct RegramMessageMediaState: Equatable {
 private final class RegramMessageMediaArguments {
     let context: any AccountContextProtocol
     let set: (String, RegramValue) -> Void
+    let toggle: (String) -> Void
     let tab: (String) -> Void
     let open: (String) -> Void
-    init(context: any AccountContextProtocol, set: @escaping (String, RegramValue) -> Void, tab: @escaping (String) -> Void, open: @escaping (String) -> Void) {
+    init(context: any AccountContextProtocol, set: @escaping (String, RegramValue) -> Void, toggle: @escaping (String) -> Void, tab: @escaping (String) -> Void, open: @escaping (String) -> Void) {
         self.context = context
         self.set = set
+        self.toggle = toggle
         self.tab = tab
         self.open = open
     }
@@ -121,7 +123,6 @@ private func regramParityRows(_ page: String) -> [RegramParityRow] {
         .notice("MediaMetadata.Setting.Notice")
     ]
     case "photos": return [
-        .header("Native.Quality"),
         .slider("outgoingPhotoQuality"),
         .notice("Settings.Photo.Quality.Notice"),
         .header("Settings.Section.Sending"),
@@ -131,7 +132,6 @@ private func regramParityRows(_ page: String) -> [RegramParityRow] {
         .notice("Media.ClipboardOriginalImages.Notice")
     ]
     case "stickers": return [
-        .header("Settings.Stickers.Size"),
         .slider("stickerSize"),
         .header("Native.Stickers"),
         .toggle("stickerTimestamp", "Settings.Stickers.Timestamp", inverted: false),
@@ -228,22 +228,28 @@ private func regramMessageMediaEntries(_ state: RegramMessageMediaState, categor
             rows.append(.desc(sectionId: section, index: index, text: .plain(regramParityText(key)), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
         case let .toggle(key, title, inverted):
             let current = state.settings[key].bool
-            general(regramParityText(title), .switchable(inverted ? !current : current), action: { arguments.set(key, .bool(!current)) })
+            general(regramParityText(title), .switchable(inverted ? !current : current), action: { arguments.toggle(key) })
         case let .picker(key, title):
             if key == "features.chatListStartupFolderMode" {
-                var items = ["telegram", "last"].map { mode in ContextMenuItem(regramParityText("features.ChatListStartupFolder." + mode), handler: { arguments.set(key, .string(mode)) }) }
+                let current = state.settings[key].string
+                let selectedFolder: String?
+                if case let .dictionary(values) = state.settings["features.startupFolders"] { selectedFolder = values[String(arguments.context.peerId.toInt64())] } else { selectedFolder = nil }
+                var selectedTitle = regramParityText("features.ChatListStartupFolder." + current)
+                var items = ["telegram", "last"].map { mode in ContextMenuItem(regramParityText("features.ChatListStartupFolder." + mode), handler: { arguments.set(key, .string(mode)) }, state: current == mode ? .on : .off, removeTail: false) }
                 for filter in state.folders {
                     let name: String
                     switch filter { case .allChats: name = regramParityText("Native.AllChats"); case let .filter(_, title, _, _): name = title.text }
+                    let selected = current == "specific" && selectedFolder == String(filter.id == 0 ? -1 : filter.id)
+                    if selected { selectedTitle = name }
                     items.append(ContextMenuItem(name, handler: {
                         var dictionary: [String: String] = [:]
                         if case let .dictionary(values) = state.settings["features.startupFolders"] { dictionary = values }
                         dictionary[String(arguments.context.peerId.toInt64())] = String(filter.id == 0 ? -1 : filter.id)
                         arguments.set("features.startupFolders", .dictionary(dictionary))
                         arguments.set(key, .string("specific"))
-                    }))
+                    }, state: selected ? .on : .off, removeTail: false))
                 }
-                general(regramParityText(title), .contextSelector(regramParityText("features.ChatListStartupFolder." + state.settings[key].string), items))
+                general(regramParityText(title), .contextSelector(selectedTitle, items))
             } else {
                 let current = state.settings[key]
                 let options = RegramSetting.byKey[key]?.choices ?? []
@@ -253,7 +259,7 @@ private func regramMessageMediaEntries(_ state: RegramMessageMediaState, categor
         case let .slider(key):
             let value = min(100, max(0, state.settings[key].integer))
             rows.append(.custom(sectionId: section, index: index, value: .none, identifier: identifier, equatable: InputDataEquatable(value), comparable: nil, item: { size, stableId in
-                PrecieSliderRowItem(size, stableId: stableId, current: CGFloat(value) / 100, markers: ["0%", "100%"], showValue: "\(value)%", update: { progress in arguments.set(key, .integer(Int64((progress * 100).rounded()))) }, viewType: .singleItem)
+                regramSliderRowItem(size, stableId: stableId, title: regramParityText(key == "outgoingPhotoQuality" ? "Native.Quality" : "Settings.Stickers.Size"), value: Int(value), range: 0...100, changed: { arguments.set(key, .integer(Int64($0))) })
             }))
         case let .action(id, title):
             general(regramParityText(title), .next, action: { arguments.open(id) })
@@ -280,6 +286,8 @@ private func regramMessageMediaController(context: any AccountContextProtocol, c
     func update(_ transform: (inout RegramMessageMediaState) -> Void) { promise.set(state.modify { value in var value = value; transform(&value); return value }) }
     let arguments = RegramMessageMediaArguments(context: context, set: { key, value in
         RegramPreferences.shared.update(accountId: accountId) { $0[key] = value }
+    }, toggle: { key in
+        RegramPreferences.shared.update(accountId: accountId) { $0[key] = .bool(!$0[key].bool) }
     }, tab: { tab in update { $0.tab = tab } }, open: { id in
         let controller: ViewController?
         switch id {
@@ -293,7 +301,7 @@ private func regramMessageMediaController(context: any AccountContextProtocol, c
     })
     let signal = combineLatest(promise.get(), appearanceSignal) |> map { state, _ in InputDataSignalValue(entries: regramMessageMediaEntries(state, category: category, arguments: arguments)) }
     var didFocus = false
-    let controller = InputDataController(dataSignal: signal, title: regramParityText("Settings.ProCategory." + category), removeAfterDisappear: false, hasDone: false, identifier: "regram.pro." + category, afterTransaction: { controller in
+    let controller = RegramFormController(dataSignal: signal, title: regramParityText("Settings.ProCategory." + category), removeAfterDisappear: false, hasDone: false, identifier: "regram.pro." + category, afterTransaction: { controller in
         guard !didFocus, let focus else { return }
         controller.tableView.enumerateItems { item in
             if let id = (item.stableId.base as? InputDataEntryId)?.identifier, id.identifier == "parity_" + focus {
@@ -304,7 +312,6 @@ private func regramMessageMediaController(context: any AccountContextProtocol, c
             return true
         }
     })
-    if category != "input" { regramConfigureSegmentedRows(controller) }
     disposables.add(regramPreferenceChanges(accountId: accountId).start(next: { settings in update { $0.settings = settings } }))
     disposables.add((context.engine.peers.updatedChatListFilters() |> deliverOnMainQueue).start(next: { folders in update { $0.folders = folders } }))
     controller.onDeinit = { disposables.dispose() }

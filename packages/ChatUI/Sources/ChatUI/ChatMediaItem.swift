@@ -42,7 +42,7 @@ public class ChatMediaItem: ChatRowItem {
         parameters?.chatLocationInput = chatInteraction.chatLocationInput
         parameters?.chatMode = chatInteraction.mode
         if let message {
-            parameters?.isProtected = message.containsSecretMedia || message.isCopyProtected(cachedData: chatInteraction.presentation.cachedData)
+            parameters?.isProtected = !regramCanSaveMessage(message, accountId: context.peerId.toInt64(), cachedData: chatInteraction.presentation.cachedData)
         }
         
         parameters?.getUpdatingMediaProgress = { [weak self] messageId in

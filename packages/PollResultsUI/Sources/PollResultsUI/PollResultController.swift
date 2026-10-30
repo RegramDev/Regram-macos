@@ -17,6 +17,7 @@ import ShortPeerRow
 import StatisticsUI
 import InlineStickerLayer
 import LocalAnimations
+import ChatHistoryModel
 
 
 
@@ -327,9 +328,10 @@ public func PollResultController(context: any AccountContextProtocol, message: M
     let copyPermission = Atomic(value: false)
     let signal = combineLatest(statePromise.get(), context.account.postbox.peerView(id: message.id.peerId)) |> map { state, peerView in
         let peer = peerViewMainPeer(peerView) ?? message.peers[message.id.peerId]
-        let canCopy = !message.flags.contains(.CopyProtected) && peer.map { !$0.isCopyProtected(cachedData: peerView.cachedData) } == true
+        let currentCopyPermission = { peer.map { regramCanCopyMessageText(message, accountId: context.peerId.toInt64(), cachedData: peerView.cachedData, peer: $0) } == true }
+        let canCopy = currentCopyPermission()
         _ = copyPermission.swap(canCopy)
-        return pollResultEntries(state, context: context, canCopy: canCopy, canCopyText: { copyPermission.with { $0 } }, openProfile: { peerId in
+        return pollResultEntries(state, context: context, canCopy: canCopy, canCopyText: { copyPermission.with { $0 } && currentCopyPermission() }, openProfile: { peerId in
             openProfile?(peerId)
         }, expandOption: { identifier in
             updateState {

@@ -59,25 +59,8 @@ public func RegramNavigationController(context: any AccountContextProtocol, focu
         }
         return InputDataSignalValue(entries: page.entries, animated: false)
     }
-    let controller = InputDataController(dataSignal: signal, title: regramString("RG.BottomBarLayout"), removeAfterDisappear: false, hasDone: false, identifier: "regram.bottomBar")
-    regramConfigureNavigationSwitches(controller)
+    let controller = RegramFormController(dataSignal: signal, title: regramString("RG.BottomBarLayout"), removeAfterDisappear: false, hasDone: false, identifier: "regram.bottomBar")
     let focus = focusSetting == "visibility" ? "contacts" : focusSetting
     regramFocusSettings(controller, page: "bottomBar", item: focus)
     return controller
-}
-
-private func regramConfigureNavigationSwitches(_ controller: InputDataController) {
-    controller.afterTransaction = { controller in
-        controller.tableView.enumerateViews { view in
-            (view as? GeneralInteractedRowView)?.switchView?.commitsOnRelease = true
-            return true
-        }
-    }
-    controller.didLoad = { controller, _ in
-        let afterSetupItem = controller.tableView.afterSetupItem
-        controller.tableView.afterSetupItem = { view, item in
-            afterSetupItem?(view, item)
-            (view as? GeneralInteractedRowView)?.switchView?.commitsOnRelease = true
-        }
-    }
 }

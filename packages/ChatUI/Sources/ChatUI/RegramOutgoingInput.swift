@@ -8,12 +8,14 @@ import RegramCore
 private func regramPanguInput(_ input: ChatTextInputState) -> ChatTextInputState {
     let protected = input.messageTextEntities().compactMap { entity -> Range<Int>? in
         switch entity.type {
-        case .Code, .Pre, .TextUrl, .TextMention, .Mention, .CustomEmoji, .BlockQuote: return entity.range
+        case .Code, .Pre, .TextUrl, .TextMention, .Mention, .CustomEmoji, .BlockQuote, .FormattedDate: return entity.range
         default: return nil
         }
     }
-    let transformed = RGFeaturePangu.transform(input.makeAttributeString(), protectedUtf16Ranges: protected)
-    return ChatTextInputState(attributedText: transformed, selectionRange: transformed.length..<transformed.length)
+    let transformed = RGFeaturePangu.transform(input.inputText, protectedUtf16Ranges: protected)
+    let attributes = input.attributes.map { $0.updateRange(RGFeaturePangu.transformRange($0.range, insertedUtf16Offsets: transformed.insertedUtf16Offsets)) }
+    let length = transformed.text.utf16.count
+    return ChatTextInputState(inputText: transformed.text, selectionRange: length..<length, attributes: attributes)
 }
 
 public func regramEditingInput(_ input: ChatTextInputState, context: any AccountContextProtocol) -> ChatTextInputState {

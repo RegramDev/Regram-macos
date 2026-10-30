@@ -73,7 +73,7 @@ public func RegramDNSController(context: any AccountContextProtocol, policy: Reg
         }
         return InputDataSignalValue(entries: page.entries)
     }
-    let controller = InputDataController(dataSignal: signal, title: regramString("DNSDiagnostics.Title"), updateDatas: { data in
+    let controller = RegramFormController(dataSignal: signal, title: regramString("DNSDiagnostics.Title"), updateDatas: { data in
         if let host = data[InputDataIdentifier("dnsDiagnostics.host")]?.stringValue { update { if !$0.running { $0.host = host } } }
         return .fail(.none)
     }, afterDisappear: cancel, removeAfterDisappear: false, hasDone: false, identifier: "regram.dnsDiagnostics")

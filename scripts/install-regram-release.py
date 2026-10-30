@@ -113,7 +113,18 @@ def sign_application(app, identity):
 
 
 def stop_running_regram():
-    processes = subprocess.check_output(["ps", "-axo", "pid=,comm="], text=True)
+    candidates = subprocess.run(["pgrep", "-x", "Regram"], capture_output=True, text=True, timeout=3)
+    if candidates.returncode == 1:
+        return
+    candidates.check_returncode()
+    pids = [str(int(value)) for value in candidates.stdout.split()]
+    if not pids:
+        return
+    result = subprocess.run(["ps", "-p", ",".join(pids), "-o", "pid=,comm="], capture_output=True, text=True, timeout=3)
+    if result.returncode == 1 and not result.stdout.strip():
+        return
+    result.check_returncode()
+    processes = result.stdout
     running = []
     for line in processes.splitlines():
         parts = line.strip().split(None, 1)

@@ -24,7 +24,7 @@ public func RegramTranslationSettingsController(context: any AccountContextProto
         }
         var rows: [InputDataEntry] = [
             .sectionId(0, type: .normal),
-            .desc(sectionId: 1, index: 0, text: .plain(strings().languageTranslateMessagesHeader.uppercased()), data: .init(color: theme.colors.listGrayText, viewType: .textTopItem)),
+            .desc(sectionId: 1, index: 0, text: .plain(strings().languageTranslateMessagesHeader), data: .init(color: theme.colors.listGrayText, viewType: .textTopItem)),
             .general(sectionId: 1, index: 1, value: .none, error: nil, identifier: InputDataIdentifier("settings.translation.translationBackend"), data: .init(name: regramString("Settings.Translation.Backend"), color: theme.colors.text, type: .contextSelector(regramString("Settings.Translation.Backend." + backend), options), viewType: .firstItem))
         ]
         rows.append(.general(sectionId: 1, index: 3, value: .none, error: nil, identifier: InputDataIdentifier("settings.translation.llmTranslationSettings"), data: .init(name: regramString("LLMTranslation.Title"), color: theme.colors.text, type: .next, viewType: .innerItem, action: { context.bindings.rootNavigation().push(RegramServiceController(context: context, purpose: .translation)) })))
@@ -39,7 +39,7 @@ public func RegramTranslationSettingsController(context: any AccountContextProto
         rows.append(.desc(sectionId: 3, index: 9, text: .plain(regramString("Settings.Editor.transcriptionSettings.Description")), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
         return InputDataSignalValue(entries: rows)
     }
-    let controller = InputDataController(dataSignal: signal, title: regramString("Settings.ProCategory.translation"), removeAfterDisappear: false, hasDone: false, identifier: "regram.translation")
+    let controller = RegramFormController(dataSignal: signal, title: regramString("Settings.ProCategory.translation"), removeAfterDisappear: false, hasDone: false, identifier: "regram.translation")
     regramFocusSettings(controller, page: "settings.translation", item: focusSetting)
     return controller
 }

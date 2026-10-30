@@ -91,7 +91,7 @@ public class MGalleryVideoItem: MGalleryItem {
     }
     
     public override init(_ context: any AccountContextProtocol, _ entry: GalleryEntry, _ pagerSize: NSSize) {
-        controller = SVideoController(context: context, reference: entry.fileReference(entry.file!), message: entry.message, isProtected: entry.isProtected, isControlsLimited: entry.message?.adAttribute != nil)
+        controller = SVideoController(context: context, reference: entry.fileReference(entry.file!), message: entry.message, isProtected: !entry.regramCanExport(accountId: context.peerId.toInt64()), isControlsLimited: entry.message?.adAttribute != nil)
         super.init(context, entry, pagerSize)
 
         rotateDisposable.set((rotate.get() |> deliverOnMainQueue).start(next: { [weak self] orientation in

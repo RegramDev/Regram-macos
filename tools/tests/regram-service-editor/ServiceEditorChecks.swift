@@ -18,6 +18,9 @@ struct InputDataEntryId { let value: String }
 final class PrecieSliderRowItem {
     init(_ size: NSSize, stableId: InputDataEntryId, current: CGFloat, magnit: [CGFloat], update: @escaping (CGFloat) -> Void, viewType: GeneralViewType) {}
 }
+func regramSliderRowItem(_ size: NSSize, stableId: InputDataEntryId, title: String, value: Int, range: ClosedRange<Int>, viewType: GeneralViewType, format: @escaping (Int) -> String, changed: @escaping (Int) -> Void) -> PrecieSliderRowItem {
+    PrecieSliderRowItem(size, stableId: stableId, current: CGFloat(value), magnit: [], update: { changed(Int($0)) }, viewType: viewType)
+}
 extension EditorEntry {
     static func sectionId(_ section: Int32, type: FixtureSectionType) -> EditorEntry { EditorEntry("section.\(section)", index: Int(section), title: "section") }
     static func desc(sectionId: Int32, index: Int32, text: FixtureText, data: FixtureGeneralTextData) -> EditorEntry { EditorEntry("text.\(index)", index: Int(index), title: text.value) }
@@ -96,6 +99,7 @@ func seedService() {
         $0["translationLLMModel"] = .string("first-model")
         $0["sttBaseURL"] = .string("https://first.example/v1")
         $0["sttModel"] = .string("first-stt")
+        $0["transcriptionBackend"] = .string("default")
     }
 }
 func isIdle(_ controller: InputDataController, key: String) -> Bool { controller.entry(key).type.identity == "none" }
@@ -111,6 +115,7 @@ struct ServiceEditorChecks {
         try checkSTTLatestDraftCancelAndLeave()
         checkLeavingAndDeinitCancelLLM()
         try checkCredentialRetryAdvancesIdentity()
+        checkIndependentServicesDoNotInvalidateEachOther()
         print("Service editor checks passed: reused actions read current LLM/STT drafts and memory credentials, edits cancel requests, stale success/errors stay invisible, base/key/format clear models, cancel/leave/deinit, credential retry identity; no Keychain, account or network was used")
     }
     static func checkOldLLMActionsReadLatestDraft() {
@@ -185,6 +190,10 @@ struct ServiceEditorChecks {
     static func checkSTTLatestDraftCancelAndLeave() throws {
         seedService()
         let controller = RegramServiceController(context: EditorContext(), purpose: .transcription)
+        precondition(!controller.entries.contains { $0.identifier == "stt.test" })
+        controller.select("stt.provider", "Settings.Transcription.Backend.apple")
+        precondition(!controller.entries.contains { $0.identifier == "stt.test" })
+        controller.select("stt.provider", "Settings.Transcription.Backend.openAICompatible")
         let oldTest = controller.entry("stt.test").action!
         controller.input("stt.baseURL", "http://127.0.0.1:8123/v1")
         controller.input("stt.endpoint", "/v1/audio/transcriptions")
@@ -205,7 +214,7 @@ struct ServiceEditorChecks {
         precondition(serviceNotices.isEmpty)
         oldTest()
         let leaving = ServiceRequests.transcriptions.last!.1
-        controller.afterDisappear()
+        controller.willDisappear?(false); controller.afterDisappear()
         precondition(leaving.cancelled)
         leaving.fail(.network("after-leave"))
         precondition(serviceNotices.isEmpty && serviceAlerts.isEmpty)
@@ -218,7 +227,7 @@ struct ServiceEditorChecks {
             var controller: InputDataController? = RegramServiceController(context: EditorContext(), purpose: .translation)
             controller!.entry("llm.fetchModels").action!()
             let request = ServiceRequests.models.last!.1
-            if deinitialize { controller = nil } else { controller!.afterDisappear() }
+            if deinitialize { controller = nil } else { controller!.willDisappear?(false); controller!.afterDisappear() }
             precondition(request.cancelled)
             request.next(["late"]); request.fail(RGLLMRequestError("late-error")); drain()
             precondition(serviceNotices.isEmpty && serviceAlerts.isEmpty)
@@ -228,6 +237,7 @@ struct ServiceEditorChecks {
         for (purpose, actionKey) in [(RegramServicePurpose.translation, "llm.testModel"), (.translation, "llm.fetchModels"), (.transcription, "stt.test")] {
             seedService()
             let controller = RegramServiceController(context: EditorContext(), purpose: purpose)
+            if purpose == .transcription { controller.select("stt.provider", "Settings.Transcription.Backend.openAICompatible") }
             let action = controller.entry(actionKey).action!
             let prefix = purpose == .translation ? "llm" : "stt"
             let before = testPreferences.settings(accountId: 42).translationIdentity
@@ -235,7 +245,7 @@ struct ServiceEditorChecks {
             controller.input(prefix + ".apiKey", "retry-key")
             let failed = testPreferences.settings(accountId: 42)
             let unsaved = try RegramCredentials.shared.read(accountId: 42, purpose: purpose.credentialPurpose)
-            precondition(failed.translationIdentity != before)
+            precondition((failed.translationIdentity != before) == (purpose == .translation))
             precondition(unsaved.isEmpty)
             action()
             precondition(testPreferences.settings(accountId: 42).translationIdentity == failed.translationIdentity)
@@ -243,8 +253,9 @@ struct ServiceEditorChecks {
             action()
             let saved = testPreferences.settings(accountId: 42)
             let persisted = try RegramCredentials.shared.read(accountId: 42, purpose: purpose.credentialPurpose)
-            precondition(saved["serviceConfigurationRevision"].integer == failed["serviceConfigurationRevision"].integer &+ 1)
-            precondition(saved.translationIdentity != failed.translationIdentity)
+            precondition(saved[purpose.configurationRevisionKey].integer == failed[purpose.configurationRevisionKey].integer &+ 1)
+            precondition((saved.translationIdentity != failed.translationIdentity) == (purpose == .translation))
+            precondition(saved.hasSameTranscriptionConfiguration(as: failed) == (purpose == .translation))
             precondition(persisted == "retry-key")
             precondition(RegramCredentials.shared.writeAttempts == 3)
             if actionKey == "llm.fetchModels" {
@@ -260,7 +271,35 @@ struct ServiceEditorChecks {
             action()
             precondition(testPreferences.settings(accountId: 42).translationIdentity == saved.translationIdentity)
             precondition(RegramCredentials.shared.writeAttempts == 3)
-            controller.afterDisappear()
+            controller.willDisappear?(false); controller.afterDisappear()
         }
+    }
+
+    static func checkIndependentServicesDoNotInvalidateEachOther() {
+        seedService()
+        let translation = RegramServiceController(context: EditorContext(), purpose: .translation)
+        let transcription = RegramServiceController(context: EditorContext(), purpose: .transcription)
+        transcription.select("stt.provider", "Settings.Transcription.Backend.openAICompatible")
+        let initial = testPreferences.settings(accountId: 42)
+        translation.entry("llm.fetchModels").action!()
+        let models = ServiceRequests.models.last!.1
+        transcription.input("stt.model", "independent-stt-model")
+        transcription.input("stt.apiKey", "independent-stt-key")
+        let afterSpeech = testPreferences.settings(accountId: 42)
+        precondition(afterSpeech.translationIdentity == initial.translationIdentity)
+        precondition(!afterSpeech.hasSameTranscriptionConfiguration(as: initial))
+        precondition(!models.cancelled)
+        transcription.entry("stt.test").action!()
+        let speech = ServiceRequests.transcriptions.last!.1
+        translation.input("llm.model", "independent-translation-model")
+        translation.input("llm.apiKey", "independent-translation-key")
+        let afterTranslation = testPreferences.settings(accountId: 42)
+        precondition(afterTranslation.translationIdentity != afterSpeech.translationIdentity)
+        precondition(afterTranslation.hasSameTranscriptionConfiguration(as: afterSpeech))
+        precondition(!speech.cancelled)
+        precondition(afterTranslation["serviceConfigurationRevision"].integer == initial["serviceConfigurationRevision"].integer)
+        speech.next("synthetic speech"); speech.complete()
+        precondition(serviceNotices.count == 1)
+        translation.willDisappear?(false); transcription.willDisappear?(false)
     }
 }

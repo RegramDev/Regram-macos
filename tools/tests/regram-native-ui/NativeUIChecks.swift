@@ -10,7 +10,14 @@ import InAppSettings
 import ThemeSettings
 import RegramCore
 
-func regramString(_ key: String) -> String { key }
+var fixtureLanguage = "zh-Hans"
+var fixtureStrings: [String: [String: String]] = [:]
+func regramString(_ key: String) -> String {
+    if fixtureStrings[fixtureLanguage] == nil, let url = Bundle.main.url(forResource: fixtureLanguage, withExtension: "strings"), let data = try? Data(contentsOf: url) {
+        fixtureStrings[fixtureLanguage] = (try? PropertyListSerialization.propertyList(from: data, format: nil)) as? [String: String]
+    }
+    return fixtureStrings[fixtureLanguage]?[key] ?? key
+}
 
 private enum NativeCheckError: Error {
     case failed(String)
@@ -132,6 +139,7 @@ struct NativeUIChecks {
         for (paletteName, palette) in [("light", dayClassicPalette), ("dark", darkPalette), ("light-return", dayClassicPalette)] {
             telegramUpdateTheme(generateTheme(palette: palette, cloudTheme: nil, bubbled: false, fontSize: 13, wallpaper: ThemeWallpaper(), liquidGlass: false), animated: false)
             row.updateColors()
+            check(row.containerView.backgroundColor.alphaComponent == 0, "\(paletteName) Telegram search stays transparent before transaction repair")
             row.searchView.updateLocalizationAndTheme(theme: theme)
             let cardItem = GeneralInteractedRowItem(NSSize(width: card.frame.width, height: 44), stableId: "search-card", name: "Native setting", type: .next, viewType: .singleItem)
             _ = cardItem.makeSize(card.frame.width, oldWidth: 0)
@@ -222,7 +230,6 @@ struct NativeUIChecks {
         controller.didLoad = { _, _ in didLoadCalls += 1 }
         controller.afterTransaction = { _ in transactionCalls += 1 }
         controller.tableView.afterSetupItem = { _, _ in setupCalls += 1 }
-        regramConfigureSegmentedRows(controller)
         regramRestoreSearchQuery(controller, identifier: InputDataIdentifier("geometry.search"), query: { "" })
         controller.didLoad(controller, [:])
         let arguments = InputDataArguments(select: { _ in }, dataUpdated: {})
@@ -245,23 +252,37 @@ struct NativeUIChecks {
         var offset: CGFloat = 115
         let groups = [("messages", ["消息操作", "聊天列表", "分组"]), ("media", ["播放与链接", "照片", "贴纸", "录制"]), ("font", ["拉丁字体", "中文字体"])]
         for (name, labels) in groups {
-            let item = regramSegmentedRowItem(NSSize(width: width, height: 50), stableId: name, labels: labels, selected: 0, changed: { _ in })
+            var changes: [Int] = []
+            let item = regramSegmentedRowItem(NSSize(width: width, height: 50), stableId: name, labels: labels, selected: 0, changed: { changes.append($0) })
             let row = makeView(item, width: width)
             controller.tableView.afterSetupItem?(row, item)
-            guard let segment = row.containerView.subviews.compactMap({ $0 as? ScrollableSegmentView }).first else { throw NativeCheckError.failed("missing native segment") }
-            let cells = allSubviews(segment).filter { String(describing: type(of: $0)) == "SegmentItemView" }.sorted { $0.frame.minX < $1.frame.minX }
-            check(cells.count == labels.count, "\(name) native cells count")
-            check(segment.fitToWidth && segment.theme.border.alphaComponent == 0, "\(name) fitToWidth and transparent baseline")
+            guard let segment = allSubviews(row).compactMap({ $0 as? GlassSegmentView }).first else { throw NativeCheckError.failed("missing Telegram glass segmented control") }
+            let tabs = row.accessibilityChildren()!.compactMap { $0 as? NSAccessibilityElement }
+            check(segment.titles == labels && tabs.count == labels.count, "\(name) Telegram category titles and radio tabs")
+            check(!allSubviews(row).contains { $0 is NSSegmentedControl }, "\(name) category control has no nested AppKit bezel")
+            check(segment.selectedIndex == 0 && changes.isEmpty, "\(name) binding does not send an action")
             check(row.containerView.frame == search.containerView.frame, "\(name) native block centered")
-            let frames = cells.map(\.frame)
-            let intrinsicWidth = frames.reduce(CGFloat(0)) { $0 + $1.width }
-            var gaps: [CGFloat] = []
-            if intrinsicWidth < segment.frame.width, let first = frames.first, let last = frames.last {
-                gaps = [first.minX] + zip(frames.dropFirst(), frames).map { $0.minX - $1.maxX } + [segment.frame.width - last.maxX]
-                check((gaps.max() ?? 0) - (gaps.min() ?? 0) <= CGFloat(labels.count + 1), "\(name) equal distributed gaps")
-                check((gaps.min() ?? 0) > 0, "\(name) avoids left packing")
+            let viewport = allSubviews(row).compactMap { $0 as? HorizontalScrollView }.first!
+            check(row.containerView.bounds.contains(viewport.frame) && segment.frame.width == segment.contentSize.width, "\(name) category viewport fits narrow and wide content columns")
+            check(row.containerView.backgroundColor.alphaComponent == 0, "\(name) no nested category background")
+            check(allSubviews(row).filter { $0 is LiquidGlassView }.count == 1, "\(name) category control reuses one glass surface")
+            for (index, label) in labels.enumerated() {
+                check(tabs[index].accessibilityLabel() == label && tabs[index].accessibilityRole() == .radioButton, "\(name) accessible category \(index)")
             }
-            measurements.append(["kind": "segment", "palette": paletteName, "paneWidth": width, "name": name, "count": cells.count, "block": NSStringFromRect(row.containerView.frame), "frames": frames.map(NSStringFromRect), "gaps": gaps, "intrinsicWidths": frames.map(\.width), "borderAlpha": segment.theme.border.alphaComponent])
+            _ = tabs[1].accessibilityPerformPress()
+            check(changes == [1], "\(name) category action switches once")
+            var rebound: [Int] = []
+            let updated = regramSegmentedRowItem(NSSize(width: width, height: 50), stableId: name, labels: labels, selected: 1, changed: { rebound.append($0) })
+            row.set(item: updated, animated: false)
+            row.layout()
+            check(allSubviews(row).contains { $0 === segment } && segment.selectedIndex == 1, "\(name) reuses the Telegram category control and updates selection")
+            let currentTabs = row.accessibilityChildren()!.compactMap { $0 as? NSAccessibilityElement }
+            _ = currentTabs[1].accessibilityPerformPress()
+            check(rebound.isEmpty, "\(name) reselecting the current category is a no-op")
+            _ = currentTabs[0].accessibilityPerformPress()
+            check(changes == [1] && rebound == [0], "\(name) reused category calls the current action")
+            check(row.firstResponder === row && row.acceptsFirstResponder, "\(name) category control participates in keyboard navigation")
+            measurements.append(["kind": "segment", "palette": paletteName, "paneWidth": width, "name": name, "count": segment.titles.count, "block": NSStringFromRect(row.containerView.frame), "control": NSStringFromRect(segment.frame)])
             row.frame.origin.y = offset
             root.addSubview(row)
             offset += 60
@@ -627,49 +648,28 @@ struct NativeUIChecks {
         }
     }
 
-    static func navigationSwitchFeedback() throws {
-        let controller = InputDataController(dataSignal: .never(), title: "Native navigation switch feedback", hasDone: false)
-        var setupCalls = 0
-        controller.tableView.afterSetupItem = { _, _ in setupCalls += 1 }
-        regramConfigureNavigationSwitches(controller)
-        controller.didLoad(controller, [:])
-        var applies = 0
-        let item = GeneralInteractedRowItem(NSSize(width: 600, height: 50), name: "Show Labels", type: .switchable(false), viewType: .singleItem, action: { applies += 1 })
-        let row = makeView(item, width: 600) as! GeneralInteractedRowView
-        controller.tableView.afterSetupItem?(row, item)
-        guard let toggle = row.switchView else { throw NativeCheckError.failed("missing native navigation switch") }
-        let window = NSWindow(contentRect: row.bounds, styleMask: .borderless, backing: .buffered, defer: false)
-        window.isReleasedWhenClosed = false
-        window.contentView = row
-        defer { window.contentView = nil; window.close() }
-        check(toggle.commitsOnRelease && setupCalls == 1, "navigation production binding enables immediate release and preserves row setup")
-        row.invokeAction(item)
-        check(toggle.isOn && applies == 1, "navigation label setting applies before its spring finishes")
-        toggle.setIsOn(true, animated: false)
-        if !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
-            check(allSubviews(toggle).contains { $0.layer?.animation(forKey: "switchPosition") != nil }, "matching settings echo preserves the navigation switch spring")
-        }
-        RunLoop.current.run(until: Date().addingTimeInterval(1.15))
-        check(toggle.isOn && applies == 1, "navigation switch animation completion never applies twice")
-        row.invokeAction(item)
-        check(!toggle.isOn && applies == 2, "navigation label disable also applies immediately")
-        toggle.isEnabled = false
-        RunLoop.current.run(until: Date().addingTimeInterval(1.15))
-        check(!toggle.isOn && applies == 2, "disabled navigation switch does not replay a committed change")
-        check(!window.isVisible && !window.isKeyWindow && !window.isMainWindow, "navigation switch feedback window remains hidden")
-    }
-
     static func main() throws {
         _ = NSApplication.shared
         NSApplication.shared.setActivationPolicy(.prohibited)
         TelegramThemeHooks.install(TelegramThemeHooks(image: nativeThemeImage, icons: generateIcons, sendingFrame: generateSendingFrame, clockMinImage: generateClockMinImage, chatGroupToggleSelected: { generateChatGroupToggleSelected(foregroundColor: $0, backgroundColor: $1) }, chatGroupToggleUnselected: { generateChatGroupToggleUnselected(foregroundColor: $0, backgroundColor: $1) }, setDefaultTheme: { setDefaultTheme(for: $0) }, liteMode: { .standart }, darkAppearance: { theme }, liveStreamBadgeColor: { .systemRed }))
         setDefaultTheme()
         let output = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
+        if CommandLine.arguments.contains("--scroll-benchmark-only") {
+            try scrollingWorkload(output: output)
+            return
+        }
         let searchOnly = CommandLine.arguments.contains("--search-only")
         let searchNavigationOnly = CommandLine.arguments.contains("--search-navigation-only")
         if !searchOnly && !searchNavigationOnly {
             try nativeBottomBar(output: output)
-            try navigationSwitchFeedback()
+            try nativeFormActions()
+            try nativeFormEditing()
+            try nativeSearchEditing()
+            try nativeSearchNavigation()
+            nativeGlassSurfaces()
+            try nativeThemeRefresh()
+            try productionCategoryPages(output: output)
+            try scrollingWorkload(output: output)
             try nativeThemeRows(output: output)
         }
         if searchOnly {
@@ -677,7 +677,11 @@ struct NativeUIChecks {
         }
         for (name, palette) in searchOnly || searchNavigationOnly ? [] : [("light", dayClassicPalette), ("dark", darkPalette)] {
             telegramUpdateTheme(generateTheme(palette: palette, cloudTheme: nil, bubbled: false, fontSize: 13, wallpaper: ThemeWallpaper(), liquidGlass: false), animated: false)
-            for width: CGFloat in [320, 600, 1000] { try geometry(width: width, paletteName: name, output: output) }
+            for width: CGFloat in [320, 600, 1000] {
+                try geometry(width: width, paletteName: name, output: output)
+                try nativeFormGeometry(width: width, palette: name, output: output)
+                try settingsHome(width: width, palette: name, output: output)
+            }
             guard let filled = savedSettingsIcon(), let outline = bookmarkSettingsIcon() else { throw NativeCheckError.failed("missing native icons") }
             try png(filled, path: output.appendingPathComponent("icon-\(name)-filled.png"))
             try png(outline, path: output.appendingPathComponent("icon-\(name)-outline.png"))

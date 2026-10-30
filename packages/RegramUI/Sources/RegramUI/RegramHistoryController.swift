@@ -35,17 +35,18 @@ public func RegramEditHistoryController(context: any AccountContextProtocol, mes
     guard let history = message.rgEditHistory else { return nil }
     let accountId = context.peerId.toInt64()
     let request = MetaDisposable()
+    let initialImages = MetaDisposable()
+    var preparedInitialImages = false
     let lifetime = Atomic(value: UUID())
     let expectedVersion = Atomic(value: message.stableVersion)
     var photoRequests: [Int: DisposableSet] = [:]
     let currentDate = message.attributes.compactMap { ($0 as? EditedMessageAttribute)?.date }.first ?? message.timestamp
     let currentImage = message.containsSecretMedia ? nil : message.media.compactMap { $0 as? TelegramMediaImage }.first
-    var versions = [HistoryVersion(index: history.entries.count, text: message.text, date: currentDate, current: true, original: false, image: currentImage, data: currentImage.flatMap { rgEditHistoryCachedImageData(image: $0, mediaBox: context.account.postbox.mediaBox) }, spoiler: message.attributes.contains { $0 is MediaSpoilerMessageAttribute })]
+    var versions = [HistoryVersion(index: history.entries.count, text: message.text, date: currentDate, current: true, original: false, image: currentImage, data: nil, spoiler: message.attributes.contains { $0 is MediaSpoilerMessageAttribute })]
     for (index, entry) in history.entries.enumerated().reversed() {
         versions.append(HistoryVersion(index: index, text: entry.text, date: entry.date, current: false, original: index == 0 && entry.date == message.timestamp, image: entry.image, data: entry.imageData, spoiler: entry.imageHasSpoiler))
     }
-    var initialPhotos = HistoryPhotos()
-    for version in versions { if let data = version.data, let image = NSImage(data: data) { initialPhotos.images[version.index] = image } }
+    let initialPhotos = HistoryPhotos()
     let photos = Atomic(value: initialPhotos)
     let photoPromise = ValuePromise(initialPhotos, ignoreRepeated: true)
     func updatePhotos(_ transform: (inout HistoryPhotos) -> Void) { photoPromise.set(photos.modify { current in var value = current; transform(&value); return value }) }
@@ -96,14 +97,15 @@ public func RegramEditHistoryController(context: any AccountContextProtocol, mes
         }
         operation.add((validate(photos: true) |> deliverOnMainQueue).start(next: { allowed in
             guard allowed, lifetime.with({ $0 == token }) else { fail(); return }
-            let data = context.account.postbox.mediaBox.resourceData(representation.resource) |> filter { $0.complete } |> take(1) |> timeout(120, queue: .concurrentDefaultQueue(), alternate: .complete()) |> deliverOnMainQueue
+            let data = context.account.postbox.mediaBox.resourceData(representation.resource) |> filter { $0.complete } |> take(1) |> timeout(120, queue: .concurrentDefaultQueue(), alternate: .complete()) |> mapToSignal { resource -> Signal<(Data, NSImage)?, NoError> in
+                guard resource.size <= Int64(RGEditHistoryEntry.maximumImageBytes) else { return .single(nil) }
+                return regramLoadHistoryImage(path: resource.path, maximumBytes: RGEditHistoryEntry.maximumImageBytes, shouldLoad: { lifetime.with { $0 == token } })
+            } |> deliverOnMainQueue
             var receivedData = false
-            operation.add(data.start(next: { resource in
+            operation.add(data.start(next: { result in
                 receivedData = true
                 guard lifetime.with({ $0 == token }) else { return }
-                guard resource.size <= Int64(RGEditHistoryEntry.maximumImageBytes),
-                      let data = try? Data(contentsOf: URL(fileURLWithPath: resource.path)),
-                      data.count <= RGEditHistoryEntry.maximumImageBytes, let loaded = NSImage(data: data) else { fail(); return }
+                guard let (data, loaded) = result else { fail(); return }
                 operation.add((validate(photos: true) |> deliverOnMainQueue).start(next: { allowed in
                     guard allowed, lifetime.with({ $0 == token }) else { fail(); return }
                     updatePhotos { $0.images[version.index] = loaded; $0.loading.remove(version.index); $0.failed.remove(version.index) }
@@ -168,15 +170,38 @@ public func RegramEditHistoryController(context: any AccountContextProtocol, mes
     func stop() {
         _ = lifetime.swap(UUID())
         request.set(nil)
+        initialImages.set(nil)
         for operation in photoRequests.values { operation.dispose() }
         photoRequests.removeAll()
         updatePhotos { $0.loading = [] }
     }
-    let controller = InputDataController(dataSignal: signal, title: regramString("EditHistory.Title"), afterDisappear: stop, removeAfterDisappear: false, hasDone: false, identifier: "regram.editHistory")
+    let controller = RegramFormController(dataSignal: signal, title: regramString("EditHistory.Title"), afterDisappear: stop, removeAfterDisappear: false, hasDone: false, identifier: "regram.editHistory")
+    controller.willDisappear = { _ in stop() }
     controller.didAppear = { (_: InputDataController) in
-        if let current = versions.first, current.image != nil, !photos.with({ $0.images[current.index] != nil }) { loadPhoto(current) }
+        if preparedInitialImages {
+            if let current = versions.first, current.image != nil, !photos.with({ $0.images[current.index] != nil }) { loadPhoto(current) }
+            return
+        }
+        let token = lifetime.with { $0 }
+        initialImages.set((regramPrepareHistoryImages({
+            var data: [Int: Data] = [:]
+            for version in versions {
+                if let imageData = version.data { data[version.index] = imageData }
+            }
+            if let current = versions.first, let image = current.image, let cached = rgEditHistoryCachedImageData(image: image, mediaBox: context.account.postbox.mediaBox) {
+                data[current.index] = cached
+            }
+            return data
+        }, shouldLoad: { lifetime.with { $0 == token } }) |> deliverOnMainQueue).start(next: { images in
+            guard lifetime.with({ $0 == token }) else { return }
+            preparedInitialImages = true
+            updatePhotos { state in
+                for (index, image) in images where state.images[index] == nil && !state.loading.contains(index) { state.images[index] = image }
+            }
+            if let current = versions.first, current.image != nil, !photos.with({ $0.images[current.index] != nil }) { loadPhoto(current) }
+        }))
     }
-    controller.onDeinit = { stop(); request.dispose() }
+    controller.onDeinit = { stop(); request.dispose(); initialImages.dispose() }
     regramFocusSettings(controller, page: "editHistory", item: focusSetting)
     return controller
 }
@@ -287,7 +312,7 @@ public func RegramRetainedMessagesController(context: any AccountContextProtocol
         }
         return InputDataSignalValue(entries: rows)
     }
-    let controller = InputDataController(dataSignal: signal, title: regramString("Revoked.Title"), updateDatas: { data in
+    let controller = RegramFormController(dataSignal: signal, title: regramString("Revoked.Title"), updateDatas: { data in
         if let query = data[InputDataIdentifier("revokedMessages.search")]?.stringValue { update { $0.query = query } }
         return .fail(.none)
     }, removeAfterDisappear: false, hasDone: false, identifier: "regram.revokedMessages")

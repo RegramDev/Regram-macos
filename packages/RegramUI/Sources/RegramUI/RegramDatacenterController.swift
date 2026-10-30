@@ -103,7 +103,7 @@ public func RegramDatacenterController(context: any AccountContextProtocol, focu
         })
         return InputDataSignalValue(entries: page.entries)
     }
-    let controller = InputDataController(dataSignal: signal, title: regramString("Diagnostics.DC.Title"), afterDisappear: cancel, removeAfterDisappear: false, hasDone: false, identifier: "regram.datacenters")
+    let controller = RegramFormController(dataSignal: signal, title: regramString("Diagnostics.DC.Title"), afterDisappear: cancel, removeAfterDisappear: false, hasDone: false, identifier: "regram.datacenters")
     controller.onDeinit = { cancel(); actions.dispose() }
     regramFocusSettings(controller, page: "datacenters", item: focusSetting)
     return controller

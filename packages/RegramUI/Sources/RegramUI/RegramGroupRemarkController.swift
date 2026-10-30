@@ -32,7 +32,7 @@ public func RegramGroupRemarkController(context: any AccountContextProtocol, pee
         ]
         return InputDataSignalValue(entries: rows)
     }
-    let controller = InputDataController(dataSignal: signal, title: regramString("GroupRemark.Title"), validateData: { data in
+    let controller = RegramFormController(dataSignal: signal, title: regramString("GroupRemark.Title"), validateData: { data in
         guard canSave.with({ $0 }) else { return .fail(.none) }
         RGGroupRemarks.shared.setName(data[identifier]?.stringValue ?? current.with { $0 }, accountId: accountId, peerId: peerId.toInt64())
         return .success(.navigationBack)

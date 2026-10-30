@@ -114,47 +114,6 @@ private final class RegramWebpageTranslation {
     }
 }
 
-private final class RegramWebTranslationView: View {
-    let webView: WKWebView
-    let translate = NSButton(title: "", target: nil, action: nil)
-    let restore = NSButton(title: "", target: nil, action: nil)
-    let status = NSTextField(labelWithString: "")
-    let notice = NSTextField(wrappingLabelWithString: "")
-
-    required init(frame frameRect: NSRect) {
-        let configuration = WKWebViewConfiguration()
-        configuration.websiteDataStore = .nonPersistent()
-        self.webView = WKWebView(frame: .zero, configuration: configuration)
-        super.init(frame: frameRect)
-        addSubview(webView)
-        for button in [translate, restore] { button.bezelStyle = .rounded; addSubview(button) }
-        status.lineBreakMode = .byTruncatingMiddle
-        addSubview(status)
-        notice.font = .systemFont(ofSize: 11)
-        addSubview(notice)
-        updateTheme()
-    }
-
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
-    func updateTheme() {
-        backgroundColor = theme.colors.background
-        status.textColor = theme.colors.text
-        notice.textColor = theme.colors.grayText
-        notice.stringValue = regramString("webTranslation.notice")
-        restore.title = regramString("webTranslation.restore")
-    }
-
-    override func layout() {
-        super.layout()
-        translate.frame = NSMakeRect(12, 10, 140, 30)
-        restore.frame = NSMakeRect(160, 10, 140, 30)
-        status.frame = NSMakeRect(310, 17, max(0, bounds.width - 322), 20)
-        notice.frame = NSMakeRect(16, 45, max(0, bounds.width - 32), 32)
-        webView.frame = NSMakeRect(0, 84, bounds.width, max(0, bounds.height - 84))
-    }
-}
-
 private final class RegramWebTranslationBrowserController: GenericViewController<RegramWebTranslationView>, WKNavigationDelegate, WKUIDelegate {
     private let context: any AccountContextProtocol
     private let url: URL
@@ -208,6 +167,7 @@ private final class RegramWebTranslationBrowserController: GenericViewController
         genericView.translate.isEnabled = genericView.webView.url != nil && !genericView.webView.isLoading
         genericView.restore.isEnabled = translation?.translated == true || translation?.running == true
         genericView.status.stringValue = genericView.webView.url?.host ?? url.host ?? ""
+        genericView.needsLayout = true
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) { translation?.navigationChanged(); updateControls() }
@@ -238,7 +198,7 @@ public func RegramWebTranslationURLController(context: any AccountContextProtoco
         .input(sectionId: 1, index: 0, value: .string(""), error: nil, identifier: identifier, mode: .plain, data: .init(viewType: .singleItem), placeholder: nil, inputPlaceholder: "https://", filter: { $0 }, limit: 4096),
         .desc(sectionId: 1, index: 1, text: .plain(regramString("webTranslation.notice")), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem))
     ]
-    return InputDataController(dataSignal: .single(InputDataSignalValue(entries: rows)), title: regramString("webTranslation.action"), validateData: { data in
+    return RegramFormController(dataSignal: .single(InputDataSignalValue(entries: rows)), title: regramString("webTranslation.action"), validateData: { data in
         guard let text = data[identifier]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines), let url = URL(string: text), let controller = RegramWebTranslationController(context: context, url: url) else { return .fail(.fields([identifier: .shake])) }
         context.bindings.rootNavigation().push(controller)
         return .fail(.none)

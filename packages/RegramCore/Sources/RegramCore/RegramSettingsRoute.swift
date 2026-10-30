@@ -13,6 +13,7 @@ public struct RegramSettingsRoute: Equatable {
     ]
     public static func normalized(page: String, item: String? = nil) -> (page: String, item: String?)? {
         guard Self.pages.contains(page), item.map(Self.validItem) ?? true else { return nil }
+        if item == "eraseAllData" { return nil }
         if ["disableDeleteChatSwipeOption", "mediaLoadingExperiment"].contains(item ?? "") { return nil }
         if ["appBages", "appBadges", "customAppBadge"].contains(item ?? "") { return nil }
         if ["inputToolbar", "textStyleMenu", "disableSwipeToRecordStory", "disableSnapDeletionEffect", "forceSystemSharing", "disableGalleryCameraPreview", "startTelescopeWithRearCam", "antiScreenshotNotification", "accountColorsSaturation", "videoPIPSwipeDirection", "features.videoPIPSwipeDirection", "disableScrollToNextChannel", "disableScrollToNextTopic", "appIcons"].contains(item ?? "") || (item?.hasPrefix("features.textStyleMenu.") ?? false) { return nil }

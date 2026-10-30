@@ -450,14 +450,14 @@ public final class InputDataArguments {
     }
 }
 
-public func prepareInputDataTransition(left:[AppearanceWrapperEntry<InputDataEntry>], right: [AppearanceWrapperEntry<InputDataEntry>], animated: Bool, searchState: TableSearchViewState?, initialSize:NSSize, arguments: InputDataArguments, onMainQueue: Bool, animateEverything: Bool = false, grouping: Bool = true, makeFirstFast: Bool = false) -> Signal<TableUpdateTransition, NoError> {
+public func prepareInputDataTransition(left:[AppearanceWrapperEntry<InputDataEntry>], right: [AppearanceWrapperEntry<InputDataEntry>], animated: Bool, searchState: TableSearchViewState?, initialSize:NSSize, arguments: InputDataArguments, onMainQueue: Bool, animateEverything: Bool = false, grouping: Bool = true, makeFirstFast: Bool = false, queue: Queue = prepareQueue) -> Signal<TableUpdateTransition, NoError> {
     return Signal { subscriber in
         
         func makeItem(_ entry: InputDataEntry) -> TableRowItem {
             return entry.item(arguments: arguments, initialSize: initialSize)
         }
         
-        let applyQueue = prepareQueue
+        let applyQueue = queue
         
         let cancelled: Atomic<Bool> = Atomic(value: false)
         
@@ -515,7 +515,7 @@ public func prepareInputDataTransition(left:[AppearanceWrapperEntry<InputDataEnt
         return ActionDisposable {
             _ = cancelled.swap(true)
         }
-    } |> runOn(onMainQueue ? .mainQueue() : prepareQueue)
+    } |> runOn(onMainQueue ? .mainQueue() : queue)
     
 }
 
@@ -702,6 +702,7 @@ public class InputDataController: GenericViewController<InputDataView> {
 
     fileprivate var modalTransitionHandler:((Bool)->Void)? = nil
     public var prepareAllItems: Bool = false
+    public var preparationQueue: Queue?
     
     private let values: Promise<InputDataSignalValue> = Promise()
     private let disposable = MetaDisposable()
@@ -989,6 +990,7 @@ public class InputDataController: GenericViewController<InputDataView> {
         genericView.tableView.getBackgroundColor = self.getBackgroundColor
         
         let makeFirstFast = self.makeFirstFast
+        let preparationQueue = self.preparationQueue ?? prepareQueue
         
         appearanceDisposablet.set(appearanceSignal.start(next: { [weak self] _ in
             self?.updateLocalizationAndTheme(theme: theme)
@@ -1016,7 +1018,7 @@ public class InputDataController: GenericViewController<InputDataView> {
         
         let signal: Signal<TableUpdateTransition, NoError> = combineLatest(queue: .mainQueue(), appearanceSignal, values.get()) |> mapToQueue { appearance, state in
             let entries = state.entries.map({AppearanceWrapperEntry(entry: $0, appearance: appearance)})
-            return prepareInputDataTransition(left: previous.swap(entries), right: entries, animated: state.animated, searchState: state.searchState, initialSize: initialSize.modify{$0}, arguments: arguments, onMainQueue: onMainQueue.swap(false), animateEverything: state.animateEverything, grouping: state.grouping, makeFirstFast: makeFirstFast)
+            return prepareInputDataTransition(left: previous.swap(entries), right: entries, animated: state.animated, searchState: state.searchState, initialSize: initialSize.modify{$0}, arguments: arguments, onMainQueue: onMainQueue.swap(false), animateEverything: state.animateEverything, grouping: state.grouping, makeFirstFast: makeFirstFast, queue: preparationQueue)
         } |> deliverOnMainQueue |> afterDisposed {
             previous.swap([])
         }

@@ -82,7 +82,7 @@ public func RegramFilterImportController(context: any AccountContextProtocol, da
     let signal = combineLatest(regramPreferenceChanges(accountId: accountId), appearanceSignal) |> deliverOnPrepareQueue |> map { settings, _ in
         InputDataSignalValue(entries: filterImportEntries(FilterImportState(plan: imported.plan(existing: settings.filterRules)), arguments: arguments))
     }
-    let controller = InputDataController(dataSignal: signal, title: regramString("MessageFilter.ImportPreview.Title"), removeAfterDisappear: false, hasDone: false, identifier: "regram.messageFilter.import")
+    let controller = RegramFormController(dataSignal: signal, title: regramString("MessageFilter.ImportPreview.Title"), removeAfterDisappear: false, hasDone: false, identifier: "regram.messageFilter.import")
     getController = { [weak controller] in controller }
     return controller
 }

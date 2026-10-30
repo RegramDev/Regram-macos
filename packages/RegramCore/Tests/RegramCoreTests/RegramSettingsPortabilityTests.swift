@@ -2,6 +2,25 @@ import XCTest
 @testable import RegramCore
 
 final class RegramSettingsPortabilityTests: XCTestCase {
+    func testVisibleSettingsHaveRoutesAndLocalizedTitles() {
+        for entry in RegramSettingsCatalog.entries {
+            XCTAssertNotNil(RegramSettingsRoute(page: entry.page, item: entry.key.isEmpty ? nil : entry.key), entry.destination)
+            for language in ["en", "zh-Hans", "zh-Hant"] {
+                XCTAssertNotEqual(entry.title(language: language), entry.titleKey, language + ":" + entry.titleKey)
+            }
+        }
+    }
+
+    func testRemovedEraseDataHasNoSearchResultOrRoute() {
+        XCTAssertFalse(RegramSettingsCatalog.sourceEntries.contains { $0.key == "eraseAllData" })
+        for page in RegramSettingsRoute.pages {
+            XCTAssertNil(RegramSettingsRoute(page: page, item: "eraseAllData"))
+        }
+        for language in ["en", "zh-Hans", "zh-Hant"] {
+            XCTAssertTrue(RegramSettingsCatalog.results(query: "eraseAllData", language: language).isEmpty)
+        }
+    }
+
     func testSourceSearchFollowsMovedControlsAndRejectsRetiredLinks() throws {
         let composer = try XCTUnwrap(RegramSettingsRoute(page: "pro.messages", item: "mentionAsUserIdLink"))
         XCTAssertEqual(composer.destination, "pro.input/mentionAsUserIdLink")

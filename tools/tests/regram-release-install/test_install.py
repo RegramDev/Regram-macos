@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 import plistlib
+import subprocess
 import tempfile
 import unittest
 from unittest import mock
@@ -68,6 +69,33 @@ class ReleaseInstallTests(unittest.TestCase):
         self.assertEqual((destination / "Contents/MacOS/Regram").read_text(), "new")
         self.assertEqual(list(self.root.glob(".Regram-install-*")), [])
         self.assertTrue(source.exists())
+
+    def test_stop_checks_only_named_candidates_and_matching_bundle(self):
+        target = self.app("Regram.app", "main")
+        other = self.app("Telegram/Regram.app", "main", bundle="org.telegram.desktop")
+        candidates = subprocess.CompletedProcess([], 0, "12\n34\n56\n", "")
+        processes = subprocess.CompletedProcess([], 0, f"12 {target}/Contents/MacOS/Regram\n34 {other}/Contents/MacOS/Regram\n56 /tmp/unrelated\n", "")
+        with mock.patch.object(INSTALL.subprocess, "run", side_effect=[candidates, processes]) as run, \
+             mock.patch.object(INSTALL.os, "kill", side_effect=[None, ProcessLookupError()]) as kill:
+            INSTALL.stop_running_regram()
+        self.assertEqual([call.args[0] for call in run.call_args_list], [["pgrep", "-x", "Regram"], ["ps", "-p", "12,34,56", "-o", "pid=,comm="]])
+        self.assertTrue(all(call.kwargs["timeout"] == 3 for call in run.call_args_list))
+        self.assertEqual([call.args[0] for call in kill.call_args_list], [12, 12])
+
+    def test_stop_returns_when_no_regram_process_is_running(self):
+        result = subprocess.CompletedProcess([], 1, "", "")
+        with mock.patch.object(INSTALL.subprocess, "run", return_value=result) as run, \
+             mock.patch.object(INSTALL.os, "kill") as kill:
+            INSTALL.stop_running_regram()
+        self.assertEqual(run.call_count, 1)
+        kill.assert_not_called()
+
+    def test_stop_fails_before_signalling_when_process_lookup_times_out(self):
+        with mock.patch.object(INSTALL.subprocess, "run", side_effect=subprocess.TimeoutExpired("pgrep", 3)), \
+             mock.patch.object(INSTALL.os, "kill") as kill:
+            with self.assertRaises(subprocess.TimeoutExpired):
+                INSTALL.stop_running_regram()
+        kill.assert_not_called()
 
     def test_restores_previous_application_when_installed_validation_fails(self):
         source = self.app("build/Regram.app", "new")

@@ -66,7 +66,7 @@ public func RegramMediaCaptureController(context: any AccountContextProtocol, pr
         page.row("cancel", title: strings().modalCancel, action: { session.cancel(); close() })
         return InputDataSignalValue(entries: page.entries)
     }
-    let controller = InputDataController(dataSignal: signal, title: strings().callCamera, didLoad: { _, _ in if previewEnabled { session.start() } }, hasDone: false)
+    let controller = RegramFormController(dataSignal: signal, title: strings().callCamera, didLoad: { _, _ in if previewEnabled { session.start() } }, hasDone: false)
     controller.onDeinit = { session.cancel() }
     let modal = InputDataModalController(controller, closeHandler: { done in session.cancel(); done() }, size: NSMakeSize(380, 490))
     close = { [weak modal] in modal?.close() }

@@ -27,7 +27,7 @@ def main():
     if production.count("NSPasteboard.general") != 2:
         raise RuntimeError("Review the changed clipboard boundary")
     production = "\n".join(line for line in production.splitlines() if not line.startswith("import "))
-    production = replace_once(production, "public func RegramDatacenterController", "func RegramDatacenterController").replace("NSPasteboard.general", "FixturePasteboard.general")
+    production = replace_once(production, "public func RegramDatacenterController", "func RegramDatacenterController").replace("NSPasteboard.general", "FixturePasteboard.general").replace("RegramFormController(", "InputDataController(")
     probe = (ROOT / "submodules/telegram-ios/submodules/TelegramCore/Sources/Network/RegramDatacenterDiagnostics.swift").read_text()
     probe = probe.split("public struct RegramDatacenterProbeSample", 1)[1].split("public extension Network", 1)[0]
     probe = "public struct RegramDatacenterProbeSample" + probe
@@ -36,7 +36,7 @@ def main():
         source = directory / "DatacenterChecks.swift"
         source.write_text(shared + "\n" + probe + "\n" + (HERE / "DatacenterChecks.swift").read_text() + "\n" + production)
         binary = directory / "datacenter-checks"
-        subprocess.run(["xcrun", "swiftc", "-parse-as-library", "-target", platform.machine() + "-apple-macos12.0", "-I", str(args.products), str(args.products / "RegramCore.o"), str(args.products / "SwiftSignalKit.o"), str(source), "-o", str(binary)], check=True)
+        subprocess.run(["xcrun", "swiftc", "-O", "-D", "STABLE", "-parse-as-library", "-target", platform.machine() + "-apple-macos12.0", "-I", str(args.products), str(args.products / "RegramCore.o"), str(args.products / "SwiftSignalKit.o"), str(source), "-o", str(binary)], check=True)
         subprocess.run([str(binary)], check=True)
 
 

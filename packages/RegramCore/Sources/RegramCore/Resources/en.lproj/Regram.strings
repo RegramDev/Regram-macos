@@ -41,6 +41,7 @@
 "AppIcon.Name.jade" = "Jade";
 "AppIcon.Name.mint" = "Mint";
 "AppIcon.Name.nebula" = "Nebula";
+"AppIcon.Name.silver" = "Silver";
 "AppUpdate.ActivityDownloaded" = "Downloaded. Open Regram to finish preparing the update.";
 "AppUpdate.ActivityOpen" = "Open update page";
 "AppUpdate.ActivityStale" = "Progress will refresh when Regram can run";
@@ -365,17 +366,6 @@
 "EditHistory.RevealPhoto" = "Tap to reveal photo";
 "EditHistory.Title" = "Edit History";
 "EditHistory.ViewPhoto" = "View Photo";
-"EraseData.Action" = "Erase Everything and Close";
-"EraseData.Close" = "Close App";
-"EraseData.Confirm" = "This logs out every account and deletes all local data of this app. This cannot be undone.";
-"EraseData.ContainerUnavailable" = "The data container is unavailable. The request is saved; reopen Regram to retry.";
-"EraseData.Done" = "All data erased";
-"EraseData.DoneNotice" = "Close Regram and open it again to start fresh.";
-"EraseData.Errors" = "Erased with errors";
-"EraseData.ErrorsNotice" = "Could not remove: %@";
-"EraseData.Notice" = "Logs out every account and deletes Regram’s local data, caches and settings on this Mac. You will need to log in again.";
-"EraseData.Progress" = "Erasing data… Please keep Regram open.";
-"EraseData.Title" = "Erase All Data";
 "Fonts.Areas" = "Apply To";
 "Fonts.Areas.Notice" = "Checked areas update immediately. Code, icons and large emoji keep their own fonts.";
 "Fonts.Cancel" = "Cancel Download";
@@ -926,7 +916,7 @@
 "Settings.Photo.SendLarge.Notice" = "Increase the side limit on compressed images to 2560px.";
 "Settings.Pro.Title" = "Regram Pro";
 "Settings.ProCategory.appearance" = "Appearance & Interface";
-"Settings.ProCategory.appearance.Description" = "Fonts, icons, bottom bar and profiles";
+"Settings.ProCategory.appearance.Description" = "Icons, navigation and profile information";
 "Settings.ProCategory.input" = "Input & Sending";
 "Settings.ProCategory.input.Description" = "Composer, sending and text formatting";
 "Settings.ProCategory.media" = "Media & Links";
@@ -940,7 +930,7 @@
 "Settings.ProCategory.privacy" = "Privacy & Filters";
 "Settings.ProCategory.privacy.Description" = "Content filters, deleted messages and privacy";
 "Settings.ProCategory.tools" = "Management & Tools";
-"Settings.ProCategory.tools.Description" = "Backup, app updates and local data";
+"Settings.ProCategory.tools.Description" = "Backups and app updates";
 "Settings.ProCategory.translation" = "Translation & Speech";
 "Settings.ProCategory.translation.Description" = "Translation services, models and transcription";
 "Settings.ProHub.Notice" = "Message tools, privacy, translation, transcription, media and backups are in Regram Pro.";
@@ -952,6 +942,7 @@
 "Settings.RecordingButton" = "Voice Recording Button";
 "Settings.Search.AllOptions" = "Search all detailed settings";
 "Settings.Search.NoResults" = "No matching settings";
+"Settings.Search.Placeholder" = "Search settings";
 "Settings.Search.Pro" = "Matching Settings in Regram Pro";
 "Settings.Section.Composer" = "Composer";
 "Settings.Section.Connection" = "Connection & Diagnostics";
@@ -1028,7 +1019,8 @@
 "Share.RepostToStory" = "Repost\nto Story";
 "Showroom.Description" = "Local Premium, gifts, rating, TON card and phone display";
 "Showroom.PremiumRefresh" = "Reopen the app to refresh screens that are already open.";
-"Showroom.Title" = "Show Off";
+"Showroom.Title" = "Showroom";
+"Showroom.Description" = "Local profile, gifts and balance previews";
 "StickerBackup.Action" = "Export sticker pack backup";
 "StickerBackup.Failed" = "Sticker pack backup failed. Check download access and available storage, then retry.";
 "StickerSave.Failed" = "Unable to save sticker. Check Photos permission and try again.";
@@ -2627,7 +2619,7 @@
 "profile.registered" = "Registered";
 "profile.registeredEstimate" = "Estimated registration";
 "profile.userId" = "User ID";
-"protectedExport.notice" = "Allow local saves and message screenshots of protected cloud messages. Secret chats, one-time media and paid media remain excluded.";
+"protectedExport.notice" = "Allow saving and capturing protected cloud messages. Secret chats, self-destructing media and paid media remain protected.";
 "quickTranslate.action" = "Quick Translate";
 "quickTranslate.busy" = "Wait for a translation to finish or cancel one.";
 "quickTranslate.cancel" = "Cancel Translation";
@@ -2854,3 +2846,4 @@
 "webTranslation.tooLarge" = "This page is too large to translate. The limit is 2000 text nodes and 500000 bytes.";
 "ImageTranslation.TooLarge" = "This image has too much text to translate at once. Select some text or crop the image and try again.";
 "webTranslation.translate" = "Translate";
+"Settings.Transcription.ConfigurationNotice" = "Choose a recognition service. Custom API settings appear when that service is selected; switching services keeps your saved configuration.";

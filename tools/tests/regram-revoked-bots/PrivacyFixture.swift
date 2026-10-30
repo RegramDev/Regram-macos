@@ -16,7 +16,7 @@ struct InputDataGeneralData {
     let enabled: Bool
     let action: (() -> Void)?
 
-    init(name: String, color: Int, type: GeneralInteractedType, viewType: GeneralViewType, enabled: Bool = true, action: (() -> Void)? = nil) {
+    init(name: String, color: Int, type: GeneralInteractedType, viewType: GeneralViewType, enabled: Bool = true, description: String? = nil, descTextColor: Int? = nil, action: (() -> Void)? = nil) {
         self.name = name
         self.color = color
         self.type = type

@@ -111,7 +111,7 @@ public func RegramSettingsBackupController(context: any AccountContextProtocol, 
         page.text(regramString("Backup.Reset.Notice"))
         return InputDataSignalValue(entries: page.entries)
     }
-    let controller = InputDataController(dataSignal: signal, title: regramString("Backup.Title"), removeAfterDisappear: false, hasDone: false, identifier: "regram.backup")
+    let controller = RegramFormController(dataSignal: signal, title: regramString("Backup.Title"), removeAfterDisappear: false, hasDone: false, identifier: "regram.backup")
     controller.onDeinit = { actions.dispose() }
     regramFocusSettings(controller, page: "backup", item: focusSetting)
     return controller

@@ -4,7 +4,7 @@ import AppKit
 
 final class RegramBrandingAssetsTests: XCTestCase {
     func testBundledSourceArtworkAndAdditionalFontCatalogHaveExactChoices() {
-        XCTAssertEqual(RegramBranding.icons.count, 9)
+        XCTAssertEqual(RegramBranding.icons.count, 10)
         for name in RegramBranding.icons {
             XCTAssertNotNil(RegramBranding.image(name, dark: false), name)
             XCTAssertNotNil(RegramBranding.image(name, dark: true), name)
@@ -16,7 +16,7 @@ final class RegramBrandingAssetsTests: XCTestCase {
     }
 
     func testNativeApplicationIconsHavePaddingMaskAndAllDockRepresentations() throws {
-        XCTAssertEqual(RegramBranding.icons, ["RGConversation", "RGAzure", "RGIris", "RGMint", "RGGathering", "RGAmber", "RGNebula", "RGJade", "RGClassic"])
+        XCTAssertEqual(RegramBranding.icons, ["RGConversation", "RGAzure", "RGIris", "RGMint", "RGGathering", "RGAmber", "RGNebula", "RGJade", "RGSilver", "RGClassic"])
         for dark in [false, true] {
             var renderedChoices = Set<Data>()
             for name in RegramBranding.icons {
@@ -36,7 +36,7 @@ final class RegramBrandingAssetsTests: XCTestCase {
                 XCTAssertGreaterThan(alpha(64, 64), 250, name)
                 renderedChoices.insert(pixels)
             }
-            XCTAssertEqual(renderedChoices.count, 9)
+            XCTAssertEqual(renderedChoices.count, 10)
         }
         XCTAssertNil(RegramBranding.applicationIcon("Default.icns", dark: false))
     }

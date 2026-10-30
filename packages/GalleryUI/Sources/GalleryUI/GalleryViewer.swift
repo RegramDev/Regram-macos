@@ -1834,10 +1834,7 @@ public class GalleryViewer: NSResponder {
     }
 
     private func updateCaptureExclusion() {
-        if viewer === self {
-        }
-        let isProtected = pager.selectedItem?.entry.isProtected == true
-            || pager.selectedItem?.entry.message?.isCopyProtected(cachedData: cachedPeerData) == true
+        let isProtected = pager.selectedItem.map { !$0.entry.regramCanExport(accountId: context.peerId.toInt64(), cachedData: cachedPeerData) } ?? false
         if isProtected {
             if captureExclusionToken == nil {
                 captureExclusionToken = context.captureExclusionManager.addExclusion(for: window, view: self.pager.view)

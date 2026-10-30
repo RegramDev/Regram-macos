@@ -47,13 +47,12 @@ public func RegramFilterController(context: any AccountContextProtocol, focusSet
     }
     let signal = combineLatest(promise.get(), regramPreferenceChanges(accountId: accountId), appearanceSignal) |> map { value, settings, _ -> InputDataSignalValue in
         let rule = RGMessageFilterRule(pattern: value.pattern.trimmingCharacters(in: .whitespacesAndNewlines), isRegex: value.regex)
-        let addIcon = TelegramThemeHooks.shared.image(.iconPollAddOption).precomposed(rule.isValid ? theme.colors.accentIcon : theme.colors.grayIcon)
-        let rightItem: InputDataRightItem = .action(addIcon, rule.isValid ? .custom({ _, _ in add() }) : .none)
         var rows: [InputDataEntry] = [
             .sectionId(0, type: .normal),
-            .input(sectionId: 1, index: 0, value: .string(value.pattern), error: nil, identifier: patternId, mode: .plain, data: .init(viewType: .firstItem, rightItem: rightItem), placeholder: nil, inputPlaceholder: regramString(value.regex ? "MessageFilter.InputPlaceholderRegex" : "MessageFilter.InputPlaceholder"), filter: { $0 }, limit: 8192),
-            .general(sectionId: 1, index: 1, value: .none, error: nil, identifier: InputDataIdentifier("messageFilter.regex"), data: .init(name: regramString("MessageFilter.Regex"), color: theme.colors.text, type: .switchable(value.regex), viewType: .lastItem, action: { update { $0.regex.toggle() } })),
-            .desc(sectionId: 1, index: 2, text: .plain(regramString("MessageFilter.SubTitle") + "\n\n" + regramString("MessageFilter.Regex.Notice")), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)),
+            .input(sectionId: 1, index: 0, value: .string(value.pattern), error: nil, identifier: patternId, mode: .plain, data: .init(viewType: .firstItem), placeholder: nil, inputPlaceholder: regramString(value.regex ? "MessageFilter.InputPlaceholderRegex" : "MessageFilter.InputPlaceholder"), filter: { $0 }, limit: 8192),
+            .general(sectionId: 1, index: 1, value: .none, error: nil, identifier: InputDataIdentifier("messageFilter.regex"), data: .init(name: regramString("MessageFilter.Regex"), color: theme.colors.text, type: .switchable(value.regex), viewType: .innerItem, action: { update { $0.regex.toggle() } })),
+            .general(sectionId: 1, index: 2, value: .none, error: nil, identifier: InputDataIdentifier("messageFilter.add"), data: .init(name: regramString("MessageFilter.Add"), color: theme.colors.accent, type: .none, viewType: .lastItem, enabled: rule.isValid && !settings.filterRules.contains(where: { $0.hasSameDefinition(as: rule) }), action: add)),
+            .desc(sectionId: 1, index: 3, text: .plain(regramString("MessageFilter.SubTitle") + "\n\n" + regramString("MessageFilter.Regex.Notice")), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)),
             .sectionId(1, type: .normal)
         ]
         let tools = {
@@ -63,7 +62,7 @@ public func RegramFilterController(context: any AccountContextProtocol, focusSet
                 ContextMenuItem(regramString("MessageFilter.Test.Title"), handler: { context.bindings.rootNavigation().push(RegramMessageFilterTestController(context: context, rules: currentRules())) })
             ]
         }
-        rows.append(.desc(sectionId: 2, index: 3, text: .plain(regramString("MessageFilter.Keywords.Title")), data: .init(color: theme.colors.listGrayText, viewType: .textTopItem, rightItem: .init(isLoading: false, text: .initialize(string: "⋯", color: theme.colors.accent, font: .medium(.title)), contextMenu: tools))))
+        rows.append(.desc(sectionId: 2, index: 4, text: .plain(regramString("MessageFilter.Keywords.Title")), data: .init(color: theme.colors.listGrayText, viewType: .textTopItem, rightItem: .init(isLoading: false, text: .initialize(string: "⋯", color: theme.colors.accent, font: .medium(.title)), contextMenu: tools))))
         let rules = Array(settings.filterRules.reversed())
         for (index, rule) in rules.enumerated() {
             var details: [String] = []
@@ -84,15 +83,15 @@ public func RegramFilterController(context: any AccountContextProtocol, focusSet
                     ContextMenuItem(regramString("MessageFilter.Rule.Delete"), handler: { remove(rule.id) })
                 ]
             }
-            rows.append(.general(sectionId: 2, index: Int32(index + 4), value: .none, error: nil, identifier: InputDataIdentifier("filter_rule_" + rule.id), data: .init(name: rule.pattern, color: rule.isEnabled ? theme.colors.text : theme.colors.grayText, type: value.editing ? .context(regramString("MessageFilter.Rule.Delete")) : .next, viewType: rules.count == 1 ? .singleItem : index == 0 ? .firstItem : index + 1 == rules.count ? .lastItem : .innerItem, description: details.joined(separator: " · "), action: {
+            rows.append(.general(sectionId: 2, index: Int32(index + 5), value: .none, error: nil, identifier: InputDataIdentifier("filter_rule_" + rule.id), data: .init(name: rule.pattern, color: rule.isEnabled ? theme.colors.text : theme.colors.grayText, type: value.editing ? .context(regramString("MessageFilter.Rule.Delete")) : .next, viewType: rules.count == 1 ? .singleItem : index == 0 ? .firstItem : index + 1 == rules.count ? .lastItem : .innerItem, description: details.joined(separator: " · "), action: {
                 if draft.with({ $0.editing }) { remove(rule.id) }
                 else if let rule = currentRules().first(where: { $0.id == rule.id }) { context.bindings.rootNavigation().push(RegramRuleController(context: context, rule: rule)) }
             }, menuItems: menu)))
         }
-        rows.append(.desc(sectionId: 2, index: Int32(rules.count + 4), text: .plain(regramString("MessageFilter.Rules.Notice")), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
+        rows.append(.desc(sectionId: 2, index: Int32(rules.count + 5), text: .plain(regramString("MessageFilter.Rules.Notice")), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
         return InputDataSignalValue(entries: rows)
     }
-    let controller = InputDataController(dataSignal: signal, title: regramString("MessageFilter.Title"), validateData: { _ in
+    let controller = RegramFormController(dataSignal: signal, title: regramString("MessageFilter.Title"), validateData: { _ in
         update { $0.editing.toggle() }
         return .fail(.none)
     }, updateDatas: { data in
@@ -117,7 +116,7 @@ public func RegramRuleController(context: any AccountContextProtocol, rule: RGMe
         .input(sectionId: 1, index: 0, value: .string(rule.pattern), error: nil, identifier: identifier, mode: .plain, data: .init(viewType: .singleItem), placeholder: nil, inputPlaceholder: regramString(rule.isRegex ? "MessageFilter.InputPlaceholderRegex" : "MessageFilter.InputPlaceholder"), filter: { $0 }, limit: 8192),
         .desc(sectionId: 1, index: 1, text: .plain(regramString(rule.isRegex ? "MessageFilter.Rule.EditMessageRegex" : "MessageFilter.Rule.EditMessage")), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem))
     ]
-    return InputDataController(dataSignal: .single(InputDataSignalValue(entries: rows)), title: regramString("MessageFilter.Rule.EditTitle"), validateData: { data in
+    return RegramFormController(dataSignal: .single(InputDataSignalValue(entries: rows)), title: regramString("MessageFilter.Rule.EditTitle"), validateData: { data in
         var result = rule
         result.pattern = (data[identifier]?.stringValue ?? rule.pattern).trimmingCharacters(in: .whitespacesAndNewlines)
         guard result.isValid else { return .fail(.fields([identifier: .shake])) }
@@ -186,7 +185,7 @@ public func RegramMessageFilterTestController(context: any AccountContextProtoco
         }
         return InputDataSignalValue(entries: rows)
     }
-    let controller = InputDataController(dataSignal: signal, title: regramString("MessageFilter.Test.Title"), updateDatas: { data in
+    let controller = RegramFormController(dataSignal: signal, title: regramString("MessageFilter.Test.Title"), updateDatas: { data in
         if let text = data[InputDataIdentifier("filter_testText")]?.stringValue { update { if $0.text != text { $0.text = text; $0.results = []; $0.generation = UUID(); $0.running = false } } }
         return .fail(.none)
     }, hasDone: false, identifier: "regram.messageFilter")

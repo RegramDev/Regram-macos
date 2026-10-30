@@ -357,7 +357,7 @@ public func RegramCommonGroupMessagesController(context: any AccountContextProto
     let signal = combineLatest(search.state.get(), appearanceSignal) |> deliverOnPrepareQueue |> map { state, _ in
         InputDataSignalValue(entries: commonGroupMessagesEntries(state, context: context, authorPeerId: authorPeerId, search: search))
     }
-    let controller = InputDataController(dataSignal: signal, title: regramString("CommonGroups.PageTitle"), removeAfterDisappear: false, hasDone: false, identifier: "regram.commonGroupMessages")
+    let controller = RegramFormController(dataSignal: signal, title: regramString("CommonGroups.PageTitle"), removeAfterDisappear: false, hasDone: false, identifier: "regram.commonGroupMessages")
     controller.contextObject = search
     controller.didAppear = { _ in search.resume() }
     controller.willDisappear = { _ in search.pause() }

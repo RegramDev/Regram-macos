@@ -69,7 +69,7 @@ public func RegramChatPreferencesController(context: any AccountContextProtocol,
         }
         return InputDataSignalValue(entries: rows)
     }
-    let controller = InputDataController(dataSignal: signal, title: regramString("ChatPreferences.Title"), removeAfterDisappear: false, hasDone: false, identifier: "regram.chatPreferences")
+    let controller = RegramFormController(dataSignal: signal, title: regramString("ChatPreferences.Title"), removeAfterDisappear: false, hasDone: false, identifier: "regram.chatPreferences")
     controller.onDeinit = { selection.dispose() }
     regramFocusSettings(controller, page: "chatPreferences", item: focusSetting)
     return controller

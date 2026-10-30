@@ -20,12 +20,15 @@ def main():
     shared = shared.replace("case none, next, loading, switchable(Bool), contextSelector", "case none, next, loading, context(String), switchable(Bool), contextSelector")
     shared = shared.replace('        case .loading: return "loading"\n', '        case .loading: return "loading"\n        case let .context(value): return value\n')
     shared = shared.replace("    let afterDisappear:", "    var afterDisappear:")
+    shared = shared.replace("    var onDeinit:", "    var willDisappear: ((Bool) -> Void)?\n    var onDeinit:")
+    shared = shared.replace('entries.first { $0.identifier == key }!', '{ guard let entry = entries.first(where: { $0.identifier == key }) else { fatalError("Missing fixture entry " + key + ": " + entries.map { $0.identifier }.joined(separator: ", ")) }; return entry }()')
+    shared = shared.replace("state: MenuState) {", "state: MenuState, removeTail: Bool = true) {")
     production = args.controller_source.read_text()
     audio_boundary = 'Bundle.module.url(forResource: "RGSTTTest", withExtension: "m4a")'
     if production.count(audio_boundary) != 1:
         raise RuntimeError("Review the changed STT audio resource boundary")
     production = "\n".join(line for line in production.splitlines() if not line.startswith("import "))
-    production = production.replace("public func Regram", "func Regram").replace("RegramPreferences.shared", "testPreferences").replace(audio_boundary, "fixtureTestAudioURL()")
+    production = production.replace("RegramFormController(", "InputDataController(").replace("public func Regram", "func Regram").replace("RegramPreferences.shared", "testPreferences").replace(audio_boundary, "fixtureTestAudioURL()")
     llm = (ROOT / "packages/RegramServices/Sources/RegramServices/RGLLMTranslate.swift").read_text().split("private final class RGTranslationRequestLimiter", 1)[0]
     transcription = (ROOT / "packages/RegramServices/Sources/RegramServices/RGOpenAITranscriptionProvider.swift").read_text().split("public enum RGOpenAITranscriptionProvider", 1)[0]
     stt = (ROOT / "packages/RegramServices/Sources/RegramServices/RGSTTConfiguration.swift").read_text()
@@ -34,7 +37,7 @@ def main():
         source = directory / "ServiceEditorChecks.swift"
         source.write_text(shared + "\n" + llm + "\n" + transcription + "\n" + stt + "\n" + (HERE / "ServiceEditorChecks.swift").read_text() + "\n" + production)
         binary = directory / "service-editor-checks"
-        command = ["xcrun", "swiftc", "-parse-as-library", "-target", platform.machine() + "-apple-macos12.0", "-I", str(args.products), str(args.products / "RegramCore.o"), str(args.products / "SwiftSignalKit.o"), str(source), "-o", str(binary)]
+        command = ["xcrun", "swiftc", "-O", "-D", "STABLE", "-parse-as-library", "-target", platform.machine() + "-apple-macos12.0", "-I", str(args.products), str(args.products / "RegramCore.o"), str(args.products / "SwiftSignalKit.o"), str(source), "-o", str(binary)]
         subprocess.run(command, check=True)
         subprocess.run([str(binary)], check=True)
 

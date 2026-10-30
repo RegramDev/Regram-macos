@@ -2,10 +2,10 @@ import Cocoa
 import TGUIKit
 import GeneralRows
 import TelegramTheme
+import InputDataUI
 
-func regramSearchMessageRowItem(_ size: NSSize, stableId: AnyHashable, title: String, date: String, preview: String, query: String, footer: String = "", selection: Bool? = nil, viewType: GeneralViewType, action: @escaping () -> Void, menu: @escaping () -> [ContextMenuItem]) -> GeneralInteractedRowItem {
+func regramSearchMessageRowItem(_ size: NSSize, stableId: AnyHashable, title: String, date: String, preview: String, query: String, footer: String = "", selection: Bool? = nil, viewType: GeneralViewType, action: @escaping () -> Void, menu: @escaping () -> [ContextMenuItem]) -> GeneralRowItem {
     let type: GeneralInteractedType = selection.map(GeneralInteractedType.selectable) ?? .none
-    let item = GeneralInteractedRowItem(size, stableId: stableId, name: title, nameStyle: .init(font: .medium(.title), foregroundColor: theme.colors.text), description: preview, descTextColor: theme.colors.text, type: type, viewType: viewType, action: action, menuItems: menu)
     let body = NSMutableAttributedString(attributedString: .initialize(string: date, color: theme.colors.grayText, font: .normal(.small)))
     if !footer.isEmpty {
         let tags = footer.count > 32 ? String(footer.prefix(31)) + "…" : footer
@@ -25,8 +25,5 @@ func regramSearchMessageRowItem(_ size: NSSize, stableId: AnyHashable, title: St
             range = NSRange(location: NSMaxRange(match), length: text.length - NSMaxRange(match))
         }
     }
-    item.descLayout = TextViewLayout(body, maximumNumberOfLines: 5)
-    item.balancedDescriptionLayout = true
-    _ = item.makeSize(size.width, oldWidth: 0)
-    return item
+    return RegramNativeRowItem(size, stableId: stableId, data: .init(name: title, color: theme.colors.text, type: selection == nil ? .next : type, viewType: viewType, description: body.string, action: action, menuItems: menu), detail: body, maximumDetailLines: 5)
 }

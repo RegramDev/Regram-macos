@@ -145,6 +145,8 @@ public struct RegramSetting: Equatable {
         .init("features.autoInlineBotEnabled", .messages, .bool(false)),
         .init("chatPreferences", .input, .string("{}")),
         .init("serviceConfigurationRevision", .translation, .integer(0)),
+        .init("translationConfigurationRevision", .translation, .integer(0)),
+        .init("transcriptionConfigurationRevision", .translation, .integer(0)),
         .init("translationBackend", .translation, .string("default"), choices: ["default", "google", "googleCN", "microsoft", "yandex", "transmart", "llm", "system"].map(RegramValue.string)),
         .init("quickTranslateButton", .translation, .bool(false)),
         .init("outgoingLanguageTranslation", .translation, .dictionary([:])),
@@ -426,11 +428,22 @@ public struct RegramAccountSettings: Codable, Equatable {
         return !self["antiRevokeSkipBots"].bool || !authorIsBot()
     }
 
+    private static let translationIdentityKeys = RegramSetting.all.map(\.key).filter {
+        $0.hasPrefix("translationLLM") || ["translationBackend", "serviceConfigurationRevision", "translationConfigurationRevision"].contains($0)
+    }
+
+    private static let transcriptionConfigurationKeys = ["transcriptionBackend", "serviceConfigurationRevision", "transcriptionConfigurationRevision", "sttBaseURL", "sttEndpoint", "sttModel", "sttLanguage", "sttPrompt"]
+
     public var translationIdentity: String {
-        let values = Dictionary(uniqueKeysWithValues: RegramSetting.all.filter { $0.key.hasPrefix("translationLLM") || $0.key == "translationBackend" || $0.key == "serviceConfigurationRevision" }.map { ($0.key, self[$0.key]) })
+        var values = Dictionary(uniqueKeysWithValues: Self.translationIdentityKeys.map { ($0, self[$0]) })
+        if self["translationConfigurationRevision"].integer == 0 { values.removeValue(forKey: "translationConfigurationRevision") }
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         return (try? encoder.encode(values)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
+    }
+
+    public func hasSameTranscriptionConfiguration(as other: RegramAccountSettings) -> Bool {
+        Self.transcriptionConfigurationKeys.allSatisfy { self[$0] == other[$0] }
     }
 
     public func chatPreferences(accountId: Int64, peerId: Int64) -> RGChatPreferences {

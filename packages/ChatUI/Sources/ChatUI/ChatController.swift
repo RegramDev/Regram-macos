@@ -2702,6 +2702,8 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
     
     private var contextQueryState: (ChatPresentationInputQuery?, Disposable)?
     private var urlPreviewQueryState: (String?, Disposable)?
+    private var regramComposerRefreshState = RegramComposerRefreshState()
+    private var urlPreviewDetectionToken = UUID()
 
     
     let layoutDisposable:MetaDisposable = MetaDisposable()
@@ -8552,6 +8554,17 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
             }
         }
 
+        let composerPreferences = regramPreferenceChanges(accountId: context.peerId.toInt64(), keys: RegramComposerPreferences.preferenceKeys) |> map { RegramComposerPreferences(settings: $0) } |> distinctUntilChanged
+        presentationDisposable.add((combineLatest(composerPreferences, self.viewOnStage) |> deliverOnMainQueue).start(next: { [weak self] preferences, onStage in
+            guard let self, preferences == RegramComposerPreferences(settings: RegramPreferences.shared.settings(accountId: self.context.peerId.toInt64())) else { return }
+            let changes = self.regramComposerRefreshState.update(preferences, visible: onStage && self.visibleMessageWorkEnabled)
+            self.cancelRegramComposerQueries(changes.cancel)
+            if !changes.reload.isEmpty {
+                let current = self.chatInteraction.presentation
+                self.notify(with: current, oldValue: current, animated: false, force: false, composerRefresh: changes.reload)
+            }
+        }))
+
         let peerPresentationPreferences = regramPreferenceChanges(accountId: context.peerId.toInt64()) |> map { [$0["hideStories"], $0["features.disableChatAvatarStories"], $0["localPremium"], $0["localPremiumEmojiStatus"]] } |> distinctUntilChanged
         presentationDisposable.add((peerPresentationPreferences |> mapToSignal { _ in titlePeerView |> take(1) } |> deliverOnMainQueue).start(next: { [weak self] titlePeer in
             guard let self else { return }
@@ -10754,8 +10767,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         sentMessageEventsDisposable.dispose()
         proccessingMessageEventsDisposable.dispose()
         chatInteraction.remove(observer: self)
-        contextQueryState?.1.dispose()
-        self.urlPreviewQueryState?.1.dispose()
+        cancelRegramComposerQueries([.context, .preview])
         botCallbackAlertMessageDisposable?.dispose()
         layoutDisposable.dispose()
         shareContactDisposable.dispose()
@@ -11627,7 +11639,24 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
     private var tempImportersContext: PeerInvitationImportersContext? = nil
     private let tempImportersContextDisposable = MetaDisposable()
     
+    private func cancelRegramComposerQueries(_ changes: RegramComposerRefresh) {
+        if changes.contains(.context) {
+            contextQueryState?.1.dispose()
+            contextQueryState = nil
+        }
+        if changes.contains(.preview) {
+            urlPreviewDetectionToken = UUID()
+            updateUrlDisposable.set(nil)
+            urlPreviewQueryState?.1.dispose()
+            urlPreviewQueryState = nil
+        }
+    }
+
     public func notify(with value: Any, oldValue: Any, animated:Bool, force:Bool) {
+        self.notify(with: value, oldValue: oldValue, animated: animated, force: force, composerRefresh: [])
+    }
+
+    private func notify(with value: Any, oldValue: Any, animated:Bool, force:Bool, composerRefresh: RegramComposerRefresh) {
         if let value = value as? ChatPresentationInterfaceState, let oldValue = oldValue as? ChatPresentationInterfaceState {
 
             if value.interfaceState.editState?.message.id != oldValue.interfaceState.editState?.message.id {
@@ -11748,7 +11777,8 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                 genericView.bubblesView.setMenuMode(value.selectionState != nil ? .done : .menu)
             }
             let input = value.effectiveInput
-            if input != oldValue.effectiveInput || value.botMenu != oldValue.botMenu || force {
+            let inputChanged = input != oldValue.effectiveInput || value.botMenu != oldValue.botMenu || force
+            if inputChanged {
                 
                 let textInputContextState = textInputStateContextQueryRangeAndType(input, includeContext: false)
                 
@@ -11773,13 +11803,17 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                     self.genericView.updateTextInputSuggestions([], range: NSMakeRange(0, 0), animated: animated)
                     self.inputSwapDisposable.set(nil)
                 }
-                
+            }
+
+            if inputChanged || composerRefresh.contains(.context) {
                 if let (updatedContextQueryState, updatedContextQuerySignal) = contextQueryResultStateForChatInterfacePresentationState(value, context: self.context, currentQuery: self.contextQueryState?.0) {
                     self.contextQueryState?.1.dispose()
                     var inScope = true
                     var inScopeResult: ((ChatPresentationInputQueryResult?) -> ChatPresentationInputQueryResult?)?
-                    self.contextQueryState = (updatedContextQueryState, (updatedContextQuerySignal |> deliverOnMainQueue).start(next: { [weak self] result in
-                        if let strongSelf = self {
+                    let queryRequest = MetaDisposable()
+                    self.contextQueryState = (updatedContextQueryState, queryRequest)
+                    queryRequest.set((updatedContextQuerySignal |> deliverOnMainQueue).start(next: { [weak self, weak queryRequest] result in
+                        if let strongSelf = self, let queryRequest, (strongSelf.contextQueryState?.1 as? MetaDisposable) === queryRequest {
                             if Thread.isMainThread && inScope {
                                 inScope = false
                                 inScopeResult = result
@@ -11803,52 +11837,58 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                         })
                         
                     }
+                }
+            }
+
+            if inputChanged || composerRefresh.contains(.preview) {
+                let detectionToken = UUID()
+                self.urlPreviewDetectionToken = detectionToken
+                var disableEditingPreview:((String)->Void)? = nil
+                if oldValue.interfaceState.editState == nil, value.interfaceState.editState != nil {
+                    disableEditingPreview = { [weak self] value in
+                        self?.chatInteraction.update({ $0.updatedInterfaceState{
+                            $0.withUpdatedComposeDisableUrlPreview(value)
+                        }})
+                    }
+                }
                     
-                    var disableEditingPreview:((String)->Void)? = nil
-                    if oldValue.interfaceState.editState == nil, value.interfaceState.editState != nil {
-                        disableEditingPreview = { [weak self] value in
-                            self?.chatInteraction.update({ $0.updatedInterfaceState{
-                                $0.withUpdatedComposeDisableUrlPreview(value)
-                            }})
+                let updateUrl = urlPreviewStateForChatInterfacePresentationState(chatInteraction.presentation, context: context, currentQuery: self.urlPreviewQueryState?.0, disableEditingPreview: disableEditingPreview) |> delay(composerRefresh.contains(.preview) || value.effectiveInput.inputText.isEmpty ? 0.0 : 0.1, queue: .mainQueue()) |> deliverOnMainQueue
+                    
+                updateUrlDisposable.set(updateUrl.start(next: { [weak self] result in
+                    if let `self` = self, self.urlPreviewDetectionToken == detectionToken, let (updatedUrlPreviewUrl, updatedUrlPreviewSignal) = result {
+                        self.urlPreviewQueryState?.1.dispose()
+                        var inScope = true
+                        var inScopeResult: ((TelegramMediaWebpage?) -> TelegramMediaWebpage?)?
+                        let previewRequest = MetaDisposable()
+                        self.urlPreviewQueryState = (updatedUrlPreviewUrl, previewRequest)
+                        previewRequest.set((updatedUrlPreviewSignal |> deliverOnMainQueue).start(next: { [weak self, weak previewRequest] result in
+                            if let strongSelf = self, let previewRequest, (strongSelf.urlPreviewQueryState?.1 as? MetaDisposable) === previewRequest {
+                                if Thread.isMainThread && inScope {
+                                    inScope = false
+                                    inScopeResult = result
+                                } else {
+                                    strongSelf.chatInteraction.update(animated: true, {
+                                        if let updatedUrlPreviewUrl = updatedUrlPreviewUrl, let webpage = result($0.urlPreview?.1) {
+                                            return $0.updatedUrlPreview((updatedUrlPreviewUrl, webpage))
+                                        } else {
+                                            return $0.updatedUrlPreview(nil)
+                                        }
+                                    })
+                                }
+                            }
+                        }))
+                        inScope = false
+                        if let inScopeResult = inScopeResult {
+                            self.chatInteraction.update(animated: true, {
+                                if let updatedUrlPreviewUrl = updatedUrlPreviewUrl, let webpage = inScopeResult($0.urlPreview?.1) {
+                                    return $0.updatedUrlPreview((updatedUrlPreviewUrl, webpage))
+                                } else {
+                                    return $0.updatedUrlPreview(nil)
+                                }
+                            })
                         }
                     }
-                    
-                    let updateUrl = urlPreviewStateForChatInterfacePresentationState(chatInteraction.presentation, context: context, currentQuery: self.urlPreviewQueryState?.0, disableEditingPreview: disableEditingPreview) |> delay(value.effectiveInput.inputText.isEmpty ? 0.0 : 0.1, queue: .mainQueue()) |> deliverOnMainQueue
-                    
-                    updateUrlDisposable.set(updateUrl.start(next: { [weak self] result in
-                        if let `self` = self, let (updatedUrlPreviewUrl, updatedUrlPreviewSignal) = result {
-                            self.urlPreviewQueryState?.1.dispose()
-                            var inScope = true
-                            var inScopeResult: ((TelegramMediaWebpage?) -> TelegramMediaWebpage?)?
-                            self.urlPreviewQueryState = (updatedUrlPreviewUrl, (updatedUrlPreviewSignal |> deliverOnMainQueue).start(next: { [weak self] result in
-                                if let strongSelf = self {
-                                    if Thread.isMainThread && inScope {
-                                        inScope = false
-                                        inScopeResult = result
-                                    } else {
-                                        strongSelf.chatInteraction.update(animated: true, {
-                                            if let updatedUrlPreviewUrl = updatedUrlPreviewUrl, let webpage = result($0.urlPreview?.1) {
-                                                return $0.updatedUrlPreview((updatedUrlPreviewUrl, webpage))
-                                            } else {
-                                                return $0.updatedUrlPreview(nil)
-                                            }
-                                        })
-                                    }
-                                }
-                            }))
-                            inScope = false
-                            if let inScopeResult = inScopeResult {
-                                self.chatInteraction.update(animated: true, {
-                                    if let updatedUrlPreviewUrl = updatedUrlPreviewUrl, let webpage = inScopeResult($0.urlPreview?.1) {
-                                        return $0.updatedUrlPreview((updatedUrlPreviewUrl, webpage))
-                                    } else {
-                                        return $0.updatedUrlPreview(nil)
-                                    }
-                                })
-                            }
-                        }
-                    }))
-                }
+                }))
             }
             
             

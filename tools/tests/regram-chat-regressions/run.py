@@ -16,7 +16,7 @@ def main():
     parser.add_argument("--package", choices=["ChatUI", "ChatHistoryModel", "SidebarUI", "GeneralRows", "ChatListUI", "QrStudioUI"], default="ChatUI")
     parser.add_argument("--filter", default="RegramMentionEntityTests|RegramFilteredReadingTests")
     arguments = parser.parse_args()
-    command = ["swift", "test", "-c", "release", "--package-path", str(ROOT / "packages" / arguments.package),
+    command = ["swift", "test", "-c", "release", "-Xswiftc", "-DSTABLE", "--package-path", str(ROOT / "packages" / arguments.package),
                "--scratch-path", str(ROOT / "packages/ChatUI/.build"), "-j", "4", "--filter", arguments.filter]
     for flag in ["-lbz2", "-liconv"]:
         command.extend(["-Xlinker", flag])

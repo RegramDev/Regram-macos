@@ -478,12 +478,14 @@ public func NotificationPreferencesController(_ context: any AccountContextProto
     let actionsDisposable = DisposableSet()
     
     
-    let entriesSignal = combineLatest(queue: prepareQueue, appNotificationSettings(accountManager: context.sharedContext.accountManager), globalNotificationSettings(postbox: context.account.postbox), exceptionsContext.exceptions, context.sharedContext.activeAccountsWithInfo |> map { $0.accounts }, NotificationSettingsHooks.shared.authorizationStatus(context), context.engine.peers.notificationSoundList(), statePromise.get()) |> map { inAppSettings, globalSettings, exceptions, accounts, unAuthStatus, soundList, state -> [InputDataEntry] in
+    let settingsQueue = Queue(name: "settings.notifications", qos: .userInitiated)
+    let entriesSignal = combineLatest(queue: settingsQueue, appNotificationSettings(accountManager: context.sharedContext.accountManager), globalNotificationSettings(postbox: context.account.postbox), exceptionsContext.exceptions, context.sharedContext.activeAccountsWithInfo |> map { $0.accounts }, NotificationSettingsHooks.shared.authorizationStatus(context), context.engine.peers.notificationSoundList(), statePromise.get()) |> map { inAppSettings, globalSettings, exceptions, accounts, unAuthStatus, soundList, state -> [InputDataEntry] in
         return notificationEntries(state: state, settings: inAppSettings, soundList: soundList, globalSettings: globalSettings, exceptions: exceptions, accounts: accounts, unAuthStatus: unAuthStatus, arguments: arguments)
     }
 
     
-    let controller = InputDataController(dataSignal: entriesSignal |> map { InputDataSignalValue(entries: $0) }, title: strings().telegramNotificationSettingsViewController, removeAfterDisappear: false, hasDone: false, identifier: "notification-settings")
+    let controller = InputDataController(dataSignal: entriesSignal |> deliverOnMainQueue |> map { InputDataSignalValue(entries: $0) }, title: strings().telegramNotificationSettingsViewController, removeAfterDisappear: false, hasDone: false, identifier: "notification-settings")
+    controller.preparationQueue = settingsQueue
     
     
     

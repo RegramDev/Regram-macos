@@ -685,24 +685,33 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
                 
                 
                 let previousBackingScale: Atomic<CGFloat> = Atomic(value: System.backingScale)
-                let signal: Signal<TelegramPresentationTheme?, NoError> = combineLatest(queue: resourcesQueue, themeSettingsView(accountManager: accountManager), backingProperties.get()) |> map { settings, backingScale in
+                let themePreparationQueue = Queue(name: "regram.application-theme", qos: .userInitiated)
+                let signal: Signal<TelegramPresentationTheme?, NoError> = combineLatest(themeSettingsView(accountManager: accountManager), backingProperties.get()) |> filter { settings, backingScale in
                     let previous = basicTheme.swap(settings)
                     let previousScale = previousBackingScale.swap(backingScale)
                     System.legacyMenu = settings.legacyMenu
-                    if previous?.palette != settings.palette || previous?.bubbled != settings.bubbled || previous?.wallpaper.wallpaper != settings.wallpaper.wallpaper || previous?.fontSize != settings.fontSize || previousScale != backingScale  {
-                        return updateTheme(with: settings, animated: ((previous?.fontSize == settings.fontSize && previous?.palette != settings.palette) || previous?.bubbled != settings.bubbled || previous?.cloudTheme?.id != settings.cloudTheme?.id || previous?.palette.isDark != settings.palette.isDark))
-                    } else {
-                        return nil
-                    }
-                } |> deliverOnMainQueue
+                    return previous?.palette != settings.palette || previous?.bubbled != settings.bubbled || previous?.wallpaper.wallpaper != settings.wallpaper.wallpaper || previous?.fontSize != settings.fontSize || previous?.cloudTheme?.id != settings.cloudTheme?.id || previousScale != backingScale
+                } |> mapToSignal { settings, _ -> Signal<TelegramPresentationTheme?, NoError> in
+                    Signal { subscriber in
+                        let cancelled = Atomic(value: false)
+                        themePreparationQueue.async {
+                            guard !cancelled.with({ $0 }) else { return }
+                            let prepared = updateTheme(with: settings)
+                            guard !cancelled.with({ $0 }) else { return }
+                            subscriber.putNext(prepared)
+                            subscriber.putCompletion()
+                        }
+                        return ActionDisposable { _ = cancelled.swap(true) }
+                    } |> deliverOnMainQueue
+                }
                 
                 _ = signal.start(next: { updatedTheme in
                     if let theme = updatedTheme {
                         if self.contextValue == nil {
-                            telegramUpdateTheme(theme, window: window, animated: true)
+                            telegramUpdateTheme(theme, window: window, animated: false)
                         } else {
                             self.enumerateApplicationContexts({ context in
-                                telegramUpdateTheme(theme, window: context.context.window, animated: true)
+                                telegramUpdateTheme(theme, window: context.context.window, animated: false)
                                 context.applyNewTheme()
                             })
                         }

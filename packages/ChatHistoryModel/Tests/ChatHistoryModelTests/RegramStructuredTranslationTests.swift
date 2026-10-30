@@ -114,6 +114,39 @@ final class RegramStructuredTranslationTests: XCTestCase {
         XCTAssertFalse(regramSupportsSelectedTranslationProvider(safe, cachedData: CachedUserData().withUpdatedFlags(.myCopyProtectionEnabled)))
     }
 
+    func testBatchPresentationSeparatesQuickHiddenAndSelectedProviderTranslations() {
+        let settings = RegramAccountSettings()
+        let translation = TranslationMessageAttribute(text: "translated", entities: [], toLang: "ja")
+        let selected = message(attributes: [translation, RegramTranslationMessageAttribute(configuration: regramTranslationCacheIdentity(settings.translationIdentity, tone: .formal))])
+        let quick = message(attributes: [translation, RegramTranslationMessageAttribute(configuration: settings.translationIdentity, quickToLang: "ja")])
+        let hidden = message(attributes: [translation, RegramTranslationMessageAttribute(configuration: settings.translationIdentity, quickToLang: "")])
+        let missing = message(attributes: [RegramTranslationMessageAttribute(configuration: settings.translationIdentity, quickToLang: "ja")])
+        let presentation = RegramTranslationPresentation(settings: settings, tone: .formal)
+        for _ in 0..<200 {
+            XCTAssertTrue(presentation.matches(selected))
+            XCTAssertFalse(presentation.matches(quick))
+            XCTAssertEqual(presentation.quickLanguage(quick), "ja")
+            XCTAssertNil(presentation.quickLanguage(selected))
+            XCTAssertNil(presentation.quickLanguage(hidden))
+            XCTAssertNil(presentation.quickLanguage(missing))
+            XCTAssertTrue(presentation.hidesQuickTranslation(hidden))
+            XCTAssertFalse(presentation.hidesQuickTranslation(quick))
+            XCTAssertFalse(presentation.hidesQuickTranslation(message()))
+        }
+        XCTAssertFalse(RegramTranslationPresentation(settings: settings, tone: .neutral).matches(selected))
+    }
+
+    func testBatchTranslationCacheRemainsValidDuringIndependentSpeechChanges() {
+        var settings = RegramAccountSettings()
+        let translated = message(attributes: [TranslationMessageAttribute(text: "translated", entities: [], toLang: "ja"), RegramTranslationMessageAttribute(configuration: regramTranslationCacheIdentity(settings.translationIdentity))])
+        settings["transcriptionBackend"] = .string("openAICompatible")
+        settings["sttModel"] = .string("speech-model")
+        settings["transcriptionConfigurationRevision"] = .integer(1)
+        XCTAssertTrue(RegramTranslationPresentation(settings: settings).matches(translated))
+        settings["translationConfigurationRevision"] = .integer(1)
+        XCTAssertFalse(RegramTranslationPresentation(settings: settings).matches(translated))
+    }
+
     func testEveryBackendNeedsVersionedProviderAndToneStamp() {
         var settings = RegramAccountSettings()
         let original = message(text: "source", attributes: [TranslationMessageAttribute(text: "old native", entities: [], toLang: "zh")])

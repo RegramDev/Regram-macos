@@ -20,6 +20,7 @@ import EmojiReplacements
 import TelegramMediaUtils
 import InputView
 import RegramCore
+import RegramServices
 
 
 
@@ -365,7 +366,7 @@ public class Sender: NSObject {
                     attrs.append(TelegramMediaFileAttribute.Video(duration: Double(container.duration), size: PixelDimensions(container.size), flags: [.instantRoundVideo], preloadSize: nil, coverTime: nil, videoCodec: nil))
                     media = TelegramMediaFile(fileId: MediaId(namespace: Namespaces.Media.LocalFile, id: randomId), partialReference: nil, resource: resource, previewRepresentations: previewForFile(path, isSecretRelated: isSecretRelated, account: account), videoThumbnails: [], immediateThumbnailData: nil, mimeType: mimeType, size: nil, attributes: attrs, alternativeRepresentations: [])
 
-                } else if mimeType.hasPrefix("image/webp") && !RGMediaPolicy.isPastedPhoto(path: path) {
+                } else if mimeType.hasPrefix("image/webp") && !RegramClipboardImages.isPreparedPhoto(path: path) {
                     let resource = LocalFileReferenceMediaResource(localFilePath:path, randomId: randomId, isUniquelyReferencedTemporaryFile: false, size: fileSize(path))
                     
                     media = TelegramMediaFile(fileId: MediaId(namespace: Namespaces.Media.LocalFile, id: randomId), partialReference: nil, resource: resource, previewRepresentations: previewForFile(path, isSecretRelated: isSecretRelated, account: account), videoThumbnails: [], immediateThumbnailData: nil, mimeType: mimeType, size: nil, attributes: fileAttributes(for: mimeType, path: path, isMedia: true), alternativeRepresentations: [])

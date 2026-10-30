@@ -41,7 +41,7 @@ assert binding_update.startswith('updateTextSelection(')
 assert 'super.notify(with: value, oldValue: oldValue, animated: animated)\n        updateTextSelection()' in poll
 assert 'if chatTextSelectionDidDrag(from: start, to: location)' in selection
 assert 'InputDataEquatable(canCopy)' in results
-assert 'canCopyText: { copyPermission.with { $0 } }' in results
+assert 'canCopyText: { copyPermission.with { $0 } && currentCopyPermission() }' in results
 assert 'lhs.isTextSelectable == rhs.isTextSelectable' in source('packages/InputDataUI/Sources/InputDataUI/InputDataControllerEntries.swift')
 assert 'view.isSelectable = canCopy' in poll
 if not args.poll_ref:
@@ -71,14 +71,15 @@ blocks = {
     '__POLL_MENU__': section(poll, '    public override func menuItems(', '    public override func makeContentSize('),
     '__FULL_COPY_ITEM__': section(menu, '                        thirdBlock.append(ContextMenuItem(strings().chatContextCopyText, handler: { [weak textLayout] in', '\n                    }'),
     '__SELECTED_COPY_ITEM__': section(menu, '                        thirdBlock.append(ContextMenuItem(strings().chatCopySelectedText, handler: { [weak textLayout] in', '\n\n                    }'),
-    '__LINK_COPY_ITEM__': section(menu, '                    thirdBlock.append(ContextMenuItem(text, handler: { [weak textLayout] in', '\n                } else if !protected'),
+    '__LINK_COPY_ITEM__': section(menu, '                    thirdBlock.append(ContextMenuItem(text, handler: { [weak textLayout] in', '\n                } else if canCopyText'),
+    '__REGRAM_COPY_POLICY__': section(source('packages/ChatHistoryModel/Sources/ChatHistoryModel/RegramMessageExportPolicy.swift'), 'public func regramCanCopyMessageText(', '\npublic func regramBookmarkCanFetchFromCloud').replace('public func', 'func'),
     '__ENTITY_FILTER__': section(entities, '        entities = concatMessageAttributes(entities).filter(', '        for entity in resolvedEntities'),
 }
 for key, value in blocks.items():
     fixture = fixture.replace(key, value)
 assert '__' not in fixture
 
-cases = ['click-selection', 'context-selection', 'radial-threshold', 'drag-return', 'intercepted-drag', 'accessibility', 'copy-policy', 'live-protection', 'unchanged-presentation', 'late-protected-selection', 'row-reuse', 'result-permission', 'question-clipboard', 'option-clipboard', 'description-actions', 'description-menu', 'description-menu-lifetime', 'description-protected-menu', 'poll-row-menu', 'incoming-entities']
+cases = ['regram-copy', 'click-selection', 'context-selection', 'radial-threshold', 'drag-return', 'intercepted-drag', 'accessibility', 'copy-policy', 'live-protection', 'unchanged-presentation', 'late-protected-selection', 'row-reuse', 'result-permission', 'question-clipboard', 'option-clipboard', 'description-actions', 'description-menu', 'description-menu-lifetime', 'description-protected-menu', 'poll-row-menu', 'incoming-entities']
 with tempfile.TemporaryDirectory(prefix='poll-text-tests-') as directory:
     directory = Path(directory)
     main = directory / 'main.swift'

@@ -16,6 +16,10 @@ public enum RegramServicePurpose: Equatable {
     var credentialPurpose: RegramCredentialPurpose {
         self == .translation ? .translation : .transcription
     }
+
+    var configurationRevisionKey: String {
+        self == .translation ? "translationConfigurationRevision" : "transcriptionConfigurationRevision"
+    }
 }
 
 private struct ServiceDraft: Equatable {
@@ -104,7 +108,7 @@ public func RegramServiceController(context: any AccountContextProtocol, purpose
                 }
                 if purpose == .translation, before.useContext != next.useContext { value["translationLLMUseContext"] = .bool(next.useContext); configurationChanged = true }
                 if purpose == .transcription, before.transcriptionBackend != next.transcriptionBackend { value["transcriptionBackend"] = .string(next.transcriptionBackend); configurationChanged = true }
-                if configurationChanged || before.fields["APIKey"] != next.fields["APIKey"] { value["serviceConfigurationRevision"] = .integer(value["serviceConfigurationRevision"].integer &+ 1) }
+                if configurationChanged || before.fields["APIKey"] != next.fields["APIKey"] { value[purpose.configurationRevisionKey] = .integer(value[purpose.configurationRevisionKey].integer &+ 1) }
             }
         }
         promise.set(next)
@@ -126,7 +130,7 @@ public func RegramServiceController(context: any AccountContextProtocol, purpose
             try RegramCredentials.shared.write(draft.fields["APIKey"] ?? "", accountId: accountId, purpose: purpose.credentialPurpose)
             credentialSaveFailed = false
             RegramPreferences.shared.update(accountId: accountId) { value in
-                value["serviceConfigurationRevision"] = .integer(value["serviceConfigurationRevision"].integer &+ 1)
+                value[purpose.configurationRevisionKey] = .integer(value[purpose.configurationRevisionKey].integer &+ 1)
             }
             return true
         } catch {
@@ -204,27 +208,32 @@ public func RegramServiceController(context: any AccountContextProtocol, purpose
         }
 
         if purpose == .transcription {
-            header("RG.STTSettings")
             let backends = ["default", "apple", "openAICompatible"].map { backend in
                 ContextMenuItem(regramString("Settings.Transcription.Backend." + backend), handler: { update({ $0.transcriptionBackend = backend }, persist: true) }, state: draft.transcriptionBackend == backend ? .on : .off)
             }
-            row("service_provider", title: "Settings.Transcription.Backend", type: .contextSelector(regramString("Settings.Transcription.Backend." + draft.transcriptionBackend), backends), viewType: .firstItem)
-            input("BaseURL", title: "RG.STTBaseURL", placeholder: RGSTTConfiguration.defaultBaseURL, viewType: .innerItem)
-            input("Endpoint", title: "RG.STTEndpoint", placeholder: RGSTTConfiguration.defaultEndpoint, viewType: .innerItem)
-            input("APIKey", title: "RG.STTAPIKey", placeholder: regramString("RG.STTAPIKey.Placeholder"), viewType: .innerItem)
-            input("Model", title: "RG.STTModel", placeholder: "gpt-4o-mini-transcribe", viewType: .innerItem)
-            input("Language", title: "RG.STTLanguage", placeholder: regramString("RG.STTLanguage.Placeholder"), viewType: .lastItem)
-            notice("RG.STTSettings.Footer")
-            nextSection()
-            header("RG.STTPrompt")
-            input("Prompt", title: nil, placeholder: regramString("RG.STTPrompt.Placeholder"), viewType: .singleItem)
-            notice("RG.STTPrompt.Footer")
-            nextSection()
-            row("service_test", title: draft.request == nil ? "RG.STTTest" : "RG.STT.Cancel", type: draft.request == nil ? .none : .loading, viewType: .singleItem, action: {
-                let current = state.with { $0 }
-                if current.request == nil { test(current) } else { cancel() }
-            })
-            notice("RG.STTTest.Footer")
+            row("service_provider", title: "Settings.Transcription.Backend", type: .contextSelector(regramString("Settings.Transcription.Backend." + draft.transcriptionBackend), backends), viewType: .singleItem)
+            notice("Settings.Transcription.ConfigurationNotice")
+            if draft.transcriptionBackend == "openAICompatible" || ["baseURL", "endpoint", "apiKey", "model", "language", "prompt", "test"].contains(focusSetting ?? "") {
+                nextSection()
+                header("Settings.Transcription.Backend.openAICompatible")
+                input("BaseURL", title: "RG.STTBaseURL", placeholder: RGSTTConfiguration.defaultBaseURL, viewType: .firstItem)
+                input("Endpoint", title: "RG.STTEndpoint", placeholder: RGSTTConfiguration.defaultEndpoint, viewType: .innerItem)
+                input("APIKey", title: "RG.STTAPIKey", placeholder: regramString("RG.STTAPIKey.Placeholder"), viewType: .innerItem)
+                input("Model", title: "RG.STTModel", placeholder: "gpt-4o-mini-transcribe", viewType: .innerItem)
+                input("Language", title: "RG.STTLanguage", placeholder: regramString("RG.STTLanguage.Placeholder"), viewType: .lastItem)
+                notice("RG.STTSettings.Footer")
+                nextSection()
+                header("RG.STTPrompt")
+                input("Prompt", title: nil, placeholder: regramString("RG.STTPrompt.Placeholder"), viewType: .singleItem)
+                notice("RG.STTPrompt.Footer")
+                nextSection()
+                row("service_test", title: draft.request == nil ? "RG.STTTest" : "RG.STT.Cancel", type: draft.request == nil ? .none : .loading, viewType: .singleItem, enabled: draft.transcriptionBackend == "openAICompatible", action: {
+                    let current = state.with { $0 }
+                    guard current.transcriptionBackend == "openAICompatible" else { return }
+                    if current.request == nil { test(current) } else { cancel() }
+                })
+                notice("RG.STTTest.Footer")
+            }
         } else {
             let format = RGLLMAPIFormat(rawValue: draft.format) ?? .openai
             let formats = RGLLMAPIFormat.allCases.map { value in
@@ -244,21 +253,24 @@ public func RegramServiceController(context: any AccountContextProtocol, purpose
                 var choices = draft.models
                 let current = draft.fields["Model"] ?? ""
                 if !choices.contains(current) { choices.insert(current, at: 0) }
-                let models = choices.map { model in ContextMenuItem(model.isEmpty ? regramString("LLMTranslation.SelectModel") : model, handler: { update({ $0.fields["Model"] = model }, persist: true) }, state: current == model ? .on : .off) }
+                let models = choices.map { model in ContextMenuItem(model.isEmpty ? regramString("LLMTranslation.SelectModel") : model, handler: { update({ $0.fields["Model"] = model }, persist: true) }, state: current == model ? .on : .off, removeTail: false) }
                 row("service_model_picker", title: "LLMTranslation.SelectModel", type: .contextSelector(draft.fields["Model"].flatMap { $0.isEmpty ? nil : $0 } ?? regramString("LLMTranslation.SelectModel"), models), viewType: .innerItem)
             }
             row("service_models", title: "LLMTranslation.FetchModels", type: draft.request == "models" ? .loading : .none, viewType: .innerItem, enabled: draft.request == nil, action: { fetchModels(state.with { $0 }) })
             row("service_test", title: "LLMTranslation.TestModel", type: draft.request == "test" ? .loading : .none, viewType: .lastItem, enabled: draft.request == nil && !(draft.fields["Model"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, action: { test(state.with { $0 }) })
             nextSection()
+            if draft.request != nil {
+                row("service_cancel", title: "Common.Cancel", type: .none, viewType: .singleItem, action: cancel)
+                nextSection()
+            }
 
             header("LLMTranslation.Prompt")
             input("Prompt", title: nil, viewType: .firstItem)
             if purpose == .translation {
                 row("service_context", title: "LLMTranslation.UseContext", type: .switchable(draft.useContext), viewType: .innerItem, action: { update({ $0.useContext.toggle() }, persist: true) })
             }
-            row("service_temperature_label", title: "LLMTranslation.Temperature", type: .context(String(format: "%.1f", Double(draft.temperatureTenths) / 10.0)), viewType: .innerItem)
             rows.append(.custom(sectionId: section, index: index, value: .none, identifier: InputDataIdentifier(page + ".temperature"), equatable: InputDataEquatable(draft.temperatureTenths), comparable: nil, item: { size, stableId in
-                PrecieSliderRowItem(size, stableId: stableId, current: CGFloat(draft.temperatureTenths) / 10.0, magnit: (0...10).map { CGFloat($0) / 10.0 }, update: { value in update({ $0.temperatureTenths = Int64((value * 10).rounded()) }, persist: true) }, viewType: .lastItem)
+                regramSliderRowItem(size, stableId: stableId, title: regramString("LLMTranslation.Temperature"), value: Int(draft.temperatureTenths), range: 0...10, viewType: .lastItem, format: { String(format: "%.1f", Double($0) / 10) }, changed: { value in update({ $0.temperatureTenths = Int64(value) }, persist: true) })
             }))
             index += 1
             notice("LLMTranslation.PromptNotice")
@@ -267,7 +279,7 @@ public func RegramServiceController(context: any AccountContextProtocol, purpose
     }
 
     let title = purpose == .translation ? "LLMTranslation.Title" : "Settings.Category.transcription"
-    let controller = InputDataController(dataSignal: signal, title: regramString(title), updateDatas: { data in
+    let controller = RegramFormController(dataSignal: signal, title: regramString(title), updateDatas: { data in
         update({ draft in
             for key in suffixes + ["APIKey"] {
                 if let value = data[fieldIdentifier(key)]?.stringValue { draft.fields[key] = value }
@@ -276,6 +288,7 @@ public func RegramServiceController(context: any AccountContextProtocol, purpose
         return .fail(.none)
     }, removeAfterDisappear: false, hasDone: false, identifier: "regram." + page)
     controller.afterDisappear = { cancel() }
+    controller.willDisappear = { _ in cancel() }
     controller.onDeinit = { request.dispose() }
     regramFocusSettings(controller, page: page, item: focusSetting)
     return controller

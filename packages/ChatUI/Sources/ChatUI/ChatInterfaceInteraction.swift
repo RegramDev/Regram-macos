@@ -1402,7 +1402,7 @@ public func sendMessageMenuItems(chatInteraction: ChatInteraction, send: @escapi
 
     if !peer.isSecretChat, presentation.interfaceState.editState == nil, chatInteraction.richTextDraft == nil, !presentation.effectiveInput.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
         let settings = RegramPreferences.shared.settings(accountId: context.peerId.toInt64())
-        let target = RegramOutgoingTranslationPolicy.language(settings: settings, accountId: context.peerId.id._internalGetInt64Value(), peerId: peer.id.id._internalGetInt64Value())
+        let target = RegramOutgoingTranslationPolicy.language(settings: settings, accountId: context.peerId.toInt64(), peerId: peer.id.toInt64())
         let language = target.flatMap { Locale(identifier: appCurrentLanguage.primaryLanguage.languageCode).localizedString(forIdentifier: $0) } ?? target ?? "…"
         let chooseLanguage = {
             guard deferredSendAction.isAvailable, let controller = FeatureNavigationHooks.shared.makeRegramController(context, "outgoingTranslation/" + String(peer.id.toInt64())) else { return }

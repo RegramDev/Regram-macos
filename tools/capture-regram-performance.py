@@ -13,7 +13,14 @@ APP = Path("/Applications/Regram.app")
 
 
 def process_rows():
-    result = subprocess.check_output(["ps", "-axo", "pid=,etime=,%cpu=,rss=,comm="], text=True)
+    candidates = subprocess.run(["pgrep", "-x", "Regram"], capture_output=True, text=True, timeout=3)
+    if candidates.returncode == 1:
+        return []
+    candidates.check_returncode()
+    pids = ",".join(candidates.stdout.split())
+    if not pids:
+        return []
+    result = subprocess.check_output(["ps", "-p", pids, "-o", "pid=,etime=,%cpu=,rss=,comm="], text=True, timeout=3)
     return [line.strip() for line in result.splitlines() if line.strip().endswith(str(APP / "Contents/MacOS/Regram"))]
 
 

@@ -35,7 +35,7 @@ public func RegramContextMenuController(context: any AccountContextProtocol) -> 
             rows.append(.general(sectionId: 1, index: Int32(index), value: .none, error: nil, identifier: menuIdentifier(id), data: .init(name: regramString("menu." + id.rawValue), color: theme.colors.text, type: .switchable(configuration.isEnabled(id)), viewType: type, action: {
                 RegramPreferences.shared.update(accountId: accountId) { settings in
                     if let key = RegramContextMenuConfiguration.settingKey(id) {
-                        settings[key] = .bool(!configuration.isEnabled(id))
+                        settings[key] = .bool(!settings[key].bool)
                     } else {
                         var disabled = Set(settings["contextMenuDisabledItems"].strings)
                         if disabled.contains(id.rawValue) { disabled.remove(id.rawValue) }
@@ -48,7 +48,7 @@ public func RegramContextMenuController(context: any AccountContextProtocol) -> 
         rows.append(.desc(sectionId: 1, index: Int32(items.count), text: .plain(regramString("ios.Settings.ContextMenu.Notice")), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
         return InputDataSignalValue(entries: rows)
     }
-    let controller = InputDataController(dataSignal: signal, title: regramString("ios.Settings.ContextMenu"), removeAfterDisappear: false, hasDone: false, identifier: "regram.contextMenu")
+    let controller = RegramFormController(dataSignal: signal, title: regramString("ios.Settings.ContextMenu"), removeAfterDisappear: false, hasDone: false, identifier: "regram.contextMenu")
     controller.afterTransaction = { controller in
         let ids = Set(visible(RegramPreferences.shared.settings(accountId: accountId)).map(menuIdentifier))
         var range = NSRange(location: NSNotFound, length: 0)

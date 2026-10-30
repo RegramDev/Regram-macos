@@ -42,6 +42,12 @@ private struct BookmarkRow: Equatable {
     let date: String
 }
 
+private struct BookmarkSnapshot {
+    let bookmark: RGMessageBookmark
+    let message: Message?
+    let peer: Peer?
+}
+
 private struct BookmarkRequest: Equatable {
     var tag: String?
     var limit = 100
@@ -137,7 +143,7 @@ private func bookmarkEntries(_ state: BookmarkState, arguments: BookmarkArgument
         let filtered = !state.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || state.tag != nil
         let emptyText = regramString(filtered ? "Bookmarks.NoResults" : "emptyBookmarks")
         rows.append(.custom(sectionId: 7, index: 0, value: .none, identifier: InputDataIdentifier("bookmarks_empty"), equatable: InputDataEquatable(state), comparable: nil, item: { size, stableId in
-            SearchEmptyRowItem(size, stableId: stableId, height: filtered && !state.loading ? 210 : 180, isLoading: state.loading, text: emptyText, action: filtered && !state.loading ? .init(click: arguments.resetFilters, title: regramString("bookmarks.all")) : nil)
+            RegramEmptyRowItem(size, stableId: stableId, height: filtered && !state.loading ? 210 : 180, isLoading: state.loading, text: emptyText, action: filtered && !state.loading ? .init(click: arguments.resetFilters, title: regramString("bookmarks.all")) : nil)
         }))
     }
     if state.rows.count < state.total {
@@ -159,6 +165,9 @@ public func RegramBookmarksController(context: any AccountContextProtocol) -> In
     let request = ValuePromise(BookmarkRequest(), ignoreRepeated: true)
     let requestValue = Atomic(value: BookmarkRequest())
     let updateRequest: ((BookmarkRequest) -> BookmarkRequest) -> Void = { change in request.set(requestValue.modify(change)) }
+    let visible = ValuePromise(false, ignoreRepeated: true)
+    let visibleValue = Atomic(value: false)
+    let loadingQueue = Queue(name: "regram.bookmarks.loading", qos: .userInitiated)
     let changes: Signal<Void, NoError> = Signal { subscriber in
         let token = NotificationCenter.default.addObserver(forName: RGMessageBookmarks.didChange, object: nil, queue: nil) { notification in
             if notification.object as? Int64 == accountId { subscriber.putNext(()) }
@@ -166,7 +175,8 @@ public func RegramBookmarksController(context: any AccountContextProtocol) -> In
         subscriber.putNext(())
         return ActionDisposable { NotificationCenter.default.removeObserver(token) }
     }
-    disposables.add((combineLatest(changes, request.get(), regramRemarkChanges(accountId: accountId)) |> mapToSignal { _, request, _ in
+    disposables.add((combineLatest(changes, request.get(), regramRemarkChanges(accountId: accountId), visible.get()) |> deliverOn(loadingQueue) |> mapToSignal { _, request, _, visible -> Signal<([BookmarkRow], [String], Int, BookmarkRequest), NoError> in
+        guard visible, visibleValue.with({ $0 }), requestValue.with({ $0 == request }) else { return .complete() }
         let all = RGMessageBookmarks.shared.bookmarks(accountId: accountId)
         let filtered = all.filter { bookmark in
             guard let tag = request.tag else { return true }
@@ -175,12 +185,24 @@ public func RegramBookmarksController(context: any AccountContextProtocol) -> In
         let query = request.query.trimmingCharacters(in: .whitespacesAndNewlines)
         let bookmarks = query.isEmpty ? Array(filtered.prefix(request.limit)) : filtered
         let tags = RGMessageBookmarks.shared.tags(accountId: accountId)
-        return context.account.postbox.transaction { transaction -> ([BookmarkRow], [String], Int, BookmarkRequest) in
-            let dateFormatter = regramSearchDateFormatter()
-            let rows = bookmarks.map { bookmark -> BookmarkRow in
+        return context.account.postbox.transaction { transaction -> [BookmarkSnapshot] in
+            guard visibleValue.with({ $0 }), requestValue.with({ $0 == request }) else { return [] }
+            var snapshots: [BookmarkSnapshot] = []
+            snapshots.reserveCapacity(bookmarks.count)
+            for (index, bookmark) in bookmarks.enumerated() {
+                if index % 64 == 0, !visibleValue.with({ $0 }) || !requestValue.with({ $0 == request }) { return [] }
                 let id = MessageId(peerId: PeerId(bookmark.messageId.peerId), namespace: bookmark.messageId.namespace, id: bookmark.messageId.id)
-                let message = transaction.getMessage(id)
-                let peer = transaction.getPeer(id.peerId)
+                snapshots.append(BookmarkSnapshot(bookmark: bookmark, message: transaction.getMessage(id), peer: transaction.getPeer(id.peerId)))
+            }
+            return snapshots
+        } |> deliverOn(loadingQueue) |> map { snapshots -> ([BookmarkRow], [String], Int, BookmarkRequest) in
+            guard visibleValue.with({ $0 }), requestValue.with({ $0 == request }) else { return ([], tags, 0, request) }
+            let dateFormatter = regramSearchDateFormatter()
+            let rows = snapshots.map { snapshot -> BookmarkRow in
+                let bookmark = snapshot.bookmark
+                let id = MessageId(peerId: PeerId(bookmark.messageId.peerId), namespace: bookmark.messageId.namespace, id: bookmark.messageId.id)
+                let message = snapshot.message
+                let peer = snapshot.peer
                 let title = RGGroupRemarks.shared.name(accountId: accountId, peerId: bookmark.messageId.peerId) ?? peer?.displayTitle ?? regramString("bookmarks.unknownChat")
                 let preview = message.map { message -> String in
                     let body = regramSearchMessageRow(message, group: peer, groupPeerId: id.peerId, accountId: accountId, dateFormatter: dateFormatter).preview
@@ -197,6 +219,7 @@ public func RegramBookmarksController(context: any AccountContextProtocol) -> In
             return (Array(matches.prefix(request.limit)), tags, query.isEmpty ? filtered.count : matches.count, request)
         }
     } |> deliverOnMainQueue).start(next: { rows, tags, total, request in
+        guard visibleValue.with({ $0 }), requestValue.with({ $0 == request }) else { return }
         updateState { current in
             var current = current
             current.rows = rows
@@ -215,7 +238,7 @@ public func RegramBookmarksController(context: any AccountContextProtocol) -> In
     enum FetchError: Error, Equatable { case inaccessible; case failed }
     let fetch: (BookmarkRow, Bool) -> Void = { row, openAfter in
         let id = row.bookmark.messageId
-        guard fetches[id] == nil else { return }
+        guard visibleValue.with({ $0 }), !context.isFrozen, fetches[id] == nil else { return }
         let messageId = MessageId(peerId: PeerId(id.peerId), namespace: id.namespace, id: id.id)
         updateState { current in var current = current; current.availability[id] = .loading; return current }
         let pending = MetaDisposable()
@@ -228,6 +251,7 @@ public func RegramBookmarksController(context: any AccountContextProtocol) -> In
             |> timeout(15, queue: .mainQueue(), alternate: .fail(.failed))
             |> deliverOnMainQueue
         pending.set(signal.start(next: { result in
+            guard visibleValue.with({ $0 }), !context.isFrozen, fetches[id] === pending else { return }
             fetches.removeValue(forKey: id)
             guard RGMessageBookmarks.shared.bookmark(accountId: accountId, messageId: id) != nil else { return }
             if case let .result(messages) = result {
@@ -237,6 +261,7 @@ public func RegramBookmarksController(context: any AccountContextProtocol) -> In
                 if loaded, openAfter { RegramUIHooks.shared.openMessage(context, messageId, row.bookmark.threadId) }
             }
         }, error: { error in
+            guard visibleValue.with({ $0 }), fetches[id] === pending else { return }
             fetches.removeValue(forKey: id)
             updateState { current in var current = current; current.availability[id] = error == .inaccessible ? .unavailable : .failed; return current }
         }))
@@ -265,6 +290,7 @@ public func RegramBookmarksController(context: any AccountContextProtocol) -> In
         return current
     } }
     arguments.open = { row in
+        guard visibleValue.with({ $0 }), !context.isFrozen else { return }
         if row.preview != nil {
             let id = row.bookmark.messageId
             RegramUIHooks.shared.openMessage(context, MessageId(peerId: PeerId(id.peerId), namespace: id.namespace, id: id.id), row.bookmark.threadId)
@@ -284,7 +310,7 @@ public func RegramBookmarksController(context: any AccountContextProtocol) -> In
     arguments.removeSelected = { [weak arguments] in arguments?.remove(stateValue.with { $0.selected }) }
     arguments.loadMore = { updateRequest { current in var current = current; current.limit += 100; return current } }
     let signal = combineLatest(state.get(), appearanceSignal) |> deliverOnPrepareQueue |> map { state, _ in InputDataSignalValue(entries: bookmarkEntries(state, arguments: arguments)) }
-    let controller = InputDataController(dataSignal: signal, title: regramString("bookmarks"), validateData: { _ in
+    let controller = RegramFormController(dataSignal: signal, title: regramString("bookmarks"), validateData: { _ in
         arguments.toggleSelecting()
         return .fail(.none)
     }, updateDoneValue: { _ in
@@ -305,7 +331,23 @@ public func RegramBookmarksController(context: any AccountContextProtocol) -> In
         }
     }
     regramRestoreSearchQuery(controller, identifier: bookmarkSearchId, query: { stateValue.with { $0.query } })
-    controller.didAppear = { _ in reload() }
+    controller.didAppear = { _ in
+        _ = visibleValue.swap(true)
+        reload()
+        visible.set(true)
+    }
+    controller.willDisappear = { _ in
+        _ = visibleValue.swap(false)
+        visible.set(false)
+        let pending = Array(fetches.values)
+        fetches.removeAll()
+        pending.forEach { $0.dispose() }
+        updateState { current in
+            var current = current
+            current.availability = current.availability.filter { $0.value != .loading }
+            return current
+        }
+    }
     controller.onDeinit = { disposables.dispose(); fetches.values.forEach { $0.dispose() }; fetches.removeAll() }
     return controller
 }
@@ -360,7 +402,7 @@ private func RegramBookmarkTagEditorController(context: any AccountContextProtoc
         }
         return InputDataSignalValue(entries: entries)
     }
-    return InputDataController(dataSignal: signal, title: title, validateData: { data in
+    return RegramFormController(dataSignal: signal, title: title, validateData: { data in
         let tags = normalized(data[id]?.stringValue ?? state.with { $0 })
         guard !requireTags || !tags.isEmpty else { return .fail(.fields([id: .shake])) }
         save(tags)

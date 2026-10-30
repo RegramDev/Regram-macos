@@ -81,7 +81,7 @@ public func regramPresentOutgoingTranslation(context: any AccountContextProtocol
     let input = suppliedInput ?? presentation.effectiveInput
     guard suppliedInput != nil || presentation.abilityToSend, presentation.interfaceState.editState == nil, interaction.richTextDraft == nil,
           interaction.peerId.namespace != Namespaces.Peer.SecretChat, !input.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-          let target = RegramOutgoingTranslationPolicy.language(settings: settings, accountId: context.peerId.id._internalGetInt64Value(), peerId: interaction.peerId.id._internalGetInt64Value()) else { return false }
+          let target = RegramOutgoingTranslationPolicy.language(settings: settings, accountId: accountId, peerId: interaction.peerId.toInt64()) else { return false }
     let action = interaction.captureDeferredSendAction()
     let state = Atomic(value: OutgoingTranslationState())
     let promise = ValuePromise(OutgoingTranslationState(), ignoreRepeated: true)
@@ -92,7 +92,7 @@ public func regramPresentOutgoingTranslation(context: any AccountContextProtocol
     func cancel() { generation = UUID(); request.set(nil); update { $0.busy = false } }
     func isCurrent() -> Bool {
         let current = RegramPreferences.shared.settings(accountId: accountId)
-        return action.isAvailable && current.translationIdentity == settings.translationIdentity && RegramOutgoingTranslationPolicy.language(settings: current, accountId: context.peerId.id._internalGetInt64Value(), peerId: interaction.peerId.id._internalGetInt64Value()) == target
+        return action.isAvailable && current.translationIdentity == settings.translationIdentity && RegramOutgoingTranslationPolicy.language(settings: current, accountId: accountId, peerId: interaction.peerId.toInt64()) == target
     }
     func translate() {
         guard !state.with({ $0.busy }) else { cancel(); return }

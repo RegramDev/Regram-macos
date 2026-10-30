@@ -72,6 +72,9 @@ public final class AdaptiveGlassEffectView: NSGlassEffectView {
 
 open class LiquidGlassView: View {
 
+    static var reduceTransparency: () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency }
+    private var accessibilityObserver: NSObjectProtocol?
+
     public var cornerRadius: CGFloat {
         didSet {
             if oldValue != cornerRadius {
@@ -131,7 +134,7 @@ open class LiquidGlassView: View {
     public let forceBlur: Bool
 
     private var usesGlass: Bool {
-        return System.liquidGlass && !forceBlur
+        return System.liquidGlass && !forceBlur && !Self.reduceTransparency()
     }
 
     public func setCustomTint(_ color: NSColor?, animated: Bool, duration: TimeInterval = 0.25) {
@@ -232,6 +235,17 @@ open class LiquidGlassView: View {
         applyAppearance(presentation)
         applyShadow()
         applyBorder()
+        accessibilityObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            guard let self else { return }
+            self.rebuildEffectView()
+            self.applyAppearance(presentation)
+        }
+    }
+
+    deinit {
+        if let accessibilityObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(accessibilityObserver)
+        }
     }
 
     /// Snapshot of the inputs that determine which `effectView` subclass
@@ -267,7 +281,7 @@ open class LiquidGlassView: View {
     private func currentRebuildState() -> RebuildState {
         return RebuildState(
             usesGlass: usesGlass,
-            blurEnabled: System.blurEnabled,
+            blurEnabled: System.blurEnabled && !Self.reduceTransparency(),
             forceAppearance: forceAppearance,
             customTint: customTint
         )
@@ -347,6 +361,7 @@ open class LiquidGlassView: View {
         if let previousFrame {
             effectView.frame = previousFrame
         }
+        effectView.isHidden = isHidden
 
 
         // Reset cached layout so updateLayout actually applies frame/cornerRadius
@@ -426,7 +441,7 @@ open class LiquidGlassView: View {
             // Solid-background fallback (glass and blur both disabled). Keep
             // the base colour aligned with the current palette and compose
             // any customTint on top via the overlay.
-            solid.layer?.backgroundColor = palette.background.cgColor
+            solid.layer?.backgroundColor = palette.background.withAlphaComponent(1).cgColor
             applyTintOverlay(host: solid)
         }
     }

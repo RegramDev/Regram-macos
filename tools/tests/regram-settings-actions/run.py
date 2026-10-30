@@ -23,7 +23,7 @@ def main():
         if production.count(boundary) != 1:
             raise RuntimeError("Update the in-memory boundary for the changed production controller: " + boundary)
     production = "\n".join(line for line in production.splitlines() if not line.startswith("import "))
-    production = production.replace("public func Regram", "func Regram").replace("RegramPreferences.shared", "testPreferences")
+    production = production.replace("RegramFormController(", "InputDataController(").replace("public func Regram", "func Regram").replace("RegramPreferences.shared", "testPreferences")
     production = production.replace("NSSavePanel()", "FixtureSavePanel()").replace("NSOpenPanel()", "FixtureOpenPanel()")
     production = production.replace(".encoded().write(to: url, options: .atomic)", ".encoded().fixtureWrite(to: url, options: .atomic)").replace("RegramSettingsBackup.read(from: url)", "FixtureFiles.read(url)")
     with tempfile.TemporaryDirectory(prefix="regram-backup-actions-") as directory:

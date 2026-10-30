@@ -4,7 +4,7 @@ import SwiftSignalKit
 
 public enum RegramBranding {
     public static let didChange = Notification.Name("Regram.NativeAppIcon.DidChange")
-    public static let icons = ["RGConversation", "RGAzure", "RGIris", "RGMint", "RGGathering", "RGAmber", "RGNebula", "RGJade", "RGClassic"]
+    public static let icons = ["RGConversation", "RGAzure", "RGIris", "RGMint", "RGGathering", "RGAmber", "RGNebula", "RGJade", "RGSilver", "RGClassic"]
     private static let iconKey = "RegramNativeApplicationIcon"
     private static let iconCache: NSCache<NSString, NSImage> = {
         let cache = NSCache<NSString, NSImage>()
@@ -27,14 +27,15 @@ public enum RegramBranding {
     }
 
     public static func titleKey(_ name: String) -> String {
-        let names = ["RGConversation": "conversation", "RGAzure": "azure", "RGIris": "iris", "RGMint": "mint", "RGGathering": "gathering", "RGAmber": "amber", "RGNebula": "nebula", "RGJade": "jade", "RGClassic": "classic"]
+        let names = ["RGConversation": "conversation", "RGAzure": "azure", "RGIris": "iris", "RGMint": "mint", "RGGathering": "gathering", "RGAmber": "amber", "RGNebula": "nebula", "RGJade": "jade", "RGClassic": "classic", "RGSilver": "silver"]
         return "AppIcon.Name." + (names[name] ?? "conversation")
     }
 
     public static func image(_ name: String, dark: Bool) -> NSImage? {
         guard icons.contains(name) else { return nil }
-        let filename = name + (dark ? "-dark" : "-light")
-        guard let url = Bundle.module.url(forResource: filename, withExtension: "png", subdirectory: "Branding") ?? Bundle.module.url(forResource: filename, withExtension: "png") else { return nil }
+        let filename = name == "RGSilver" ? name : name + (dark ? "-dark" : "-light")
+        let suffix = name == "RGSilver" ? "jpg" : "png"
+        guard let url = Bundle.module.url(forResource: filename, withExtension: suffix, subdirectory: "Branding") ?? Bundle.module.url(forResource: filename, withExtension: suffix) else { return nil }
         return NSImage(contentsOf: url)
     }
 

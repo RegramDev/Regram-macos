@@ -376,7 +376,7 @@ public class MGalleryPhotoItem: MGalleryItem {
     }
     
     public override var backgroundColor: NSColor {
-        if self.entry.isProtected {
+        if !entry.regramCanExport(accountId: context.peerId.toInt64()) {
             return .clear
         } else {
             return theme.colors.transparentBackground

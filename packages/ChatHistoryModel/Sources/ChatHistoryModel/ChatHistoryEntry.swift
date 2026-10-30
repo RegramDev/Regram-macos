@@ -661,6 +661,7 @@ public func messageEntries(_ messagesEntries: [MessageHistoryEntry], location: C
     var entries: [ChatHistoryEntry] = []
     let regramRevision = accountPeerId.map { RegramPreferences.shared.revision(accountId: $0.toInt64()) &+ RegramQuickTranslationTasks.shared.revision(accountId: $0.toInt64()) } ?? 0
     let regramSettings = accountPeerId.map { RegramPreferences.shared.settings(accountId: $0.toInt64()) } ?? RegramAccountSettings()
+    let regramTranslation = RegramTranslationPresentation(settings: regramSettings, tone: translate?.tone ?? .neutral)
     let adMessage = regramSettings["disableAllAds"].bool ? nil : adMessage
     let dynamicAdMessages = regramSettings["disableAllAds"].bool ? [] : dynamicAdMessages
     let topFixedMessages = topFixedMessages?.filter { message in
@@ -1262,11 +1263,11 @@ public func messageEntries(_ messagesEntries: [MessageHistoryEntry], location: C
                 replyTranslate = nil
             }
             if translateCanTranslate, translateTranslate {
-                if canDisplayTranslation, regramTranslationMatches(message, settings: regramSettings, tone: translate.tone), let _ = message.translationAttribute(toLang: translateTo) {
+                if canDisplayTranslation, regramTranslation.matches(message), let _ = message.translationAttribute(toLang: translateTo) {
                     messageTranslate = .complete(toLang: translateTo)
                 }
                 if let reply = message.replyAttribute, let replyMessage = message.associatedMessages[reply.messageId] {
-                    if regramTranslationMatches(replyMessage, settings: regramSettings, tone: translate.tone), let _ = replyMessage.translationAttribute(toLang: translateTo) {
+                    if regramTranslation.matches(replyMessage), let _ = replyMessage.translationAttribute(toLang: translateTo) {
                         replyTranslate = .complete(toLang: translateTo)
                     }
                 }
@@ -1277,9 +1278,9 @@ public func messageEntries(_ messagesEntries: [MessageHistoryEntry], location: C
             let key = RGBookmarkMessageId(peerId: message.id.peerId.toInt64(), namespace: message.id.namespace, id: message.id.id)
             if let task = RegramQuickTranslationTasks.shared.task(accountId: accountPeerId.toInt64(), messageId: key) {
                 messageTranslate = .loading(toLang: task.language)
-            } else if let language = regramQuickTranslationLanguage(message, settings: regramSettings) {
+            } else if let language = regramTranslation.quickLanguage(message) {
                 messageTranslate = .complete(toLang: language)
-            } else if let stamp = message.attributes.compactMap({ $0 as? RegramTranslationMessageAttribute }).first, stamp.configuration == regramSettings.translationIdentity, stamp.quickToLang == "" {
+            } else if regramTranslation.hidesQuickTranslation(message) {
                 messageTranslate = nil
             }
         }

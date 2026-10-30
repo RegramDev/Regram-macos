@@ -988,7 +988,7 @@
 		8906078AAACC5A8C9B73E62E /* RegramCore in Frameworks */ = {isa = PBXBuildFile; productRef = 8BE0F3050B8B5791956B3FE4 /* RegramCore */; };
 		E83AD432732D5B3FA3BA9F2D /* RegramUI in Frameworks */ = {isa = PBXBuildFile; productRef = 84A1701E123256D7A0BC172E /* RegramUI */; };
 		803CFDF764EE45BD8E2BF38A /* RegramAppearanceIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7C88C7600AA4E26AFE2B15B /* RegramAppearanceIntegration.swift */; };
-		1BCDBD573C254AA69AF06F28 /* RegramDataReset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F8C66E561C84F2EAD6433CB /* RegramDataReset.swift */; };
+		1BCDBD573C254AA69AF06F28 /* RegramRestart.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F8C66E561C84F2EAD6433CB /* RegramRestart.swift */; };
 		C0DEBACC1000000000000001 /* AccountResetSupport in Frameworks */ = {isa = PBXBuildFile; productRef = C0DEBACC1000000000000003 /* AccountResetSupport */; };
 		C0DEBACC1000000000000002 /* AccountResetSupport in Frameworks */ = {isa = PBXBuildFile; productRef = C0DEBACC1000000000000004 /* AccountResetSupport */; };
 /* End PBXBuildFile section */
@@ -2013,7 +2013,7 @@
 		2BCDD1CA2BB95F89B64252CE /* RegramUI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = RegramUI; path = packages/RegramUI; sourceTree = "<group>"; };
 		259F0794284456B8AD3BCBF5 /* RegramServices */ = {isa = PBXFileReference; lastKnownFileType = folder; name = RegramServices; path = packages/RegramServices; sourceTree = "<group>"; };
 		E7C88C7600AA4E26AFE2B15B /* RegramAppearanceIntegration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RegramAppearanceIntegration.swift; sourceTree = "<group>"; };
-		7F8C66E561C84F2EAD6433CB /* RegramDataReset.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RegramDataReset.swift; sourceTree = "<group>"; };
+		7F8C66E561C84F2EAD6433CB /* RegramRestart.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RegramRestart.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -3398,7 +3398,7 @@
 			isa = PBXGroup;
 			children = (
 				5D1C475964FAD1AA5BF7E679 /* main.swift */,
-				7F8C66E561C84F2EAD6433CB /* RegramDataReset.swift */,
+				7F8C66E561C84F2EAD6433CB /* RegramRestart.swift */,
 				D098C7181D7E175A007784E4 /* AppDelegate.swift */,
 				C24949131E5B763F00D7ED5D /* ApplicationContext.swift */,
 				C2303E891D9A76D800098E12 /* MainViewController.swift */,
@@ -4736,7 +4736,7 @@
 				4518F8F646BFF69AD02BEACD /* ChatListFilterPredicate.swift in Sources */,
 				532033F7F48F391836787019 /* AccountContextConformance.swift in Sources */,
 				05976A10C30DCDC2DE7A700B /* main.swift in Sources */,
-				1BCDBD573C254AA69AF06F28 /* RegramDataReset.swift in Sources */,
+				1BCDBD573C254AA69AF06F28 /* RegramRestart.swift in Sources */,
 				44CA2DA9CAA980BF3DCC85DC /* TelegramThemeHooksInstall.swift in Sources */,
 				27A1B2C3D4E5F60718293A4B /* GeneralRowsHooksInstall.swift in Sources */,
 				12D364FFF19D45B18AA545D6 /* InputDataUIHooksInstall.swift in Sources */,

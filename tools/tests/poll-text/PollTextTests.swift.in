@@ -131,6 +131,8 @@ struct MenuAnimation {
     var value: Int { 0 }
 }
 struct ContextMenuItem {
+    enum Action { case copy }
+    func regramAction(_ action: Action) -> Self { self }
     let text: String
     let handler: () -> Void
     init(_ text: String, handler: @escaping () -> Void, itemImage: Int) {
@@ -171,6 +173,7 @@ struct ChatMenuRequest {
 }
 var menuRequests: [ChatMenuRequest] = []
 func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLayout: (TextViewLayout?, LinkType?)?, chatInteraction: ChatInteraction, source: ChatMenuItemSource = .general) -> Signal<[ContextMenuItem], NoError> {
+    let context = PollContext()
     menuRequests.append(ChatMenuRequest(message: message, entry: entry, layout: textLayout?.0, linkType: textLayout?.1, interaction: chatInteraction, source: source))
     var thirdBlock = [ContextMenuItem("Message Actions", handler: {}, itemImage: 0)]
     let linkType = textLayout?.1
@@ -248,13 +251,25 @@ struct Message {
     var id = MessageId(peerId: 1)
     var flags: Flags = []
     var peers: [Int: Peer] = [:]
+    func withUpdatedPeers(_ peers: [Int: Peer]) -> Message {
+        var value = self
+        value.peers = peers
+        return value
+    }
+    func isCopyProtected(cachedData: CachedPeerData?) -> Bool {
+        flags.contains(.CopyProtected) || peers[id.peerId]?.isCopyProtected(cachedData: cachedData) == true
+    }
 }
+var regramProtectedCopyEnabled = false
+func regramCanSaveMessage(_ message: Message, accountId: Int64, cachedData: CachedPeerData?) -> Bool { regramProtectedCopyEnabled }
+__REGRAM_COPY_POLICY__
+extension Int { func toInt64() -> Int64 { Int64(self) } }
 struct Presentation { var cachedData: CachedPeerData? }
 final class ChatInteraction {
     var peer: Peer?
     var presentation = Presentation()
 }
-final class PollContext { var isFrozen = false }
+final class PollContext { var isFrozen = false; let peerId = 1 }
 struct PollOption {
     static let spaceBetweenOptions: CGFloat = 5
     let option: PollOptionValue
@@ -326,6 +341,7 @@ struct PeerView {
 }
 func peerViewMainPeer(_ view: PeerView) -> Peer? { view.peer }
 func resultPermission(_ message: Message, _ peerView: PeerView, _ copyPermission: Atomic<Bool>) -> Bool {
+    let context = PollContext()
     __RESULT_POLICY__
     return canCopy
 }
@@ -363,6 +379,19 @@ func filteredEntities(ignoreLinks: Bool, message: EntityMessage? = nil) -> [Enti
 
 let test = CommandLine.arguments[1]
 switch test {
+case "regram-copy":
+    let item = ChatPollItem()
+    var message = Message()
+    message.flags = [.CopyProtected]
+    message.peers[1] = Peer(1)
+    item.message = message
+    check(!item.canCopyText, "protected copy starts disabled")
+    regramProtectedCopyEnabled = true
+    check(item.canCopyText, "poll uses the existing Regram copy policy")
+    let permission = Atomic(value: false)
+    check(resultPermission(message, PeerView(), permission), "poll results use the same Regram policy")
+    regramProtectedCopyEnabled = false
+    check(!item.canCopyText, "existing poll reads the current Regram policy")
 case "click-selection":
     for _ in 0..<3 {
         let view = OptionControl()

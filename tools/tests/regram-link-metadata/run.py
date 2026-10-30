@@ -28,7 +28,7 @@ def main():
         production = directory / "RegramLinkMetadata.swift"
         production.write_text(source)
         binary = directory / "preview-url-checks"
-        command = ["xcrun", "swiftc", "-parse-as-library", "-target", platform.machine() + "-apple-macos12.0", "-I", str(args.products), str(args.products / "RegramCore.o"), str(args.products / "SwiftSignalKit.o"), str(production), str(HERE / "PreviewURLChecks.swift"), "-o", str(binary)]
+        command = ["xcrun", "swiftc", "-O", "-D", "STABLE", "-parse-as-library", "-target", platform.machine() + "-apple-macos12.0", "-I", str(args.products), str(args.products / "RegramCore.o"), str(args.products / "SwiftSignalKit.o"), str(production), str(HERE / "PreviewURLChecks.swift"), "-o", str(binary)]
         subprocess.run(command, check=True)
         subprocess.run([str(binary)], check=True)
 

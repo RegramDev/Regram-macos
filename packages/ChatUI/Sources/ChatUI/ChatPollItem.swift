@@ -401,11 +401,11 @@ public class ChatPollItem: ChatRowItem {
     public let isTranslateLoading: Bool
 
     fileprivate var canCopyText: Bool {
-        guard let message = message, !message.flags.contains(.CopyProtected) else {
+        guard let message = message else {
             return false
         }
         let peer = chatInteraction.peer.flatMap { $0.id == message.id.peerId ? $0 : nil } ?? message.peers[message.id.peerId]
-        return peer.map { !$0.isCopyProtected(cachedData: chatInteraction.presentation.cachedData) } ?? false
+        return peer.map { regramCanCopyMessageText(message, accountId: context.peerId.toInt64(), cachedData: chatInteraction.presentation.cachedData, peer: $0) } ?? false
     }
     
     public override init(_ initialSize: NSSize, _ chatInteraction: ChatInteraction, _ context: any AccountContextProtocol, _ object: ChatHistoryEntry, theme: TelegramPresentationTheme) {

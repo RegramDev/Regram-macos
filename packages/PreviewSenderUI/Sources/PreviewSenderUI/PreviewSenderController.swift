@@ -1388,7 +1388,7 @@ public class PreviewSenderController: ModalViewController, Notifable {
         if let cached = senderOptionsCache, cached.key == key {
             return cached.value
         }
-        let pastedPhotos = urls.filter { RGMediaPolicy.isPastedPhoto(path: $0.path) && RegramClipboardImages.canSendAsPhoto($0) }
+        let pastedPhotos = urls.filter { RegramClipboardImages.isPreparedPhoto(path: $0.path) && RegramClipboardImages.canSendAsPhoto($0) }
         let otherURLs = urls.filter { !pastedPhotos.contains($0) }
         var value = otherURLs.isEmpty && !pastedPhotos.isEmpty ? [] : takeSenderOptions(for: otherURLs)
         if !pastedPhotos.isEmpty, !value.contains(.media) { value.append(.media) }
@@ -3223,10 +3223,11 @@ public class PreviewSenderController: ModalViewController, Notifable {
     func processPaste(_ pasteboard: NSPasteboard) -> Bool {
         guard !pendingActions.isClosed, !sent else { return false }
         
-        if RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["clipboardOriginalImages"].bool, let original = RegramClipboardImages.snapshot(from: pasteboard), original.containsImage {
+        let originalImages = RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["clipboardOriginalImages"].bool
+        if let original = RegramClipboardImages.snapshot(from: pasteboard), original.containsImage {
             guard original.urls.allSatisfy({ fileSize($0.path).map { FeatureNavigationHooks.shared.fileSizeLimitExceed(context, $0) } ?? false }) else { FeatureNavigationHooks.shared.showFileLimit(context, nil); return true }
             if let peer = contextChatInteraction.presentation.peer, let text = permissionText(from: peer, for: .banSendMedia) { alert(for: context.window, info: text); return true }
-            guard let photos = try? RegramClipboardImages.preparingPhotos(original) else { alert(for: context.window, info: strings().unknownError); return true }
+            guard let photos = try? RegramClipboardImages.preparingPhotos(original, originalQuality: originalImages) else { alert(for: context.window, info: strings().unknownError); return true }
             self.receivePasteURLs(.single(photos.urls), completion: { [weak self] urls in
                 guard let self, !urls.isEmpty else { return }
                 self.genericView.state = self.genericView.state.withUpdatedState(.media)

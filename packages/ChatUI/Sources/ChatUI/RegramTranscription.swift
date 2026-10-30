@@ -69,12 +69,13 @@ func regramTranscriptionTaskKey(accountId: Int64, messageId: MessageId) -> Regra
 func regramTranscribeMessage(account: Account, message: Message, settings: RegramAccountSettings, language: String) -> Signal<Void, RGTranscriptionError> {
     _ = RegramTranscriptionLifecycle.shared
     let accountId = account.peerId.toInt64()
+    let messageId = message.id
     let resourceId = message.media.compactMap { $0 as? TelegramMediaFile }.first(where: { $0.isVoice || $0.isInstantVideo })?.resource.id
-    return RegramTranscriptionTasks.shared.perform(key: regramTranscriptionTaskKey(accountId: accountId, messageId: message.id), revision: Int64(message.stableVersion), threadId: message.threadId) { [weak account] isCurrent in
+    return RegramTranscriptionTasks.shared.perform(key: regramTranscriptionTaskKey(accountId: accountId, messageId: messageId), revision: Int64(message.stableVersion), threadId: message.threadId) { [weak account] isCurrent in
         guard let account, isCurrent() else { return .fail(.cancelled) }
         return account.postbox.transaction { transaction -> Message? in
-            if let cached = transaction.getPeerCachedData(peerId: message.id.peerId) as? CachedUserData, cached.flags.contains(.copyProtectionEnabled) || cached.flags.contains(.myCopyProtectionEnabled) { return nil }
-            return transaction.getMessage(message.id)
+            if let cached = transaction.getPeerCachedData(peerId: messageId.peerId) as? CachedUserData, cached.flags.contains(.copyProtectionEnabled) || cached.flags.contains(.myCopyProtectionEnabled) { return nil }
+            return transaction.getMessage(messageId)
         }
         |> castError(RGTranscriptionError.self)
         |> mapToSignal { current in
@@ -89,7 +90,6 @@ private func regramPerformTranscription(account: Account, message: Message, sett
     guard regramCanTranscribe(message, settings: settings), let file = message.media.compactMap({ $0 as? TelegramMediaFile }).first(where: { $0.isVoice || $0.isInstantVideo }) else { return .fail(.invalidAudio) }
     let accountId = account.peerId.toInt64()
     let external = settings["transcriptionBackend"].string == "openAICompatible"
-    let configurationKeys = ["transcriptionBackend", "serviceConfigurationRevision", "sttBaseURL", "sttEndpoint", "sttModel", "sttLanguage", "sttPrompt"]
     let configuration: RGSTTConfiguration?
     do { configuration = external ? try regramSTTConfiguration(accountId: accountId, settings: settings) : nil }
     catch { return .fail(.configuration(error.localizedDescription)) }
@@ -106,7 +106,7 @@ private func regramPerformTranscription(account: Account, message: Message, sett
             var applied = false
             transaction.updateMessage(message.id) { current in
                 let currentSettings = RegramPreferences.shared.settings(accountId: accountId)
-                guard isCurrent(), current.stableVersion == message.stableVersion, configurationKeys.allSatisfy({ currentSettings[$0] == settings[$0] }) else { return .skip }
+                guard isCurrent(), current.stableVersion == message.stableVersion, currentSettings.hasSameTranscriptionConfiguration(as: settings) else { return .skip }
                 var attributes = current.attributes.filter { !($0 is AudioTranscriptionMessageAttribute) }
                 attributes.append(AudioTranscriptionMessageAttribute(id: 0, text: text, isPending: false, didRate: true, error: nil, source: external ? .external : .local))
                 applied = true

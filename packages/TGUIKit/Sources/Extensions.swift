@@ -3563,10 +3563,10 @@ private func extractRelativeDates(from text: String, referenceDate: Date) -> [Ex
     // Collect matches from A (strong signal)
     if let regexA {
         for m in regexA.matches(in: text, options: [], range: nsRange) {
-            guard m.numberOfRanges >= 4,
+            guard m.numberOfRanges >= 3,
                   let fullRange = Range(m.range, in: text),
-                  let numRange = Range(m.range(at: 2), in: text),
-                  let unitRange = Range(m.range(at: 3), in: text),
+                  let numRange = Range(m.range(at: 1), in: text),
+                  let unitRange = Range(m.range(at: 2), in: text),
                   let number = parseNumber(text[numRange]) else { continue }
 
             let unitToken = String(text[unitRange])

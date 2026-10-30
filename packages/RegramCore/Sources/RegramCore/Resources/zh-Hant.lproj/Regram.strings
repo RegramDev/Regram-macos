@@ -41,6 +41,7 @@
 "AppIcon.Name.jade" = "青嵐";
 "AppIcon.Name.mint" = "薄荷";
 "AppIcon.Name.nebula" = "星河";
+"AppIcon.Name.silver" = "銀色氣泡";
 "AppUpdate.ActivityDownloaded" = "已下載，開啟 Regram 完成更新準備";
 "AppUpdate.ActivityOpen" = "開啟更新頁面";
 "AppUpdate.ActivityStale" = "等待 Regram 恢復執行後更新進度";
@@ -365,17 +366,6 @@
 "EditHistory.RevealPhoto" = "點擊顯示圖片";
 "EditHistory.Title" = "編輯紀錄";
 "EditHistory.ViewPhoto" = "檢視圖片";
-"EraseData.Action" = "清除資料";
-"EraseData.Close" = "關閉應用程式";
-"EraseData.Confirm" = "確認清除";
-"EraseData.ContainerUnavailable" = "無法存取資料容器。清除工作已保留，請重新開啟 Regram 重試。";
-"EraseData.Done" = "資料已全部清除";
-"EraseData.DoneNotice" = "關閉 Regram 後重新開啟，即可重新開始。";
-"EraseData.Errors" = "清除完成，但有部分錯誤";
-"EraseData.ErrorsNotice" = "未能刪除：%@";
-"EraseData.Notice" = "登出所有帳號，刪除這台 Mac 上 Regram 的本機資料、快取與設定。清除後需要重新登入。";
-"EraseData.Progress" = "正在清除資料… 請保持 Regram 開啟。";
-"EraseData.Title" = "清除所有資料";
 "Fonts.Areas" = "套用位置";
 "Fonts.Areas.Notice" = "勾選的位置會立即更新。程式碼、圖示和大表情保留各自的字型。";
 "Fonts.Cancel" = "取消下载";
@@ -926,7 +916,7 @@
 "Settings.Photo.SendLarge.Notice" = "將壓縮影像的尺寸限制增加到 2560px";
 "Settings.Pro.Title" = "Regram Pro";
 "Settings.ProCategory.appearance" = "外觀與介面";
-"Settings.ProCategory.appearance.Description" = "字體、圖示、底欄與個人資料顯示";
+"Settings.ProCategory.appearance.Description" = "圖示、導覽與個人資料顯示";
 "Settings.ProCategory.input" = "輸入與傳送";
 "Settings.ProCategory.input.Description" = "輸入工具、傳送方式與文字格式";
 "Settings.ProCategory.media" = "媒體與連結";
@@ -940,7 +930,7 @@
 "Settings.ProCategory.privacy" = "隱私與過濾";
 "Settings.ProCategory.privacy.Description" = "內容過濾、防撤回與隱私控制";
 "Settings.ProCategory.tools" = "管理與工具";
-"Settings.ProCategory.tools.Description" = "備份回復、應用程式更新與本機資料";
+"Settings.ProCategory.tools.Description" = "備份還原與應用程式更新";
 "Settings.ProCategory.translation" = "翻譯與語音";
 "Settings.ProCategory.translation.Description" = "翻譯服務、模型介面與語音辨識";
 "Settings.ProHub.Notice" = "訊息工具、隱私、翻譯、語音辨識、媒體與備份等功能集中在 Regram Pro。";
@@ -952,6 +942,7 @@
 "Settings.RecordingButton" = "錄音按鈕";
 "Settings.Search.AllOptions" = "搜尋全部詳細設定";
 "Settings.Search.NoResults" = "沒有符合的設定";
+"Settings.Search.Placeholder" = "搜尋設定";
 "Settings.Search.Pro" = "Regram Pro 中的相關設定";
 "Settings.Section.Composer" = "輸入工具";
 "Settings.Section.Connection" = "連線與診斷";
@@ -1028,7 +1019,8 @@
 "Share.RepostToStory" = "轉發\n至限時動態";
 "Showroom.Description" = "本機會員、禮物、評級、TON 資料卡與號碼顯示";
 "Showroom.PremiumRefresh" = "已開啟的會員介面可在重新開啟 App 後重新整理。";
-"Showroom.Title" = "顯擺一下";
+"Showroom.Title" = "展示空間";
+"Showroom.Description" = "本機個人資料、禮物與餘額預覽";
 "StickerBackup.Action" = "匯出貼圖包備份";
 "StickerBackup.Failed" = "貼圖包備份失敗。請確認檔案可下載及裝置有足夠空間後重試。";
 "StickerSave.Failed" = "儲存失敗，請檢查相簿權限後重試。";
@@ -2627,7 +2619,7 @@
 "profile.registered" = "註冊年月";
 "profile.registeredEstimate" = "估算註冊時間";
 "profile.userId" = "使用者 ID";
-"protectedExport.notice" = "允許將受保護的雲端訊息儲存到本機或匯出訊息截圖。秘密聊天、閱後即焚媒體與付費媒體除外。";
+"protectedExport.notice" = "允許儲存受保護的雲端訊息，並在截圖中顯示其圖片和影片。秘密聊天、閱後即焚媒體及付費媒體仍受保護。";
 "quickTranslate.action" = "快速翻譯";
 "quickTranslate.busy" = "請等待一個翻譯工作完成，或先取消進行中的工作。";
 "quickTranslate.cancel" = "取消翻譯";
@@ -2854,3 +2846,4 @@
 "webTranslation.tooLarge" = "此網頁過大，無法翻譯。上限為 2000 個文字節點、500000 位元組。";
 "ImageTranslation.TooLarge" = "圖片中的文字過多，無法一次翻譯。請選取部分文字，或裁切圖片後重試。";
 "webTranslation.translate" = "翻譯";
+"Settings.Transcription.ConfigurationNotice" = "選擇語音辨識服務。選用自訂 API 後可設定連線參數；切換服務會保留已儲存的設定。";

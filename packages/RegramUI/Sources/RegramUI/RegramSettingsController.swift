@@ -8,7 +8,6 @@ import TelegramTheme
 import Localization
 import InputDataUI
 import GeneralRows
-import AlertsUI
 import RegramCore
 import RegramSignals
 import RegramServices
@@ -85,53 +84,22 @@ public func RegramSettingsController(context: any AccountContextProtocol, page: 
 }
 
 private func regramSettingsHomeController(context: any AccountContextProtocol) -> InputDataController {
-    let queryValue = Atomic(value: "")
+    let currentQuery = Atomic(value: "")
     let promise = ValuePromise(RegramHomeState(), ignoreRepeated: true)
     let signal = combineLatest(promise.get(), appearanceSignal) |> map { state, _ -> InputDataSignalValue in
-        var builder = RegramPageBuilder(page: "pro.home")
-        builder.section()
-        builder.search("search", value: state.query, update: { query in
-            _ = queryValue.swap(query)
+        InputDataSignalValue(entries: regramSettingsHomeEntries(query: state.query, language: appCurrentLanguage.primaryLanguage.languageCode, update: { query in
+            _ = currentQuery.swap(query)
             promise.set(RegramHomeState(query: query))
-        })
-        let query = state.query.trimmingCharacters(in: .whitespacesAndNewlines)
-        if query.isEmpty {
-            let groups: [[RegramCategory]] = [[.messages, .input, .translation], [.privacy, .media, .appearance, .notifications], [.network, .tools]]
-            for group in groups {
-                builder.section()
-                for category in group where category != .notifications || RegramSettingsScope.includesNotifications {
-                    builder.row("category." + category.rawValue, title: regramString("Settings.ProCategory." + category.rawValue), type: .next, icon: RegramSettingsArtwork.category(category), action: { context.bindings.rootNavigation().push(RegramSettingsController(context: context, page: "pro." + category.rawValue)) })
-                }
+        }, open: { destination in
+            if destination == "settings.appearance/appIcon" {
+                RegramUIHooks.shared.openNativeSettings(context, "appIcon")
+            } else {
+                context.bindings.rootNavigation().push(RegramSettingsController(context: context, page: destination))
             }
-            builder.section()
-            builder.row("localGifts", title: regramString("Showroom.Title"), type: .next, icon: theme.icons.settingsPremium, action: { context.bindings.rootNavigation().push(RegramSettingsController(context: context, page: "localGifts")) })
-        } else {
-            let results = RegramSettingsCatalog.results(query: query, language: appCurrentLanguage.primaryLanguage.languageCode)
-            let grouped = Dictionary(grouping: results, by: { $0.page == "pro.home" ? "Settings.Pro.Title" : $0.pageTitleKey })
-            var seen = Set<String>()
-            for result in results {
-                let group = result.page == "pro.home" ? "Settings.Pro.Title" : result.pageTitleKey
-                guard seen.insert(group).inserted else { continue }
-                builder.section(group)
-                for result in grouped[group] ?? [] {
-                    builder.row("result." + result.sourceIdentifier, title: regramString(result.titleKey), type: .next, action: {
-                        if result.destination == "settings.appearance/appIcon" {
-                            RegramUIHooks.shared.openNativeSettings(context, "appIcon")
-                        } else {
-                            context.bindings.rootNavigation().push(RegramSettingsController(context: context, page: result.destination))
-                        }
-                    })
-                }
-            }
-            if results.isEmpty {
-                builder.section()
-                builder.custom("empty", equatable: InputDataEquatable(query), item: { size, stableId in SearchEmptyRowItem(size, stableId: stableId, height: 180, text: regramString("Settings.Search.NoResults")) })
-            }
-        }
-        return InputDataSignalValue(entries: builder.entries)
+        }))
     }
-    let controller = InputDataController(dataSignal: signal, title: "Regram Pro", removeAfterDisappear: false, hasDone: false, identifier: "regram.pro.home")
-    regramRestoreSearchQuery(controller, identifier: InputDataIdentifier("pro.home.search"), query: { queryValue.with { $0 } })
+    let controller = RegramFormController(dataSignal: signal, title: "Regram Pro", removeAfterDisappear: false, hasDone: false, identifier: "regram.pro.home")
+    regramRestoreSearchQuery(controller, identifier: InputDataIdentifier("pro.home.search"), autofocusSearch: false, query: { currentQuery.with { $0 } })
     return controller
 }
 
@@ -139,7 +107,7 @@ private func regramComposedSettingsController(context: any AccountContextProtoco
     let accountId = context.peerId.toInt64()
     let signal = combineLatest(regramPreferenceChanges(accountId: accountId), appearanceSignal) |> map { settings, _ -> InputDataSignalValue in
         var page = RegramPageBuilder(page: "pro." + category.rawValue)
-        func set(_ key: String, _ value: RegramValue) { RegramPreferences.shared.update(accountId: accountId) { $0[key] = value } }
+        func toggle(_ key: String) { RegramPreferences.shared.update(accountId: accountId) { $0[key] = .bool(!$0[key].bool) } }
         func push(_ destination: String) { context.bindings.rootNavigation().push(RegramSettingsController(context: context, page: destination)) }
         switch category {
         case .privacy:
@@ -148,39 +116,36 @@ private func regramComposedSettingsController(context: any AccountContextProtoco
                 page.row(key, title: regramString(title), type: .next, action: { push(key) })
             }
             page.section("Settings.Section.PrivacyDisplay")
-            page.row("hidePhoneInSettings", title: regramString("Settings.HidePhoneInSettingsUI"), type: .switchable(settings["hidePhoneInSettings"].bool), action: { set("hidePhoneInSettings", .bool(!settings["hidePhoneInSettings"].bool)) })
+            page.row("hidePhoneInSettings", title: regramString("Settings.HidePhoneInSettingsUI"), type: .switchable(settings["hidePhoneInSettings"].bool), action: { toggle("hidePhoneInSettings") })
             page.text(regramString("Settings.HidePhoneInSettingsUI.Notice"))
             var section = page.nextSectionId
             var index = page.nextIndex
-            let stories = regramStoriesSettingsEntries(context: context, settings: settings, sectionId: &section, index: &index, update: set)
+            let stories = regramStoriesSettingsEntries(context: context, settings: settings, sectionId: &section, index: &index)
             return InputDataSignalValue(entries: page.entries + stories)
         case .network:
             page.section("Settings.Section.Connection")
             page.row("diagnostics", title: regramString("Diagnostics.Title"), type: .next, action: { push("diagnostics") })
             page.row("networkPolicy", title: regramString("NetworkPolicy.Title"), type: .next, action: { push("networkPolicy") })
             page.section("Diagnostics.Download")
-            page.row("uploadSpeedBoost", title: regramString("Settings.UploadsBoost"), type: .switchable(settings["uploadSpeedBoost"].bool), action: { set("uploadSpeedBoost", .bool(!settings["uploadSpeedBoost"].bool)) })
-            page.row("downloadSpeedBoost", title: regramString("Settings.DownloadsBoost"), type: .switchable(settings["downloadSpeedBoost"].string != "none"), action: { set("downloadSpeedBoost", .string(settings["downloadSpeedBoost"].string == "none" ? "medium" : "none")) })
+            page.row("uploadSpeedBoost", title: regramString("Settings.UploadsBoost"), type: .switchable(settings["uploadSpeedBoost"].bool), action: { toggle("uploadSpeedBoost") })
+            page.row("downloadSpeedBoost", title: regramString("Settings.DownloadsBoost"), type: .switchable(settings["downloadSpeedBoost"].string != "none"), action: { RegramPreferences.shared.update(accountId: accountId) { $0["downloadSpeedBoost"] = .string($0["downloadSpeedBoost"].string == "none" ? "medium" : "none") } })
             page.text(regramString("Settings.DownloadsBoost.Notice"))
             page.section()
             page.text(strings().recentCallsRecentCalls, header: true)
-            page.row("enableVoipTcp", title: regramString("Settings.Calls.ForceTCP"), type: .switchable(settings["enableVoipTcp"].bool), action: { set("enableVoipTcp", .bool(!settings["enableVoipTcp"].bool)) })
+            page.row("enableVoipTcp", title: regramString("Settings.Calls.ForceTCP"), type: .switchable(settings["enableVoipTcp"].bool), action: { toggle("enableVoipTcp") })
             page.text(regramString("Common.KnowWhatYouDo"))
         case .tools:
             page.section("Settings.ProCategory.tools")
             page.row("appUpdate", title: regramString("AppUpdate.Title"), type: .next, action: { push("updates") })
             page.row("backup", title: regramString("Backup.Title"), type: .next, action: { push("backup") })
-            page.row("eraseAllData", title: regramString("EraseData.Title"), color: theme.colors.redUI, action: {
-                verifyAlert(for: context.window, header: regramString("EraseData.Title"), information: regramString("EraseData.Confirm"), successHandler: { _ in RegramUIHooks.shared.eraseAllData(context) })
-            })
-            page.text(regramString("EraseData.Notice"))
+
         case .notifications:
             break
         default: break
         }
         return InputDataSignalValue(entries: page.entries)
     }
-    let controller = InputDataController(dataSignal: signal, title: regramString("Settings.ProCategory." + category.rawValue), removeAfterDisappear: false, hasDone: false, identifier: "regram.pro." + category.rawValue)
+    let controller = RegramFormController(dataSignal: signal, title: regramString("Settings.ProCategory." + category.rawValue), removeAfterDisappear: false, hasDone: false, identifier: "regram.pro." + category.rawValue)
     regramFocusSettings(controller, page: "pro." + category.rawValue, item: focus)
     return controller
 }

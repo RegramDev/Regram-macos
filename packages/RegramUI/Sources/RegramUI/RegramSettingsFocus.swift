@@ -4,6 +4,7 @@ import InputDataUI
 
 func regramFocusSettings(_ controller: InputDataController, page: String?, item: String?) {
     guard let item, !item.isEmpty else { return }
+    let focusItem = ["nyStyleSnow", "nyStyleLightning"].contains(item) ? "nyStyle" : item
     var completed = false
     let previous = controller.afterTransaction
     controller.afterTransaction = { controller in
@@ -11,7 +12,7 @@ func regramFocusSettings(_ controller: InputDataController, page: String?, item:
         guard !completed else { return }
         controller.tableView.enumerateItems { row in
             guard let stable = row.stableId.base as? InputDataEntryId, let identifier = stable.identifier else { return true }
-            let suffix = "." + item
+            let suffix = "." + focusItem
             let matches = identifier.identifier == (page.map { $0 + suffix } ?? "") || identifier.identifier.hasSuffix(suffix)
             guard matches else { return true }
             completed = true

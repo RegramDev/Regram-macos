@@ -41,7 +41,7 @@ struct RegramPageBuilder {
     }
 
     mutating func section(_ title: String? = nil) {
-        append(.sectionId(sectionId, type: .normal))
+        append(.sectionId(sectionId, type: .customModern(16)))
         sectionId += 1
         if let title { text(regramString(title), header: true) }
     }
@@ -77,8 +77,8 @@ struct RegramPageBuilder {
         }
     }
 
-    mutating func search(_ key: String, value: String, update: @escaping (String) -> Void) {
-        append(regramSearchEntry(sectionId: sectionId, index: index, value: value, identifier: InputDataIdentifier(page + "." + key), update: update))
+    mutating func search(_ key: String, value: String, placeholder: String? = nil, update: @escaping (String) -> Void) {
+        append(regramSearchEntry(sectionId: sectionId, index: index, value: value, identifier: InputDataIdentifier(page + "." + key), placeholder: placeholder, update: update))
         index += 1
     }
 }
@@ -86,23 +86,64 @@ struct RegramPageBuilder {
 private struct RegramSearchPresentation: Equatable {
     let value: String
     let viewType: GeneralViewType
+    let placeholder: String?
 }
 
-func regramSearchEntry(sectionId: Int32, index: Int32, value: String, identifier: InputDataIdentifier, viewType: GeneralViewType = .singleItem, update: @escaping (String) -> Void) -> InputDataEntry {
-    .custom(sectionId: sectionId, index: index, value: .string(value), identifier: identifier, equatable: InputDataEquatable(RegramSearchPresentation(value: value, viewType: viewType)), comparable: nil, item: { size, stableId in
-        SearchRowItem(size, stableId: stableId, searchInteractions: SearchInteractions({ state, _ in
+private final class RegramSearchRowItem: SearchRowItem {
+    let placeholder: String?
+
+    init(_ size: NSSize, stableId: AnyHashable, searchInteractions: SearchInteractions, viewType: GeneralViewType, placeholder: String?) {
+        self.placeholder = placeholder
+        super.init(size, stableId: stableId, searchInteractions: searchInteractions, viewType: viewType)
+    }
+
+    override func viewClass() -> AnyClass { RegramSearchRowView.self }
+}
+
+private final class RegramSearchRowView: SearchRowView {
+    override var backdorColor: NSColor { .clear }
+
+    override func updateColors() {
+        super.updateColors()
+        updateSearchTheme()
+    }
+
+    override func set(item: TableRowItem, animated: Bool = false) {
+        super.set(item: item, animated: animated)
+        updateSearchTheme()
+    }
+
+    private func updateSearchTheme() {
+        guard let item = item as? RegramSearchRowItem, let placeholder = item.placeholder else {
+            searchView.searchTheme = nil
+            return
+        }
+        let base = theme.search
+        if let current = searchView.searchTheme, current.placeholder() == placeholder, current.backgroundColor == base.backgroundColor, current.textColor == base.textColor, current.placeholderColor == base.placeholderColor, current.searchImage === base.searchImage, current.clearImage === base.clearImage { return }
+        searchView.searchTheme = .init(base.backgroundColor, base.searchImage, base.clearImage, { placeholder }, base.textColor, base.placeholderColor)
+    }
+}
+
+func regramSearchEntry(sectionId: Int32, index: Int32, value: String, identifier: InputDataIdentifier, viewType: GeneralViewType = .singleItem, placeholder: String? = nil, update: @escaping (String) -> Void) -> InputDataEntry {
+    .custom(sectionId: sectionId, index: index, value: .string(value), identifier: identifier, equatable: InputDataEquatable(RegramSearchPresentation(value: value, viewType: viewType, placeholder: placeholder)), comparable: nil, item: { size, stableId in
+        RegramSearchRowItem(size, stableId: stableId, searchInteractions: SearchInteractions({ state, _ in
             update(state.request)
         }, { state in
             update(state.request)
-        }), viewType: viewType.withUpdatedInsets(NSEdgeInsets()))
+        }), viewType: viewType.withUpdatedInsets(NSEdgeInsets()), placeholder: placeholder)
     })
 }
 
-func regramRestoreSearchQuery(_ controller: InputDataController, identifier: InputDataIdentifier, query: @escaping () -> String) {
+func regramRestoreSearchQuery(_ controller: InputDataController, identifier: InputDataIdentifier, autofocusSearch: Bool = true, query: @escaping () -> String) {
     let externalFirstResponder = controller._externalFirstResponder
     controller._externalFirstResponder = { [weak controller] in
         if let responder = externalFirstResponder?() { return responder }
-        guard let controller, query().isEmpty else { return nil }
+        guard let controller else { return nil }
+        if !autofocusSearch {
+            if let responder = controller.window?.firstResponder as? NSView, responder !== controller.tableView.documentView, responder.isDescendant(of: controller.genericView) { return responder }
+            return controller.tableView.documentView
+        }
+        guard query().isEmpty else { return nil }
         if let responder = controller.window?.firstResponder as? NSView, responder !== controller.tableView.documentView, responder.isDescendant(of: controller.genericView) { return nil }
         if let view = controller.tableView.item(stableId: AnyHashable(InputDataEntryId.custom(identifier)))?.view as? SearchRowView, view.searchView.input.hasMarkedText() { return nil }
         return controller.tableView.documentView

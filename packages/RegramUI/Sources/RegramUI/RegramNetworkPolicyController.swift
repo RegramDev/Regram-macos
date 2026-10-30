@@ -57,7 +57,7 @@ public func RegramNetworkPolicyController(context: any AccountContextProtocol, f
         })
         return InputDataSignalValue(entries: page.entries)
     }
-    let controller = InputDataController(dataSignal: signal, title: regramString("NetworkPolicy.Title"), updateDatas: { data in
+    let controller = RegramFormController(dataSignal: signal, title: regramString("NetworkPolicy.Title"), updateDatas: { data in
         if let endpoint = data[InputDataIdentifier("networkPolicy.endpoint")]?.stringValue {
             update { $0.policy.endpoint = endpoint; $0.failure = RegramDNSDiagnostics.lastFailure(endpoint: endpoint) }
         }

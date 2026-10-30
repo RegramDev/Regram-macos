@@ -86,12 +86,33 @@ final class RegramWorkflowTests: XCTestCase {
 
     func testOutgoingLanguageRequiresAnExactAccountAndChatKey() {
         var settings = RegramAccountSettings()
-        settings["outgoingLanguageTranslation"] = .dictionary(["1:2": "ja", "1:3": "off", "default": "en"])
+        settings["outgoingLanguageTranslation"] = .dictionary([RegramOutgoingTranslationPolicy.key(accountId: 1, peerId: 2): "ja", RegramOutgoingTranslationPolicy.key(accountId: 1, peerId: 3): "off", "default": "en"])
         XCTAssertEqual(RegramOutgoingTranslationPolicy.language(settings: settings, accountId: 1, peerId: 2), "ja")
         XCTAssertNil(RegramOutgoingTranslationPolicy.language(settings: settings, accountId: 9, peerId: 2))
         XCTAssertNil(RegramOutgoingTranslationPolicy.language(settings: settings, accountId: 1, peerId: 4))
         XCTAssertNil(RegramOutgoingTranslationPolicy.language(settings: settings, accountId: 1, peerId: 3))
         XCTAssertNil(RegramOutgoingTranslationPolicy.language(settings: RegramAccountSettings(), accountId: 1, peerId: 2))
+    }
+
+    func testOutgoingLanguageSeparatesPeerNamespacesAndLeavesAmbiguousLegacyValuesUnused() {
+        let user: Int64 = 17
+        let group: Int64 = (1 << 32) | 17
+        let channel: Int64 = (2 << 32) | 17
+        var settings = RegramAccountSettings()
+        settings["outgoingLanguageTranslation"] = .dictionary([
+            RegramOutgoingTranslationPolicy.key(accountId: 1, peerId: user): "en",
+            RegramOutgoingTranslationPolicy.key(accountId: 1, peerId: group): "ja",
+            RegramOutgoingTranslationPolicy.key(accountId: 1, peerId: channel): "off",
+            "1:18": "de"
+        ])
+        XCTAssertEqual(RegramOutgoingTranslationPolicy.language(settings: settings, accountId: 1, peerId: user), "en")
+        XCTAssertEqual(RegramOutgoingTranslationPolicy.language(settings: settings, accountId: 1, peerId: group), "ja")
+        XCTAssertNil(RegramOutgoingTranslationPolicy.language(settings: settings, accountId: 1, peerId: channel))
+        XCTAssertNil(RegramOutgoingTranslationPolicy.language(settings: settings, accountId: 2, peerId: user))
+        XCTAssertNil(RegramOutgoingTranslationPolicy.language(settings: settings, accountId: 1, peerId: 18))
+        if case let .dictionary(values) = settings["outgoingLanguageTranslation"] {
+            XCTAssertEqual(values["1:18"], "de")
+        } else { XCTFail("Language choices were not preserved") }
     }
 
     func testLLMURLsRejectCredentialsInBaseAndAbsoluteEndpoint() {

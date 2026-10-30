@@ -12,7 +12,7 @@ public func RegramLinkPreviewSettingsController(context: any AccountContextProto
     let accountId = context.peerId.toInt64()
     let signal = combineLatest(regramPreferenceChanges(accountId: accountId), appearanceSignal) |> map { settings, _ -> InputDataSignalValue in
         var rows: [InputDataEntry] = [.sectionId(0, type: .normal)]
-        rows.append(.general(sectionId: 1, index: 0, value: .none, error: nil, identifier: InputDataIdentifier("linkPreview.enabled"), data: .init(name: regramString("ios.LinkPreview.Repair"), color: theme.colors.text, type: .switchable(settings["fixLinkPreviews"].bool), viewType: .singleItem, action: { RegramPreferences.shared.update(accountId: accountId) { $0["fixLinkPreviews"] = .bool(!settings["fixLinkPreviews"].bool) } })))
+        rows.append(.general(sectionId: 1, index: 0, value: .none, error: nil, identifier: InputDataIdentifier("linkPreview.enabled"), data: .init(name: regramString("ios.LinkPreview.Repair"), color: theme.colors.text, type: .switchable(settings["fixLinkPreviews"].bool), viewType: .singleItem, action: { RegramPreferences.shared.update(accountId: accountId) { $0["fixLinkPreviews"] = .bool(!$0["fixLinkPreviews"].bool) } })))
         rows.append(.desc(sectionId: 1, index: 1, text: .plain(regramString("ios.LinkPreview.Repair.Notice")), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
         rows.append(.sectionId(1, type: .normal))
         rows.append(.desc(sectionId: 2, index: 2, text: .plain(regramString("ios.LinkPreview.Services")), data: .init(color: theme.colors.listGrayText, viewType: .textTopItem)))
@@ -25,7 +25,7 @@ public func RegramLinkPreviewSettingsController(context: any AccountContextProto
         rows.append(.desc(sectionId: 2, index: 6, text: .plain(regramString("ios.LinkPreview.InvalidHost")), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
         return InputDataSignalValue(entries: rows)
     }
-    return InputDataController(dataSignal: signal, title: regramString("ios.LinkPreview.Repair"), updateDatas: { data in
+    return RegramFormController(dataSignal: signal, title: regramString("ios.LinkPreview.Repair"), updateDatas: { data in
         RegramPreferences.shared.update(accountId: accountId) { settings in
             for (key, item) in [("linkPreviewXHost", "xHost"), ("linkPreviewInstagramHost", "instagramHost")] {
                 if let value = data[InputDataIdentifier("linkPreview." + item)]?.stringValue, RGLinkPreviewRules.isValidHost(value) { settings[key] = .string(value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()) }

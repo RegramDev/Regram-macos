@@ -42,7 +42,7 @@ public func RegramRecentChatsController(context: any AccountContextProtocol) -> 
         rows.append(.general(sectionId: 2, index: Int32(peers.count), value: .none, error: nil, identifier: InputDataIdentifier("recent_clear"), data: .init(name: regramString("clearRecent"), color: theme.colors.redUI, type: .none, viewType: .singleItem, action: { RegramRecentChats.shared.clear(accountId: accountId) })))
         return InputDataSignalValue(entries: rows)
     }
-    return InputDataController(dataSignal: signal, title: regramString("recent"), removeAfterDisappear: false, hasDone: false, identifier: "regram.recent")
+    return RegramFormController(dataSignal: signal, title: regramString("recent"), removeAfterDisappear: false, hasDone: false, identifier: "regram.recent")
 }
 
 public func RegramHiddenPeersController(context: any AccountContextProtocol, focusSetting: String? = nil) -> InputDataController {
@@ -83,7 +83,7 @@ private func regramPeerSettingListController(context: any AccountContextProtocol
         }
         return InputDataSignalValue(entries: rows)
     }
-    let controller = InputDataController(dataSignal: signal, title: regramString(title), removeAfterDisappear: false, hasDone: false, identifier: "regram." + (key == "blockedPeerIds" ? "hiddenUsers" : "antiRevokeChats"))
+    let controller = RegramFormController(dataSignal: signal, title: regramString(title), removeAfterDisappear: false, hasDone: false, identifier: "regram." + (key == "blockedPeerIds" ? "hiddenUsers" : "antiRevokeChats"))
     regramFocusSettings(controller, page: key == "blockedPeerIds" ? "hiddenUsers" : "antiRevokeChats", item: focusSetting)
     return controller
 }

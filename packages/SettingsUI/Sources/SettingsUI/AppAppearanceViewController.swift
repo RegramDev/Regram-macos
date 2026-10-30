@@ -803,7 +803,8 @@ public func AppAppearanceViewController(context: any AccountContextProtocol, foc
             }
     } |> deliverOnMainQueue
     
-    let signal:Signal<InputDataSignalValue, NoError> = combineLatest(queue: prepareQueue, themeUnmodifiedSettings(accountManager: context.sharedContext.accountManager), SettingsHooks.shared.cloudThemes(context), nightSettings, appearanceSignal, animatedEmojiStickers, statePromise.get(), RegramBranding.selection) |> map { themeSettings, themes, autoNightSettings, appearance, animatedEmojiStickers, state, selectedIcon in
+    let settingsQueue = Queue(name: "settings.appearance", qos: .userInitiated)
+    let signal:Signal<InputDataSignalValue, NoError> = combineLatest(queue: settingsQueue, themeUnmodifiedSettings(accountManager: context.sharedContext.accountManager), SettingsHooks.shared.cloudThemes(context), nightSettings, appearanceSignal, animatedEmojiStickers, statePromise.get(), RegramBranding.selection) |> map { themeSettings, themes, autoNightSettings, appearance, animatedEmojiStickers, state, selectedIcon in
         return appAppearanceEntries(appearance: appearance, state: state, settings: themeSettings, cloudThemes: themes.themes.reversed(), generated: themes, autoNightSettings: autoNightSettings, animatedEmojiStickers: animatedEmojiStickers, selectedIcon: selectedIcon, arguments: arguments)
     }
     |> map { entries in
@@ -864,6 +865,7 @@ public func AppAppearanceViewController(context: any AccountContextProtocol, foc
         
     })
     
+    controller.preparationQueue = settingsQueue
     controller.makeFirstFast = focusOnItemTag == nil
     controller.updateRightBarView = { view in
         if let view = view as? ImageBarView {

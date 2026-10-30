@@ -116,7 +116,7 @@ public func RegramPresentFolderPickerAfterJoining(context: any AccountContextPro
             })
         })
         let signal = statePromise.get() |> deliverOnPrepareQueue |> map { state in InputDataSignalValue(entries: regramJoinedFolderEntries(state, arguments: arguments)) }
-        let controller = InputDataController(dataSignal: signal, title: strings().chatListFilterAddToFolder, removeAfterDisappear: false, hasDone: false)
+        let controller = RegramFormController(dataSignal: signal, title: strings().chatListFilterAddToFolder, removeAfterDisappear: false, hasDone: false)
         let modal = InputDataModalController(controller, size: NSMakeSize(360, 350))
         close = { [weak modal] in modal?.modal?.close() }
         controller.leftModalHeader = ModalHeaderData(image: theme.icons.modalClose, handler: { close?() })

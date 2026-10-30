@@ -22,15 +22,42 @@ func regramTranslationCacheIdentity(_ identity: String, tone: TranslationTone = 
     identity + "\nselected-provider-v2:" + tone.rawValue
 }
 
+final class RegramTranslationPresentation {
+    private let settings: RegramAccountSettings
+    private let tone: TranslationTone
+    private lazy var identity = settings.translationIdentity
+    private lazy var selectedIdentity = regramTranslationCacheIdentity(identity, tone: tone)
+
+    init(settings: RegramAccountSettings, tone: TranslationTone = .neutral) {
+        self.settings = settings
+        self.tone = tone
+    }
+
+    func matches(_ message: Message) -> Bool {
+        guard let stamp = message.attributes.first(where: { $0 is RegramTranslationMessageAttribute }) as? RegramTranslationMessageAttribute else { return false }
+        return stamp.configuration == selectedIdentity
+    }
+
+    func quickLanguage(_ message: Message) -> String? {
+        guard let stamp = message.attributes.first(where: { $0 is RegramTranslationMessageAttribute }) as? RegramTranslationMessageAttribute,
+              let language = stamp.quickToLang, !language.isEmpty, stamp.configuration == identity,
+              message.translationAttribute(toLang: language) != nil else { return nil }
+        return language
+    }
+
+    func hidesQuickTranslation(_ message: Message) -> Bool {
+        guard let stamp = message.attributes.first(where: { $0 is RegramTranslationMessageAttribute }) as? RegramTranslationMessageAttribute,
+              stamp.quickToLang == "" else { return false }
+        return stamp.configuration == identity
+    }
+}
+
 func regramTranslationMatches(_ message: Message, settings: RegramAccountSettings, tone: TranslationTone = .neutral) -> Bool {
-    message.attributes.compactMap { $0 as? RegramTranslationMessageAttribute }.first?.configuration == regramTranslationCacheIdentity(settings.translationIdentity, tone: tone)
+    RegramTranslationPresentation(settings: settings, tone: tone).matches(message)
 }
 
 public func regramQuickTranslationLanguage(_ message: Message, settings: RegramAccountSettings) -> String? {
-    guard let stamp = message.attributes.compactMap({ $0 as? RegramTranslationMessageAttribute }).first,
-          stamp.configuration == settings.translationIdentity, let language = stamp.quickToLang, !language.isEmpty,
-          message.translationAttribute(toLang: language) != nil else { return nil }
-    return language
+    RegramTranslationPresentation(settings: settings).quickLanguage(message)
 }
 
 private enum RegramTranslationPlanError: Error {

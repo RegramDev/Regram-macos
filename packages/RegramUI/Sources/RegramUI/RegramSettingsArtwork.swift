@@ -4,7 +4,11 @@ import RegramCore
 import TelegramTheme
 
 public enum RegramSettingsArtwork {
-    private static let cache = NSCache<NSString, CGImage>()
+    private static let cache: NSCache<NSString, CGImage> = {
+        let cache = NSCache<NSString, CGImage>()
+        cache.countLimit = 64
+        return cache
+    }()
 
     public static func entry(dark: Bool) -> CGImage? {
         cached("entry-\(dark)") {
@@ -23,16 +27,34 @@ public enum RegramSettingsArtwork {
     }
 
     static func category(_ category: RegramCategory) -> CGImage? {
+        let symbol: String
         switch category {
-        case .messages: return theme.icons.settingsFilters
-        case .input: return theme.icons.settingsGeneral
-        case .translation: return theme.icons.settingsLanguage
-        case .privacy: return theme.icons.settingsSecurity
-        case .media: return theme.icons.settingsStorage
-        case .appearance: return theme.icons.settingsAppearance
-        case .network: return theme.icons.settingsProxy
-        case .tools: return theme.icons.settingsSessions
-        case .notifications: return theme.icons.settingsNotifications
+        case .messages: symbol = "bubble.left.and.bubble.right"
+        case .input: symbol = "keyboard"
+        case .translation: symbol = "character.bubble"
+        case .privacy: symbol = "hand.raised"
+        case .media: symbol = "photo.on.rectangle"
+        case .appearance: symbol = "paintpalette"
+        case .network: symbol = "network"
+        case .tools: symbol = "slider.horizontal.3"
+        case .notifications: symbol = "bell"
+        }
+        return symbolImage(symbol)
+    }
+
+    static func symbolImage(_ name: String) -> CGImage? {
+        cached("symbol-tile-\(name)-\(theme.colors.accent.hexString)") {
+            guard let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(.init(pointSize: 17, weight: .regular)) else { return nil }
+            let glyph = image.precomposed(theme.colors.accent)
+            let glyphSize = glyph.backingSize.aspectFitted(NSSize(width: 18, height: 18))
+            return generateImage(NSSize(width: 24, height: 24), contextGenerator: { size, context in
+                let bounds = CGRect(origin: .zero, size: size)
+                context.clear(bounds)
+                context.setFillColor(theme.colors.accent.withAlphaComponent(0.14).cgColor)
+                context.addPath(CGPath(roundedRect: bounds, cornerWidth: 7, cornerHeight: 7, transform: nil))
+                context.fillPath()
+                context.draw(glyph, in: CGRect(x: (size.width - glyphSize.width) / 2, y: (size.height - glyphSize.height) / 2, width: glyphSize.width, height: glyphSize.height))
+            })
         }
     }
 

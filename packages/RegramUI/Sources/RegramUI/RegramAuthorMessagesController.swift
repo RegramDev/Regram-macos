@@ -240,7 +240,7 @@ private func authorMessagesEntries(_ state: AuthorMessagesState, context: any Ac
         let key = !state.available ? "AuthorMessages.Unavailable" : state.loading ? "AuthorMessages.Loading" : state.failed ? "AuthorMessages.LoadFailed" : state.paused ? "AuthorMessages.Paused" : state.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "AuthorMessages.Empty" : "AuthorMessages.NoResults"
         let action: SearchEmptyRowItem.Action? = state.available && !state.loading && (state.failed || state.paused) ? .init(click: search.primaryAction, title: regramString(state.failed ? "AuthorMessages.Retry" : "CommonGroups.Continue")) : nil
         entries.append(.custom(sectionId: 3, index: index, value: .none, identifier: InputDataIdentifier("authorMessages.empty"), equatable: InputDataEquatable(state), comparable: nil, item: { size, stableId in
-            SearchEmptyRowItem(size, stableId: stableId, height: action == nil ? 180 : 210, isLoading: state.available && state.loading, text: regramString(key), action: action)
+            RegramEmptyRowItem(size, stableId: stableId, height: action == nil ? 180 : 210, isLoading: state.available && state.loading, text: regramString(key), action: action)
         }))
         index += 1
     } else {
@@ -274,7 +274,7 @@ public func RegramAuthorMessagesController(context: any AccountContextProtocol, 
     let signal = combineLatest(search.state.get(), appearanceSignal) |> deliverOnPrepareQueue |> map { state, _ in
         InputDataSignalValue(entries: authorMessagesEntries(state, context: context, authorPeerId: authorPeerId, search: search))
     }
-    let controller = InputDataController(dataSignal: signal, title: regramString("AuthorMessages.PageTitle"), updateDatas: { data in
+    let controller = RegramFormController(dataSignal: signal, title: regramString("AuthorMessages.PageTitle"), updateDatas: { data in
         if let query = data[authorMessagesSearchId]?.stringValue { search.updateQuery(query) }
         return .fail(.none)
     }, removeAfterDisappear: false, hasDone: false, identifier: "regram.authorMessages")

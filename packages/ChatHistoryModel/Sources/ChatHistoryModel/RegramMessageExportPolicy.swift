@@ -9,7 +9,15 @@ public func regramCanSaveMessage(_ message: Message, accountId: Int64, cachedDat
     return !message.isCopyProtected(cachedData: cachedData) || RegramPreferences.shared.settings(accountId: accountId)["allowSavingProtectedContent"].bool
 }
 
-public func regramCanCopyMessageText(_ message: Message, accountId: Int64, cachedData: CachedPeerData? = nil) -> Bool {
+public func regramCanCopyMessageText(_ source: Message, accountId: Int64, cachedData: CachedPeerData? = nil, peer: Peer? = nil) -> Bool {
+    let message: Message
+    if let peer, peer.id == source.id.peerId {
+        var peers = source.peers
+        peers[peer.id] = peer
+        message = source.withUpdatedPeers(peers)
+    } else {
+        message = source
+    }
     return !message.isCopyProtected(cachedData: cachedData) || regramCanSaveMessage(message, accountId: accountId, cachedData: cachedData)
 }
 

@@ -34,7 +34,7 @@ private func regramPrivacyToolsController(context: any AccountContextProtocol, g
             let count = keys.count + (showsMarker ? 1 : 0)
             for (index, item) in keys.enumerated() {
                 let enabled = item.0 != "antiRevokeSkipBots" || settings["antiRevoke"].bool
-                rows.append(.general(sectionId: sectionId, index: Int32(index), value: .none, error: nil, identifier: InputDataIdentifier(page + "." + item.0), data: .init(name: regramString(item.1), color: enabled ? theme.colors.text : theme.colors.grayText, type: .switchable(settings[item.0].bool), viewType: index == 0 ? .firstItem : index + 1 == count ? .lastItem : .innerItem, enabled: enabled, action: {
+                rows.append(.general(sectionId: sectionId, index: Int32(index), value: .none, error: nil, identifier: InputDataIdentifier(page + "." + item.0), data: .init(name: regramString(item.1), color: enabled ? theme.colors.text : theme.colors.grayText, type: .switchable(settings[item.0].bool), viewType: index == 0 ? .firstItem : index + 1 == count ? .lastItem : .innerItem, enabled: enabled, description: item.0 == "allowSavingProtectedContent" ? regramString("protectedExport.notice") : nil, descTextColor: theme.colors.grayText, action: {
                     RegramPreferences.shared.update(accountId: accountId) {
                         guard item.0 != "antiRevokeSkipBots" || $0["antiRevoke"].bool else { return }
                         $0[item.0] = .bool(!$0[item.0].bool)
@@ -51,7 +51,7 @@ private func regramPrivacyToolsController(context: any AccountContextProtocol, g
         rows.append(.desc(sectionId: Int32(groups.count), index: Int32((groups.last?.count ?? 0) + 1), text: .plain(regramString(ghostMode ? "Ghost.Notice" : "AntiFeatures.Notice")), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
         return InputDataSignalValue(entries: rows)
     }
-    let controller = InputDataController(dataSignal: signal, title: regramString(ghostMode ? "Ghost.Header" : "AntiFeatures.Header"), removeAfterDisappear: false, hasDone: false, identifier: "regram.privacyTools")
+    let controller = RegramFormController(dataSignal: signal, title: regramString(ghostMode ? "Ghost.Header" : "AntiFeatures.Header"), removeAfterDisappear: false, hasDone: false, identifier: "regram.privacyTools")
     regramFocusSettings(controller, page: page, item: focusSetting)
     return controller
 }
@@ -101,7 +101,7 @@ public func RegramRevokedMarkerController(context: any AccountContextProtocol, f
         })))
         return InputDataSignalValue(entries: rows)
     }
-    let controller = InputDataController(dataSignal: signal, title: regramString("RevokedMarker.Title"), updateDatas: { data in
+    let controller = RegramFormController(dataSignal: signal, title: regramString("RevokedMarker.Title"), updateDatas: { data in
         update { marker in
             if let text = data[InputDataIdentifier("revokedMarker.text")]?.stringValue { marker.text = RegramRevokedMarker.normalizedText(text) }
             if let color = data[InputDataIdentifier("revokedMarker.color")]?.stringValue { marker.color = color }

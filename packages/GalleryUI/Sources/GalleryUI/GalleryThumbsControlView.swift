@@ -119,13 +119,14 @@ public class GalleryThumbContainer : Control {
                 imageView.setSignal(signal: cachedMedia(media: media, arguments: arguments, scale: System.backingScale), clearInstantly: true)
             }
             
-            imageView.preventsCapture = item.item.entry.isProtected
+            let preventsCapture = !item.item.entry.regramCanExport(accountId: item.item.context.peerId.toInt64())
+            imageView.preventsCapture = preventsCapture
 
             imageView.setSignal(signal, cacheImage: { result in
                 if let media = media {
                     cacheMedia(result, media: media, arguments: arguments, scale: System.backingScale)
                 }
-            }, isProtected: item.item.entry.isProtected)
+            }, isProtected: preventsCapture)
             imageView.set(arguments: arguments)
         }
         overlay.layer?.opacity = 0.35

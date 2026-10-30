@@ -383,7 +383,6 @@ func installFeatureNavigationHooks() {
     regramHooks.makeUpdateController = { AppUpdateViewController() }
     #endif
     regramHooks.restartApplication = { restartRegramApplication() }
-    regramHooks.eraseAllData = { _ in requestRegramFullWipe(language: appCurrentLanguage.primaryLanguage.languageCode) }
     regramHooks.selectChat = { context, selected in
         selectModalPeers(window: context.window, context: context, title: regramLocalizedString("ChatPreferences.SelectChat", languageCode: appCurrentLanguage.primaryLanguage.languageCode), settings: [.contacts, .remote, .groups, .channels], limit: 1, selectedPeerIds: Set(selected.map { [$0] } ?? []))
         |> mapToSignal { ids in ids.first.map { .single($0) } ?? .complete() }

@@ -140,6 +140,8 @@ private final class RGTranslationRequestLimiter {
                     if entry.isRunning {
                         self.runningCount -= 1
                         self.startPending()
+                    } else {
+                        self.pending.removeAll { $0 === entry }
                     }
                 }
             }

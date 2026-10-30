@@ -185,10 +185,12 @@ public final class RegramTranscriptionTasks {
         if case let .failure(error) = outcome { entry.error = error.localizedDescription }
         entry.request.dispose()
         entry.outcome.set(.single(outcome))
+        prune()
         publish()
     }
 
     private func prune() {
+        guard entries.count > 100 else { return }
         let finished = entries.values.filter { $0.state != .running && $0.state != .interrupted }.sorted { $0.updatedAt < $1.updatedAt }
         for entry in finished.prefix(max(0, entries.count - 100)) { entries.removeValue(forKey: entry.key) }
     }

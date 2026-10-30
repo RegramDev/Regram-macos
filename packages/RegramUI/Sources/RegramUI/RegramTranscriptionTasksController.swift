@@ -36,7 +36,7 @@ public func RegramTranscriptionTasksController(context: any AccountContextProtoc
         }
         return InputDataSignalValue(entries: rows)
     }
-    let controller = InputDataController(dataSignal: signal, title: regramString("transcription.tasks"), removeAfterDisappear: false, hasDone: false, identifier: "regram.transcriptionTasks")
+    let controller = RegramFormController(dataSignal: signal, title: regramString("transcription.tasks"), removeAfterDisappear: false, hasDone: false, identifier: "regram.transcriptionTasks")
     regramFocusSettings(controller, page: "transcriptionTasks", item: focusSetting)
     return controller
 }

@@ -87,6 +87,56 @@ final class RegramClipboardImagesTests: XCTestCase {
         XCTAssertNil(RegramClipboardImages.imageBytes(Data()))
     }
 
+    func testPreparedStandardPhotosPreserveBytesWithoutEnablingHighestQuality() throws {
+        let original = try bytes(image(width: 640, height: 480), type: "public.png")
+        let input = try RegramClipboardImages.temporaryFile(XCTUnwrap(RegramClipboardImages.imageBytes(original)))
+        var directories = Set([input.deletingLastPathComponent()])
+        defer { for directory in directories { try? FileManager.default.removeItem(at: directory) } }
+        var settings = RegramAccountSettings()
+        settings["outgoingPhotoQuality"] = .integer(20)
+        var snapshot = RegramClipboardImages.snapshot(urls: [input])
+        for highestQuality in [false, true, false] {
+            snapshot = try RegramClipboardImages.preparingPhotos(snapshot, originalQuality: highestQuality)
+            let photo = try XCTUnwrap(snapshot.urls.first)
+            directories.insert(photo.deletingLastPathComponent())
+            XCTAssertTrue(RegramClipboardImages.isPreparedPhoto(path: photo.path))
+            XCTAssertTrue(RegramClipboardImages.canSendAsPhoto(photo))
+            XCTAssertEqual(RGMediaPolicy.isPastedPhoto(path: photo.path), highestQuality)
+            XCTAssertEqual(try Data(contentsOf: photo), original)
+            XCTAssertEqual(RGMediaPolicy.photoQuality(settings: settings, pasted: RGMediaPolicy.isPastedPhoto(path: photo.path)), highestQuality ? 1 : 0.2)
+            XCTAssertEqual(RGMediaPolicy.photoMaximumDimension(native: 1280, settings: settings, pasted: RGMediaPolicy.isPastedPhoto(path: photo.path)), highestQuality ? 2560 : 1280)
+            let repeated = try RegramClipboardImages.preparingPhotos(snapshot, originalQuality: highestQuality)
+            XCTAssertEqual(repeated.urls, snapshot.urls)
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: input.path))
+        XCTAssertFalse(RegramClipboardImages.isPreparedPhoto(path: input.path))
+    }
+
+    func testPreparingMixedContentKeepsDocumentsAndPhotoDimensionLimits() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("RegramClipboardMixed." + UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        var directories = Set([directory])
+        defer { for directory in directories { try? FileManager.default.removeItem(at: directory) } }
+        let document = directory.appendingPathComponent("Document.txt")
+        try Data("Synthetic clipboard document".utf8).write(to: document)
+        XCTAssertFalse(RegramClipboardImages.snapshot(urls: [document]).containsImage)
+        XCTAssertEqual(try RegramClipboardImages.preparingPhotos(RegramClipboardImages.snapshot(urls: [document])).urls, [document])
+        for (width, height, eligible) in [(640, 480, true), (3001, 97, false), (32, 32, false)] {
+            let path = directory.appendingPathComponent("Image-\(width).download")
+            let data = try bytes(image(width: width, height: height), type: "public.png")
+            try data.write(to: path)
+            for highestQuality in [false, true] {
+                let prepared = try RegramClipboardImages.preparingPhotos(RegramClipboardImages.snapshot(urls: [document, path]), originalQuality: highestQuality)
+                XCTAssertEqual(prepared.urls.first, document)
+                let photo = try XCTUnwrap(prepared.urls.last)
+                directories.insert(photo.deletingLastPathComponent())
+                XCTAssertEqual(photo.pathExtension, "png")
+                XCTAssertEqual(try Data(contentsOf: photo), data)
+                XCTAssertEqual(RegramClipboardImages.canSendAsPhoto(photo), eligible)
+            }
+        }
+    }
+
     func testClipboardPhotosRespectTelegramPhotoDimensions() throws {
         for (width, height, photo) in [(640, 480, true), (480, 640, true), (3001, 97, false), (32, 32, false)] {
             let source = try XCTUnwrap(RegramClipboardImages.imageBytes(bytes(image(width: width, height: height), type: "public.png")))

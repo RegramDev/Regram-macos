@@ -23,7 +23,7 @@ public func RegramInlineRulesController(context: any AccountContextProtocol) -> 
         var rows: [InputDataEntry] = [.sectionId(0, type: .normal)]
         rows.append(.desc(sectionId: 1, index: 0, text: .plain(regramString("ios.features.InlineBots.Title")), data: .init(color: theme.colors.listGrayText, viewType: .textTopItem)))
         rows.append(.general(sectionId: 1, index: 1, value: .none, error: nil, identifier: InputDataIdentifier("inlineBots.enabled"), data: .init(name: regramString("ios.features.AutoInlineBot.Enabled"), color: theme.colors.text, type: .switchable(settings["features.autoInlineBotEnabled"].bool), viewType: .singleItem, action: {
-            RegramPreferences.shared.update(accountId: accountId) { $0["features.autoInlineBotEnabled"] = .bool(!settings["features.autoInlineBotEnabled"].bool) }
+            RegramPreferences.shared.update(accountId: accountId) { $0["features.autoInlineBotEnabled"] = .bool(!$0["features.autoInlineBotEnabled"].bool) }
         })))
         rows.append(.desc(sectionId: 1, index: 2, text: .plain(regramString("ios.features.AutoInlineBot.Footer")), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
         rows.append(.sectionId(1, type: .normal))
@@ -36,5 +36,5 @@ public func RegramInlineRulesController(context: any AccountContextProtocol) -> 
         rows.append(.desc(sectionId: Int32(rules.count + 2), index: Int32(rules.count * 2 + 4), text: .plain(regramString("ios.features.InlineBotRules.Footer")), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
         return InputDataSignalValue(entries: rows)
     }
-    return InputDataController(dataSignal: signal, title: regramString("ios.features.InlineBots.Title"), removeAfterDisappear: false, hasDone: false, identifier: "regram.inlineBots")
+    return RegramFormController(dataSignal: signal, title: regramString("ios.features.InlineBots.Title"), removeAfterDisappear: false, hasDone: false, identifier: "regram.inlineBots")
 }

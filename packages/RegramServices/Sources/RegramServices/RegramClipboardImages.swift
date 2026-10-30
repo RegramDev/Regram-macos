@@ -4,6 +4,7 @@ import ImageIO
 import UniformTypeIdentifiers
 
 public enum RegramClipboardImages {
+    private static let photoFilenamePrefix = "regram-clipboard-photo-"
     public struct ImageBytes {
         public let data: Data
         public let type: String
@@ -44,27 +45,37 @@ public enum RegramClipboardImages {
     }
 
     public static func snapshot(urls: [URL]) -> Snapshot {
-        Snapshot(urls: urls, containsImage: urls.contains { CGImageSourceCreateWithURL($0 as CFURL, nil) != nil })
+        Snapshot(urls: urls, containsImage: urls.contains { imageSource($0) != nil })
+    }
+
+    private static func imageSource(_ url: URL) -> CGImageSource? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil), CGImageSourceGetCount(source) > 0, CGImageSourceGetType(source) != nil else { return nil }
+        return source
     }
 
     public static func canSendAsPhoto(_ url: URL) -> Bool {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil), CGImageSourceGetCount(source) == 1,
+        guard let source = imageSource(url), CGImageSourceGetCount(source) == 1,
               let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
               let width = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.doubleValue,
               let height = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.doubleValue else { return false }
         return width >= 40 && height >= 40 && width <= height * 10 && height <= width * 10
     }
 
-    public static func preparingPhotos(_ snapshot: Snapshot) throws -> Snapshot {
+    public static func isPreparedPhoto(path: String) -> Bool {
+        RGMediaPolicy.isPastedPhoto(path: path) || URL(fileURLWithPath: path).lastPathComponent.hasPrefix(photoFilenamePrefix)
+    }
+
+    public static func preparingPhotos(_ snapshot: Snapshot, originalQuality: Bool = true) throws -> Snapshot {
+        let prefix = originalQuality ? RGMediaPolicy.pastedPhotoFilenamePrefix : photoFilenamePrefix
         var urls: [URL] = []
         for url in snapshot.urls {
-            if CGImageSourceCreateWithURL(url as CFURL, nil) != nil {
-                if RGMediaPolicy.isPastedPhoto(path: url.path) { urls.append(url); continue }
+            if imageSource(url) != nil {
+                if url.lastPathComponent.hasPrefix(prefix) { urls.append(url); continue }
                 let bytes = try Data(contentsOf: url, options: .mappedIfSafe)
                 guard let image = imageBytes(bytes) else { throw CocoaError(.fileReadCorruptFile) }
                 let directory = FileManager.default.temporaryDirectory.appendingPathComponent("regram-clipboard-" + UUID().uuidString, isDirectory: true)
                 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-                let target = directory.appendingPathComponent(RGMediaPolicy.pastedPhotoFilenamePrefix + "Image." + image.fileExtension)
+                let target = directory.appendingPathComponent(prefix + "Image." + image.fileExtension)
                 do { try bytes.write(to: target, options: .atomic) }
                 catch { try? FileManager.default.removeItem(at: directory); throw error }
                 urls.append(target)

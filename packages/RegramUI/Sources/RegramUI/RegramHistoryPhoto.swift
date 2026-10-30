@@ -93,5 +93,5 @@ func regramHistoryImageController(context: any AccountContextProtocol, image: NS
             RegramHistoryPhotoRowItem(size, stableId: stableId, image: image, concealed: false, zoomable: true, action: {})
         })
     ]
-    return InputDataController(dataSignal: .single(InputDataSignalValue(entries: rows)), title: regramString("EditHistory.ViewPhoto"), removeAfterDisappear: false, hasDone: false)
+    return RegramFormController(dataSignal: .single(InputDataSignalValue(entries: rows)), title: regramString("EditHistory.ViewPhoto"), removeAfterDisappear: false, hasDone: false)
 }

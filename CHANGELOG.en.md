@@ -2,6 +2,20 @@
 
 [简体中文](CHANGELOG.md) · **English**
 
+## 13.1.0 (283392) — 2026-10-30
+
+- Follow upstream through `de608bb0`, including chat-date navigation, menu hover timing, and native interaction fixes.
+- Refine Regram Pro grouped forms with Telegram search and category controls. Fix search focus, category switching, narrow layouts, and accessibility; add the silver icon.
+- Fix delayed appearance changes, mixed colors, and stale transition overlays. Reduce repeated preparation and queue contention during settings, folder switching, and scrolling.
+- Remove the macOS full-data wipe entry and implementation while retaining category settings backup and restore.
+- Make native switches read current values during rapid or interleaved actions and immediately after restoring settings. Preserve current local profile values in showroom switches.
+- Apply link-preview, link-repair, and automatic-inline settings to unchanged drafts. Cancel hidden-page queries and reject stale callbacks.
+- Preserve code-block languages and rich-text attributes through Pangu spacing, including mentions, links, custom emoji, quotes, and formatted dates.
+- Keep pasted browser/app images on the photo preview path despite temporary filename extensions or high DPI, independently of the highest-quality option. Handle static WebP consistently.
+- Fix ordinary documents being misdetected as images and mixed-paste preparation failing. Retain native photo-dimension and animation-format limits.
+- Remove cancelled translation entries, bound completed transcription history, and avoid retaining complete messages in retry actions.
+- Expand combination, concurrent-service, pasteboard, native-switch, and lifecycle regressions without sending real chat messages.
+
 ## 13.1.0 (283383) — 2026-10-29
 
 - Merge 13 upstream updates through `191789f8`, including device renaming, chat header search and topic actions, Stars price confirmation, and button styling.
