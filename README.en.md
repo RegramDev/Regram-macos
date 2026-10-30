@@ -9,7 +9,8 @@
     <a href="https://github.com/RegramDev/Regram-macos/releases/tag/v13.1.0-283392">Download</a> ·
     <a href="CHANGELOG.en.md">Changelog</a> ·
     <a href="INSTALL.md">Build instructions</a> ·
-    <a href="https://github.com/RegramDev/Regram-macos/issues">Report an issue</a>
+    <a href="https://github.com/RegramDev/Regram-macos/issues">Report an issue</a> ·
+    <a href="https://linux.do/">LINUX DO community</a>
   </p>
 </div>
 
@@ -65,6 +66,10 @@ By default, the installer builds only for the current Mac’s architecture. It p
 ## Report an issue
 
 Please report problems through this repository's [Issues](https://github.com/RegramDev/Regram-macos/issues), including your Regram version, macOS version, and steps to reproduce.
+
+## Community
+
+We support the [LINUX DO](https://linux.do/) community and appreciate the space it provides for developers to share and discuss open-source projects.
 
 ## Credits and license
 

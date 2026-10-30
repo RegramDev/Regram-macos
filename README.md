@@ -7,7 +7,8 @@
     <a href="https://github.com/RegramDev/Regram-macos/releases/tag/v13.1.0-283392">下载</a> ·
     <a href="CHANGELOG.md">更新日志</a> ·
     <a href="INSTALL.zh-CN.md">构建说明</a> ·
-    <a href="https://github.com/RegramDev/Regram-macos/issues">问题反馈</a>
+    <a href="https://github.com/RegramDev/Regram-macos/issues">问题反馈</a> ·
+    <a href="https://linux.do/">LINUX DO 社区</a>
   </p>
 </div>
 
@@ -63,6 +64,10 @@ python3 scripts/install-regram-release.py --identity YOUR_CERTIFICATE_SHA1
 ## 问题反馈
 
 请通过本仓库的 [Issues](https://github.com/RegramDev/Regram-macos/issues) 反馈问题，并提供 Regram 版本、macOS 版本和复现步骤。
+
+## 社区
+
+支持 [LINUX DO](https://linux.do/) 社区，感谢社区为开发者和开源项目提供交流与分享的平台。
 
 ## 来源与许可
 
