@@ -1096,7 +1096,7 @@ class ChatPinnedView : Control, ChatHeaderProtocol {
         
         
         
-        let animated = animated && (self.pinnedMessage != nil && (!pinnedMessage.isLatest || (self.pinnedMessage?.isLatest != pinnedMessage.isLatest))) && self.translate == translate
+        let animated = animated && self.pinnedMessage?.messageId != pinnedMessage.messageId && (self.pinnedMessage != nil && (!pinnedMessage.isLatest || (self.pinnedMessage?.isLatest != pinnedMessage.isLatest))) && self.translate == translate
 
         
         particleList.update(count: pinnedMessage.totalCount, selectedIndex: pinnedMessage.index, animated: animated)

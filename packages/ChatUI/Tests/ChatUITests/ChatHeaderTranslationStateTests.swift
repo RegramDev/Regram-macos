@@ -5,12 +5,18 @@ import ChatHistoryModel
 @testable import ChatUI
 
 final class ChatHeaderTranslationStateTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        applyMacEnglishStrings()
+    }
+
     private func state() -> ChatPresentationInterfaceState.TranslateState {
-        return .init(canTranslate: true, translate: false, from: "en", to: "zh-Hans", paywall: false, result: [:])
+        return .init(canTranslate: true, translate: false, from: "de", to: "zh-Hans", paywall: false, result: [:])
     }
 
     func testUnrelatedMessageResultsDoNotChangeHeaderPresentation() {
         let original = state()
+        XCTAssertNotNil(ChatHeaderState.Translation(original))
         var updated = original
         let id = MessageId(peerId: PeerId(1), namespace: 0, id: 10)
         updated.result[.init(id: id, toLang: "zh-Hans")] = .loading(toLang: "zh-Hans")
@@ -21,6 +27,7 @@ final class ChatHeaderTranslationStateTests: XCTestCase {
 
     func testVisibleTranslationControlsStillChangeHeaderPresentation() {
         let original = state()
+        XCTAssertNotNil(ChatHeaderState.Translation(original))
         var updated = original
         updated.translate = true
         XCTAssertNotEqual(ChatHeaderState.Translation(original), ChatHeaderState.Translation(updated))
@@ -36,6 +43,16 @@ final class ChatHeaderTranslationStateTests: XCTestCase {
         updated = original
         updated.tone = .formal
         XCTAssertNotEqual(ChatHeaderState.Translation(original), ChatHeaderState.Translation(updated))
+    }
+
+    func testInterfaceLanguageSourceStaysHiddenUntilTranslationIsActive() {
+        var source = state()
+        source.from = "en"
+        XCTAssertNil(ChatHeaderState.Translation(source))
+        source.translate = true
+        XCTAssertNotNil(ChatHeaderState.Translation(source))
+        source.to = "en"
+        XCTAssertNil(ChatHeaderState.Translation(source))
     }
 
     func testPinnedMessageTranslationStillChangesHeaderPresentation() {

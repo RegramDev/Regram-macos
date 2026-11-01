@@ -57,6 +57,29 @@ final class RichDraftStoreTests: XCTestCase {
         XCTAssertEqual(store.value(for: zeroThread), 2)
     }
 
+    func testAccountChatTopicAndCustomEditorsKeepSeparateDrafts() {
+        let keys = [
+            key,
+            ChatRichTextDraftKey(accountId: 3, peerId: 2, threadId: nil, isWelcome: false),
+            ChatRichTextDraftKey(accountId: 1, peerId: 4, threadId: nil, isWelcome: false),
+            ChatRichTextDraftKey(accountId: 1, peerId: 2, threadId: 5, isWelcome: false),
+            ChatRichTextDraftKey(accountId: 1, peerId: 2, threadId: nil, isWelcome: true, isCustomEditor: true),
+            ChatRichTextDraftKey(accountId: 1, peerId: 2, threadId: nil, isWelcome: false, isCustomEditor: true)
+        ]
+        let store = ChatRichTextDraftStore<Int>()
+        for (index, key) in keys.enumerated() {
+            store.set(index, for: key)
+        }
+        for (index, key) in keys.enumerated() {
+            XCTAssertEqual(store.value(for: key), index)
+        }
+        store.set(nil, for: key)
+        XCTAssertNil(store.value(for: key))
+        for (index, key) in keys.enumerated().dropFirst() {
+            XCTAssertEqual(store.value(for: key), index)
+        }
+    }
+
     func testNewObservationAfterMutationDoesNotReviveOldObservation() {
         let store = ChatRichTextDraftStore<Int>()
         let old = store.captureRevision(for: key)

@@ -726,32 +726,9 @@ public final class InstantPageV2View: View, NSViewToolTipOwner, HorizontalScroll
         return (attr.string as NSString).substring(with: effectiveRange)
     }
 
-    /// Mirrors `TextView.selectWord`: starts at the clicked character and expands left and right
-    /// across alphanumerics + underscore until a non-word boundary. A click on a non-word
-    /// character returns an empty range so the caller can fall through.
     private func wordRange(in string: NSAttributedString, around index: Int) -> NSRange {
-        let nsString = string.string as NSString
-        guard index >= 0, index < nsString.length else { return NSRange(location: 0, length: 0) }
-        let initial = nsString.substring(with: NSRange(location: index, length: 1))
-        if !isWordCharacter(initial) {
-            return NSRange(location: 0, length: 0)
-        }
-        var lo = index
-        var hi = index
-        while lo > 0 {
-            let prev = nsString.substring(with: NSRange(location: lo - 1, length: 1))
-            if isWordCharacter(prev) { lo -= 1 } else { break }
-        }
-        while hi + 1 < nsString.length {
-            let next = nsString.substring(with: NSRange(location: hi + 1, length: 1))
-            if isWordCharacter(next) { hi += 1 } else { break }
-        }
-        return NSRange(location: lo, length: hi - lo + 1)
-    }
-
-    private func isWordCharacter(_ ch: String) -> Bool {
-        let tidy = ch.trimmingCharacters(in: .alphanumerics)
-        return tidy.isEmpty || tidy == "_" || tidy == "\u{FFFD}"
+        guard index >= 0, index < string.length else { return NSRange(location: 0, length: 0) }
+        return string.doubleClick(at: index)
     }
 
     private func trackScrollerDrag(index: Int, startMouseX: CGFloat, startOffset: CGFloat) {

@@ -43,7 +43,9 @@ deferred = deferred.replace('__DATE_CALLBACK_GUARD__', date_guard)
 deferred = deferred.replace('__CONFIRMATION_GUARD__', confirmation_guard)
 payment = Path(__file__).with_name('PaymentConfirmationTests.swift').read_text()
 payment_source = (root / 'packages/ChatUI/Sources/ChatUI/ChatSendPaymentConfirmation.swift').read_text()
-payment = payment.replace('__PAYMENT_CONFIRMATION__', payment_source[payment_source.index('func verifyChatSendPayment('):])
+payment_start = payment_source.index('func verifyChatSendPayment(')
+payment_end = payment_source.index('\npublic func chatPaidMessagePriceIsCurrent(', payment_start)
+payment = payment.replace('__PAYMENT_CONFIRMATION__', payment_source[payment_start:payment_end])
 with tempfile.TemporaryDirectory(prefix='chat-date-context-') as directory:
     directory = Path(directory)
     (directory / 'Package.swift').write_text('''// swift-tools-version:5.9

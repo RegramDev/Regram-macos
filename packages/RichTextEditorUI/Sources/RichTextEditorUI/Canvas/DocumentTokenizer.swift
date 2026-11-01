@@ -99,16 +99,10 @@ final class DocumentTokenizer: NSObject {
     }
 
     private func enclosingWord(at pos: Int) -> (Int, Int)? {
-        guard let (r, local) = canvas.leafRegion(containingGlobal: pos) else { return nil }
-        let s = r.layout.attributedString.string as NSString
-        var result: (Int, Int)?
-        s.enumerateSubstrings(in: NSRange(location: 0, length: s.length), options: [.byWords, .substringNotRequired]) { _, range, _, stop in
-            if local >= range.location && local <= range.location + range.length {
-                result = (r.globalStart + range.location, r.globalStart + range.location + range.length)
-                stop.pointee = true
-            }
-        }
-        return result
+        guard let (region, local) = canvas.leafRegion(containingGlobal: pos), region.length > 0 else { return nil }
+        let range = region.layout.attributedString.doubleClick(at: min(max(0, local), region.length - 1))
+        guard range.location != NSNotFound, range.length > 0 else { return nil }
+        return (region.globalStart + range.location, region.globalStart + NSMaxRange(range))
     }
 
     // MARK: - Region (paragraph / line / sentence v1)

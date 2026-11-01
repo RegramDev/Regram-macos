@@ -923,9 +923,6 @@ public func messageEntries(_ messagesEntries: [MessageHistoryEntry], location: C
     }
     let emptyDetailsExpanded: Set<Int> = []
 
-    let translateCanTranslate = translate?.canTranslate ?? false
-    let translateTranslate = translate?.translate ?? false
-    let translateTo = translate?.to
     let canHighlightLinksDefault: Bool = {
         if peer?.isUser == false {
             return true
@@ -1252,28 +1249,14 @@ public func messageEntries(_ messagesEntries: [MessageHistoryEntry], location: C
         
         var messageTranslate: ChatLiveTranslateContext.State.Result?
         var replyTranslate: ChatLiveTranslateContext.State.Result?
-        let canDisplayTranslation = accountPeerId.flatMap { message.effectivelyIncoming($0) } ?? true
-        if let translate = translate, let translateTo = translateTo {
-            if canDisplayTranslation {
-                messageTranslate = translate.result[.Key(id: message.id, toLang: translateTo)]
-            }
+        if let translate = translate {
+            messageTranslate = translate.translationResult(for: message, accountPeerId: accountPeerId, matchingTranslation: regramTranslation.matches(message))
             if let reply = message.replyAttribute, let replyMessage = message.associatedMessages[reply.messageId] {
-                replyTranslate = translate.result[.init(id: replyMessage.id, toLang: translateTo)]
-            } else {
-                replyTranslate = nil
-            }
-            if translateCanTranslate, translateTranslate {
-                if canDisplayTranslation, regramTranslation.matches(message), let _ = message.translationAttribute(toLang: translateTo) {
-                    messageTranslate = .complete(toLang: translateTo)
-                }
-                if let reply = message.replyAttribute, let replyMessage = message.associatedMessages[reply.messageId] {
-                    if regramTranslation.matches(replyMessage), let _ = replyMessage.translationAttribute(toLang: translateTo) {
-                        replyTranslate = .complete(toLang: translateTo)
-                    }
-                }
+                replyTranslate = translate.replyTranslationResult(for: replyMessage, matchingTranslation: regramTranslation.matches(replyMessage))
             }
         }
 
+        let canDisplayTranslation = accountPeerId.map { message.effectivelyIncoming($0) } ?? true
         if let accountPeerId, canDisplayTranslation {
             let key = RGBookmarkMessageId(peerId: message.id.peerId.toInt64(), namespace: message.id.namespace, id: message.id.id)
             if let task = RegramQuickTranslationTasks.shared.task(accountId: accountPeerId.toInt64(), messageId: key) {
@@ -1295,10 +1278,7 @@ public func messageEntries(_ messagesEntries: [MessageHistoryEntry], location: C
         let entryQuoteRevealed = quoteRevealedByMessage[message.id] ?? emptyQuoteRevealed
         let entryDetailsExpanded = detailsExpandedByMessage[message.id] ?? emptyDetailsExpanded
 
-        var transcriptionTranslate: ChatLiveTranslateContext.State.TranscriptionResult?
-        if let translate = translate, let translateTo = translateTo, translateCanTranslate, translateTranslate {
-            transcriptionTranslate = translate.transcriptionResult[.Key(id: message.id, toLang: translateTo)]
-        }
+        let transcriptionTranslate = translate?.transcriptionTranslationResult(for: message, accountPeerId: accountPeerId)
 
         let summarize = translate?.summarizeResult[.Key(id: message.id)]
 
