@@ -411,7 +411,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
         selectedMessages = .single([])
     }
 
-    return combineLatest(chatMenuItemsData(for: message, textLayout: textLayout, entry: entry, chatInteraction: chatInteraction, source: source), selectedMessages) |> mapToSignal { data, selectedMessages in
+    return combineLatest(queue: .mainQueue(), chatMenuItemsData(for: message, textLayout: textLayout, entry: entry, chatInteraction: chatInteraction, source: source), selectedMessages) |> mapToSignal { data, selectedMessages in
         regramFilterImportData(for: data) |> map { (data, selectedMessages, $0) }
     } |> deliverOnMainQueue |> map { [chatInteraction] data, selectedMessages, filterImportData in
         
@@ -1527,34 +1527,9 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                         
             fifthBlock.append(reportItem)
         }
-//        if let peer = data.peer as? TelegramChannel, peer.isSupergroup, data.chatMode == .history {
-//            if peer.groupAccess.canEditMembers, let author = data.message.author {
-//                if author.id != context.peerId, data.message.flags.contains(.Incoming), author.isUser || author.isBot {
-//                    fifthBlock.append(ContextMenuItem(strings().chatContextRestrict, handler: {
-//                        _ = showModalProgress(signal: context.engine.peers.fetchChannelParticipant(peerId: chatInteraction.peerId, participantId: author.id), for: context.window).start(next: { participant in
-//                            if let participant = participant {
-//                                switch participant {
-//                                case let .member(memberId, _, _, _, _, _):
-//                                    showModal(with: RestrictedModalViewController(context, peerId: peerId, memberId: memberId, initialParticipant: participant, updated: { updatedRights in
-//                                        _ = context.peerChannelMemberCategoriesContextsManager.updateMemberBannedRights(peerId: peerId, memberId: author.id, bannedRights: updatedRights).startStandalone()
-//                                        _ = showModalSuccess(for: context.window, icon: theme.icons.successModalProgress, delay: 3.0).startStandalone()
-//                                    }), for: context.window)
-//                                default:
-//                                    break
-//                                }
-//                            }
-//                        })
-//                    }, itemImage: MenuAnimation.menu_restrict.value))
-//                    
-//                    if data.isLogInteraction {
-//                        fifthBlock.append(ContextMenuItem(strings().chatContextBan, handler: {
-//                            _ = context.peerChannelMemberCategoriesContextsManager.updateMemberBannedRights(peerId: peerId, memberId: author.id, bannedRights: TelegramChatBannedRights(flags: .banReadMessages, untilDate: .max)).startStandalone()
-//                            _ = showModalSuccess(for: context.window, icon: theme.icons.successModalProgress, delay: 3.0).startStandalone()
-//                        }, itemMode: .destruct, itemImage: MenuAnimation.menu_ban.value))
-//                    }
-//                }
-//            }
-//        }
+        if chatInteraction.isLogInteraction, let channel = chatInteraction.peer as? TelegramChannel, let author = message.author ?? message.effectiveAuthor {
+            fifthBlock.append(contentsOf: ChatHistoryUIHooks.shared.participantModerationMenuItems(context, channel, author, nil))
+        }
         
         if data.updatingMessageMedia[messageId] != nil {
             fifthBlock.append(ContextMenuItem(strings().chatContextCancelEditing, handler: {

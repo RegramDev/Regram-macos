@@ -13,11 +13,12 @@ NATIVE_DIRECTORIES = [
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--package", choices=["ChatUI", "ChatHistoryModel", "SidebarUI", "GeneralRows", "ChatListUI", "QrStudioUI"], default="ChatUI")
+    parser.add_argument("--package", choices=["ChatUI", "ChatHistoryModel", "SidebarUI", "GeneralRows", "ChatListUI", "QrStudioUI", "PeerModerationUI", "MessageTextUtils", "TGUIKit"], default="ChatUI")
     parser.add_argument("--filter", default="RegramMentionEntityTests|RegramFilteredReadingTests")
+    parser.add_argument("--scratch-path", type=Path, default=ROOT / "packages/ChatUI/.build")
     arguments = parser.parse_args()
     command = ["swift", "test", "-c", "release", "-Xswiftc", "-DSTABLE", "--package-path", str(ROOT / "packages" / arguments.package),
-               "--scratch-path", str(ROOT / "packages/ChatUI/.build"), "-j", "4", "--filter", arguments.filter]
+               "--scratch-path", str(arguments.scratch_path), "-j", "4", "--filter", arguments.filter]
     for flag in ["-lbz2", "-liconv"]:
         command.extend(["-Xlinker", flag])
     for directory in NATIVE_DIRECTORIES:
@@ -26,7 +27,7 @@ def main():
             raise FileNotFoundError(f"Missing native libraries: {directory}")
         for library in libraries:
             command.extend(["-Xlinker", str(library)])
-    if arguments.package in ["ChatHistoryModel", "SidebarUI"]:
+    if arguments.package in ["ChatHistoryModel", "SidebarUI", "PeerModerationUI", "MessageTextUtils"]:
         rnnoise = ROOT / "packages/ChatUI/.build/out/Products/Release/rnoise.o"
         if not rnnoise.is_file():
             raise FileNotFoundError("Run the ChatUI regressions first to build the shared RNNoise object")
