@@ -8,6 +8,9 @@ import RichTextEditorCore
 final class FullBleedLayoutTests: XCTestCase {
     private func canvas(_ blocks: [CanvasModelBlock], width: CGFloat) -> DocumentCanvasView {
         let v = DocumentCanvasView()
+        v.mediaBlockViewProvider = { _, _, _, width in
+            NSView(frame: CGRect(x: 0, y: 0, width: width, height: 50))
+        }
         v.setModelBlocks(blocks, width: width)
         v.frame = CGRect(x: 0, y: 0, width: width, height: 600)
         v.layoutSubtreeIfNeeded()
@@ -20,23 +23,24 @@ final class FullBleedLayoutTests: XCTestCase {
         XCTAssertEqual(box.textOrigin.x, CanvasMetrics.pageMargin, accuracy: 0.5)   // 16pt, not 8
     }
 
-    func test_imageRect_fullBleedToCanvasEdges() {
+    func test_hostedImage_fullBleedToCanvasEdges() throws {
         let v = canvas([
             .media(MediaBlock(id: BlockID("img"), kind: .image, mediaID: "x", naturalSize: Size2D(width: 100, height: 50),
                               caption: [TextRun(text: "Cap")]))
         ], width: 390)
-        let img = v.boxes[0] as! ImageBlockBox
-        let rect = img.imageRect()
+        let img = try XCTUnwrap(v.boxes[0] as? MediaBlockBox)
+        XCTAssertEqual(img.kind, .image)
+        let rect = try XCTUnwrap(v.mediaBlockViews[img.id.rawValue]).view.frame
         XCTAssertEqual(rect.minX, 0, accuracy: 0.5)          // bleeds to the left edge
         XCTAssertEqual(rect.width, 390, accuracy: 0.5)        // full canvas width
     }
 
-    func test_caption_insetByPageMargin() {
+    func test_caption_insetByPageMargin() throws {
         let v = canvas([
             .media(MediaBlock(id: BlockID("img"), kind: .image, mediaID: "x", naturalSize: Size2D(width: 100, height: 50),
                               caption: [TextRun(text: "Cap")]))
         ], width: 390)
-        let img = v.boxes[0] as! ImageBlockBox
+        let img = try XCTUnwrap(v.boxes[0] as? MediaBlockBox)
         XCTAssertEqual(img.textOrigin.x, CanvasMetrics.pageMargin, accuracy: 0.5)   // caption at 16
     }
 

@@ -11,7 +11,11 @@ final class ImageBlockBoxTests: AppKitTestCase {
     }
     private func mixedCanvas() -> DocumentCanvasView {
         let v = DocumentCanvasView()
-        v.imageProvider = { _ in self.solid(CGSize(width: 100, height: 60)) }
+        v.mediaBlockViewProvider = { _, _, _, width in
+            let view = NSImageView(image: self.solid(CGSize(width: 100, height: 60)))
+            view.frame = CGRect(x: 0, y: 0, width: width, height: 60)
+            return view
+        }
         v.setModelBlocks([
             .core(.paragraph(ParagraphBlock(id: BlockID("a"), runs: [TextRun(text: "Above")]))),
             .media(MediaBlock(id: BlockID("img"), kind: .image, mediaID: "x", naturalSize: Size2D(width: 100, height: 60),
@@ -90,10 +94,7 @@ final class ImageBlockBoxTests: AppKitTestCase {
     func test_imageRect_respectsExplicitDisplayWidth() {
         let block = RichTextEditorUI.MediaBlock(id: BlockID("img"), kind: .image, mediaID: "x",
                                displayWidth: 60, naturalSize: Size2D(width: 100, height: 50), caption: [])
-        let v = DocumentCanvasView()
-        v.setModelBlocks([.media(block)], width: 390)
-        v.frame = CGRect(x: 0, y: 0, width: 390, height: 400); v.layoutSubtreeIfNeeded()
-        let box = v.boxes[0] as! ImageBlockBox
+        let box = ImageBlockBox(media: block, mapper: AttributedStringMapper(), width: 390)
         XCTAssertEqual(box.imageRect().width, 60, accuracy: 0.5)   // explicit width honored, not stretched full-bleed
     }
 }

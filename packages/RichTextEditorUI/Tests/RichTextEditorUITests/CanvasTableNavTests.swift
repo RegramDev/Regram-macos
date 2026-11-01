@@ -145,7 +145,7 @@ final class CanvasTableNavTests: XCTestCase {
     }
 
     // Backspace at the first cell when the block before the table is an IMAGE → its caption end.
-    func test_backspaceAtFirstCellStart_withImageBefore_movesToCaptionEnd() {
+    func test_backspaceAtFirstCellStart_withImageBefore_movesToCaptionEnd() throws {
         let v = DocumentCanvasView()
         v.setModelBlocks([
             .media(MediaBlock(id: BlockID("img"), kind: .image, mediaID: "x", naturalSize: Size2D(width: 80, height: 50),
@@ -154,7 +154,7 @@ final class CanvasTableNavTests: XCTestCase {
                 rows: [Row(id: BlockID("r0"), cells: [cell("a", "Alpha"), cell("b", "Beta")])]))),
         ], width: 340)
         v.frame = CGRect(x: 0, y: 0, width: 340, height: 500); v.layoutSubtreeIfNeeded()
-        let imageBox = v.boxes.first { $0 is ImageBlockBox }!
+        let imageBox = try XCTUnwrap(v.boxes.first { $0.id == BlockID("img") } as? MediaBlockBox)
         let ap = v.allLeafRegions().first { $0.ref == .paragraph(BlockID("ap")) }!
         let sizeBefore = v.documentSizeValue
         v.selectedGlobalRange = (ap.globalStart, ap.globalStart)

@@ -8,7 +8,9 @@ import RichTextEditorCore
 final class GapCursorTests: AppKitTestCase {
     private func canvas() -> DocumentCanvasView {
         let v = DocumentCanvasView()
-        v.imageProvider = { [self] _ in image(of: CGSize(width: 80, height: 50), fill: .systemTeal) }
+        v.mediaBlockViewProvider = { _, _, _, width in
+            NSView(frame: CGRect(x: 0, y: 0, width: width, height: 50))
+        }
         v.setModelBlocks([
             .core(.paragraph(ParagraphBlock(id: BlockID("a"), runs: [TextRun(text: "Above")]))),
             .media(MediaBlock(id: BlockID("img"), kind: .image, mediaID: "x", naturalSize: Size2D(width: 80, height: 50),
@@ -25,10 +27,10 @@ final class GapCursorTests: AppKitTestCase {
         XCTAssertTrue(v.isGapPosition(img.nodeStart))
     }
 
-    func test_tapOnImageArea_landsOnGap() {
+    func test_tapOnImageArea_landsOnGap() throws {
         let v = canvas()
-        let img = v.boxes[1] as! ImageBlockBox
-        let p = CGPoint(x: img.imageRect().midX, y: img.imageRect().midY)
+        let img = try XCTUnwrap(v.boxes[1] as? MediaBlockBox)
+        let p = CGPoint(x: img.frame.midX, y: img.mediaOrigin.y + img.mediaAreaHeight / 2)
         XCTAssertEqual(v.closestGlobalPosition(to: p), img.nodeStart)
     }
 

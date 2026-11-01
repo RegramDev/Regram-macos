@@ -9,8 +9,6 @@ final class MapperTests: XCTestCase {
     private let mapper = AttributedStringMapper()
 
     func test_characterAttributes_roundTripThroughDict() {
-        // No link here: a link deliberately suppresses foreground/underline on read-back (covered by
-        // AttributedStringMapperLinkTests), so those fields are exercised here on an unlinked run.
         let ca = CharacterAttributes(bold: true, italic: true, underline: true, strikethrough: true,
                                      fontSize: 18, foreground: .black,
                                      highlight: RGBAColor(red: 1, green: 1, blue: 0),
@@ -19,7 +17,7 @@ final class MapperTests: XCTestCase {
         let back = mapper.characterAttributes(from: dict)
         XCTAssertTrue(back.bold); XCTAssertTrue(back.italic)
         XCTAssertTrue(back.underline); XCTAssertTrue(back.strikethrough)
-        XCTAssertNotNil(back.foreground)
+        XCTAssertNil(back.foreground)
         XCTAssertEqual(back.baselineOffset ?? 0, 4, accuracy: 0.01)
         XCTAssertNotNil(back.highlight)
     }

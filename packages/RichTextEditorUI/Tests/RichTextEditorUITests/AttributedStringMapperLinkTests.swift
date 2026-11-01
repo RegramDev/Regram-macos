@@ -29,16 +29,24 @@ final class AttributedStringMapperLinkTests: XCTestCase {
         XCTAssertNil(ca.foreground, "blue from link styling must not leak into the model")
     }
 
-    func test_readback_noLink_stillReadsForegroundAndUnderline() {
-        let dict: [NSAttributedString.Key: Any] = [
-            .foregroundColor: NSColor.red,
-            .underlineStyle: NSUnderlineStyle.single.rawValue,
-            .font: NSFont.systemFont(ofSize: 16),
-        ]
-        let ca = mapper.characterAttributes(from: dict)
-        XCTAssertNil(ca.link)
-        XCTAssertTrue(ca.underline, "underline is still read when there is no link")
-        XCTAssertNotNil(ca.foreground, "foreground is still read when there is no link")
+    func test_readback_noLink_preservesUnderlineAndUsesCurrentThemeForeground() {
+        for color in [NSColor.red, .black, .white] {
+            let dict: [NSAttributedString.Key: Any] = [
+                .foregroundColor: color,
+                .underlineStyle: NSUnderlineStyle.single.rawValue,
+                .font: NSFont.systemFont(ofSize: 16),
+            ]
+            let ca = mapper.characterAttributes(from: dict)
+            XCTAssertNil(ca.link)
+            XCTAssertTrue(ca.underline)
+            XCTAssertNil(ca.foreground)
+            for foreground in [NSColor.black, .white] {
+                let themed = AttributedStringMapper(styleSheet: .default, appearance: EditorAppearance(defaultForeground: foreground))
+                let rendered = themed.attributes(for: ca, style: .body)
+                XCTAssertEqual(rendered[.foregroundColor] as? NSColor, foreground)
+                XCTAssertEqual(rendered[.underlineStyle] as? Int, NSUnderlineStyle.single.rawValue)
+            }
+        }
     }
 
     func test_roundTrip_linkOnly() {

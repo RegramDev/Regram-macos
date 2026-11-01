@@ -64,14 +64,14 @@ final class CanvasInsertTableTests: XCTestCase {
         XCTAssertEqual(tables(v).count, 1)
     }
 
-    func test_insertTable_onImageGap_isNoOp() {
+    func test_insertTable_onImageGap_isNoOp() throws {
         let v = DocumentCanvasView()
         v.setModelBlocks([
             .core(.paragraph(ParagraphBlock(id: BlockID("p"), runs: [TextRun(text: "Hi")]))),
             .media(MediaBlock(id: BlockID("img"), kind: .image, mediaID: "x", naturalSize: Size2D(width: 50, height: 50))),
         ], width: 320)
         v.frame = CGRect(x: 0, y: 0, width: 320, height: 600); v.layoutSubtreeIfNeeded()
-        let img = v.boxes.first { $0 is ImageBlockBox }!
+        let img = try XCTUnwrap(v.boxes.first { $0.id == BlockID("img") } as? MediaBlockBox)
         v.anchor = img.nodeStart; v.head = img.nodeStart
         let before = v.currentModelBlocks().count
         v.insertTable(rows: 2, columns: 2)

@@ -31,7 +31,7 @@ final class CanvasMediaBlockTests: AppKitTestCase {
         v.keyDown(with: e)
     }
 
-    func test_videoKind_routesToHostedMediaBox_notImage() {
+    func test_imagesAndVideos_routeToHostedMediaBoxes() throws {
         XCTAssertEqual(RichTextEditorUI.MediaKind(rawValue: "video"), RichTextEditorUI.MediaKind.video, "the host inserts video via the \"video\" kind string")
         let v = DocumentCanvasView()
         v.setModelBlocks([
@@ -40,7 +40,11 @@ final class CanvasMediaBlockTests: AppKitTestCase {
         ], width: 400)
         XCTAssertTrue(v.boxes[0] is MediaBlockBox, "video renders as a hosted media view, like file/audio/map")
         XCTAssertFalse(v.boxes[0] is ImageBlockBox)
-        XCTAssertTrue(v.boxes[1] is ImageBlockBox, "image stays a drawn bitmap")
+        let video = try XCTUnwrap(v.boxes[0] as? MediaBlockBox)
+        let image = try XCTUnwrap(v.boxes[1] as? MediaBlockBox)
+        XCTAssertEqual(video.kind, .video)
+        XCTAssertEqual(image.kind, .image)
+        XCTAssertEqual(image.mediaID, "img")
     }
 
     func test_videoBleedsFullWidth_otherMediaDont() {
@@ -54,11 +58,15 @@ final class CanvasMediaBlockTests: AppKitTestCase {
         XCTAssertFalse(box(.map).mediaBleeds)
     }
 
-    func test_insertMediaBlock_ignoresImageKind() {
+    func test_insertMediaBlock_acceptsHostedImageKind() throws {
         let (v, _) = seeded()
         v.setCaret(global: v.boxes[0].textStart)
-        v.insertMediaBlock(kind: .image, mediaID: "x")   // images must use insertImage; this is a guarded no-op
-        XCTAssertTrue(mediaBoxes(v).isEmpty)
+        v.insertMediaBlock(kind: .image, mediaID: "x")
+        XCTAssertEqual(mediaBoxes(v).count, 1)
+        let image = try XCTUnwrap(mediaBoxes(v).first)
+        XCTAssertEqual(image.kind, .image)
+        XCTAssertEqual(image.mediaID, "x")
+        XCTAssertEqual(v.head, image.textStart)
         XCTAssertFalse(v.boxes.contains { $0 is ImageBlockBox })
     }
 

@@ -8,7 +8,9 @@ import RichTextEditorCore
 final class CanvasImageSelectionTests: AppKitTestCase {
     private func canvas() -> DocumentCanvasView {
         let v = DocumentCanvasView()
-        v.imageProvider = { [self] _ in image(of: CGSize(width: 80, height: 50), fill: .systemTeal) }
+        v.mediaBlockViewProvider = { _, _, _, width in
+            NSView(frame: CGRect(x: 0, y: 0, width: width, height: 50))
+        }
         v.setModelBlocks([
             .core(.paragraph(ParagraphBlock(id: BlockID("a"), runs: [TextRun(text: "Above")]))),
             .media(MediaBlock(id: BlockID("img"), kind: .image, mediaID: "x", naturalSize: Size2D(width: 80, height: 50),
@@ -19,22 +21,27 @@ final class CanvasImageSelectionTests: AppKitTestCase {
         return v
     }
 
-    func test_selectionFlowsThroughCaption() {
+    private func imageBox(in canvas: DocumentCanvasView) throws -> MediaBlockBox {
+        let box = try XCTUnwrap(canvas.boxes.first { $0.id == BlockID("img") } as? MediaBlockBox)
+        XCTAssertEqual(box.kind, .image)
+        return box
+    }
+
+    func test_selectionFlowsThroughCaption() throws {
         let v = canvas()
-        let imgBox = v.boxes[1]
-        // From inside "Above" through the caption into "Below" → rects in all three blocks.
+        let imgBox = try imageBox(in: v)
         let rects = v.selectionRects(globalFrom: v.boxes[0].textStart + 2,
                                      globalTo: v.boxes[2].textStart + 2)
         func count(in box: CanvasBlock) -> Int { rects.filter { box.frame.intersects($0) }.count }
         XCTAssertGreaterThan(count(in: v.boxes[0]), 0)
-        XCTAssertGreaterThan(count(in: imgBox), 0)        // caption rects
+        XCTAssertGreaterThan(count(in: imgBox), 0)
         XCTAssertGreaterThan(count(in: v.boxes[2]), 0)
     }
 
-    func test_shiftEnterInImageCaption_exitsIntoNewParagraph() {
+    func test_shiftEnterInImageCaption_exitsIntoNewParagraph() throws {
         let v = canvas()
-        let img = v.boxes[1] as! ImageBlockBox
-        v.setCaret(global: img.textStart + 2)   // inside the caption
+        let img = try imageBox(in: v)
+        v.setCaret(global: img.textStart + 2)
         let before = v.boxes.count
         let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .shift, timestamp: 0,
                                  windowNumber: 0, context: nil, characters: "\r", charactersIgnoringModifiers: "\r",
@@ -45,50 +52,50 @@ final class CanvasImageSelectionTests: AppKitTestCase {
         XCTAssertEqual(v.head, v.boxes[2].textStart, "caret lands in the new paragraph")
     }
 
-    func test_clickImageBitmap_resolvesImageBox() {
+    func test_clickHostedImage_resolvesImageContext() throws {
         let v = canvas()
-        let img = v.boxes[1] as! ImageBlockBox
-        let mid = CGPoint(x: img.imageRect().midX, y: img.imageRect().midY)
-        XCTAssertEqual(v.imageBoxAtCanvasPoint(mid)?.id, img.id, "a click on the bitmap resolves the image box")
-        XCTAssertNil(v.imageBoxAtCanvasPoint(CGPoint(x: img.imageRect().midX, y: img.textOrigin.y + 1)), "the caption area is not the bitmap")
+        let img = try imageBox(in: v)
+        let point = CGPoint(x: img.frame.midX, y: img.mediaOrigin.y + img.mediaAreaHeight / 2)
+        let context = try XCTUnwrap(v.mediaContext(atCanvasPoint: point))
+        XCTAssertEqual(context.blockID, img.id.rawValue)
+        XCTAssertEqual(context.kind, "image")
+        XCTAssertNil(v.mediaContext(atCanvasPoint: CGPoint(x: img.frame.midX, y: img.textOrigin.y + 1)))
     }
 
-    func test_clickImage_selectsWithAccent_togglesOff_andDeletes() {
+    func test_clickImage_selectsWithAccent_togglesOff_andDeletes() throws {
         let v = canvas()
-        let img = v.boxes[1] as! ImageBlockBox
-        v.selectImageBlock(img)
-        XCTAssertEqual(v.soleSelectedImageBlock()?.id, img.id, "first click selects the image")
-        XCTAssertEqual(v.imageBoxesInSelection().count, 1, "the image atom is in the selection (drives the accent wash)")
-        v.selectImageBlock(img)
-        XCTAssertNil(v.soleSelectedImageBlock(), "second click deselects (toggle)")
-        v.selectImageBlock(img)
+        let img = try imageBox(in: v)
+        v.selectMediaBlock(id: img.id)
+        XCTAssertEqual(v.soleSelectedMediaBlock()?.id, img.id)
+        XCTAssertEqual(v.mediaBoxesInSelection().map(\.id), [img.id])
+        v.selectMediaBlock(id: img.id)
+        XCTAssertNil(v.soleSelectedMediaBlock())
+        v.selectMediaBlock(id: img.id)
         v.performDeleteBackward()
-        XCTAssertFalse(v.boxes.contains { $0 is ImageBlockBox }, "Backspace removes the click-selected image")
+        XCTAssertFalse(v.boxes.contains { $0.id == img.id })
     }
 
-    func test_caretInCaption_isBelowImage() {
+    func test_caretInCaption_isBelowImage() throws {
         let v = canvas()
-        let imgBox = v.boxes[1] as! ImageBlockBox
+        let imgBox = try imageBox(in: v)
         let caret = v.caretRect(forGlobal: imgBox.textStart)
-        XCTAssertGreaterThan(caret.minY, imgBox.imageRect().minY)   // caption caret sits below the image
+        XCTAssertGreaterThanOrEqual(caret.minY, imgBox.mediaOrigin.y + imgBox.mediaAreaHeight)
     }
 
-    func test_caretAtImageGap_isVerticalBarAtImageLeadingEdge() {
+    func test_caretAtImageGap_isVerticalBarAtImageLeadingEdge() throws {
         let v = canvas()
-        let imgBox = v.boxes[1] as! ImageBlockBox
-        // The gap before the image atom is a real caret position; we must report a drawable rect so
-        // UITextSelectionDisplayInteraction renders the native caret there (not .zero, which is invisible).
+        let imgBox = try imageBox(in: v)
         let caret = v.caretRect(forGlobal: imgBox.nodeStart)
-        let img = imgBox.imageRect()
         XCTAssertFalse(caret.isEmpty, "gap caret must be a drawable rect, not .zero")
-        XCTAssertEqual(caret.minX, img.minX, accuracy: 0.5, "vertical caret sits at the image's leading edge")
-        XCTAssertEqual(caret.height, img.height, accuracy: 0.5, "caret spans the image height")
+        XCTAssertEqual(caret.minX, imgBox.mediaOrigin.x, accuracy: 0.5)
+        XCTAssertEqual(caret.minY, imgBox.mediaOrigin.y, accuracy: 0.5)
+        XCTAssertEqual(caret.height, imgBox.mediaAreaHeight, accuracy: 0.5)
     }
 
-    func test_typingInCaption_editsCaptionText() {
+    func test_typingInCaption_editsCaptionText() throws {
         let v = canvas()
-        let imgBox = v.boxes[1] as! ImageBlockBox
-        v.selectedGlobalRange = (imgBox.textStart + 7, imgBox.textStart + 7) // end of "Caption"
+        let imgBox = try imageBox(in: v)
+        v.selectedGlobalRange = (imgBox.textStart + 7, imgBox.textStart + 7)
         v.commitText("!")
         guard case .media(let out) = v.boxes[1].currentModelBlock() else { return XCTFail() }
         XCTAssertEqual(out.caption.map(\.text).joined(), "Caption!")
