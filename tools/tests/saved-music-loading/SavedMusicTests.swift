@@ -805,6 +805,76 @@ final class SavedMusicTests: XCTestCase {
         subscription.dispose()
     }
 
+    func testStaleCacheWriteCannotOverwriteAcceptedMutation() throws {
+        let account = Account()
+        seed(account, [1])
+        let context = ProfileSavedMusicContext(account: account, peerId: 1)
+        account.postbox.delayNextTransaction = true
+        account.network.pending[0].succeed([1], count: 1)
+        let staleWrite = try XCTUnwrap(account.postbox.finishTransaction)
+        let action = context.addMusic(file: file(2)).start()
+        account.network.mutations[0].succeed()
+        XCTAssertEqual(cachedIds(account), [2, 1])
+        staleWrite()
+        XCTAssertEqual(cachedIds(account), [2, 1])
+        XCTAssertEqual(preferenceIds(account), [1, 2])
+        action.dispose()
+    }
+
+    func testReloadInvalidatesAlreadyCapturedCacheWrite() throws {
+        let account = Account()
+        seed(account, [9])
+        let context = ProfileSavedMusicContext(account: account, peerId: 1)
+        account.postbox.delayNextTransaction = true
+        account.network.pending[0].succeed([1], count: 1)
+        let staleWrite = try XCTUnwrap(account.postbox.finishTransaction)
+        context.reload()
+        account.network.pending[1].succeed([2], count: 1)
+        XCTAssertEqual(cachedIds(account), [2])
+        staleWrite()
+        XCTAssertEqual(cachedIds(account), [2])
+    }
+
+    func testUnsubscribedMutationDoesNotRetainContext() {
+        let account = Account()
+        var context: ProfileSavedMusicContext? = ProfileSavedMusicContext(account: account, peerId: 1)
+        account.network.pending[0].succeed([1], count: 1)
+        let signal = context!.addMusic(file: file(2))
+        weak var weakContext = context
+        context = nil
+        XCTAssertNil(weakContext)
+        XCTAssertTrue(account.network.mutations.isEmpty)
+        let action = signal.start()
+        account.network.mutations[0].succeed()
+        XCTAssertEqual(cachedIds(account), [2, 1])
+        XCTAssertEqual(account.network.pending.count, 1)
+        action.dispose()
+    }
+
+    func testRejectedMutationRefreshesWithoutPersistingOptimisticValue() {
+        let account = Account()
+        seed(account, [1])
+        let context = ProfileSavedMusicContext(account: account, peerId: 1)
+        account.network.pending[0].succeed([1], count: 1)
+        var state: ProfileSavedMusicContext.State?
+        let subscription = context.state.start(next: { state = $0 })
+        var failed = false
+        let action = context.addMusic(file: file(2)).start(error: { _ in failed = true })
+        XCTAssertEqual(state?.files.map { $0.fileId }, [2, 1])
+        account.network.mutations[0].succeed(false)
+        XCTAssertTrue(failed)
+        XCTAssertEqual(cachedIds(account), [1])
+        XCTAssertEqual(preferenceIds(account), [1])
+        XCTAssertEqual(account.network.pending.count, 2)
+        if account.network.pending.count == 2 {
+            XCTAssertEqual(account.network.pending[1].request.offset, 0)
+            account.network.pending[1].succeed([1], count: 1)
+        }
+        XCTAssertEqual(state?.files.map { $0.fileId }, [1])
+        action.dispose()
+        subscription.dispose()
+    }
+
     func testPickerDoesNotShowEmptyWhileSavedMusicLoads() {
         var picker = SendAudioState()
         picker.sharedAudioLoaded = true

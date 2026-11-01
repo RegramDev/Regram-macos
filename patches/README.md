@@ -6,4 +6,6 @@ Run `bash scripts/prepare-regram-core.sh` after initializing that submodule and 
 
 The patch contains account-scoped Regram policy hooks, message retention and edit attributes, local overflow pins, transcription provenance, external translation provenance, audio draining for transcription, the two local Swift Package path repairs needed by this checkout, and automatic Metal shader compilation for Xcode 27. It preserves the macOS core's server-message merge and adaptive Rust download scheduling.
 
+Profile music repairs are also included: retryable loading, raw server pagination cursors, generation-checked cache and request ownership, subscription-scoped optimistic changes, and cache/preferences/header updates only after server acceptance. The focused Release/STABLE regression runner is `tools/tests/saved-music-loading/run.py`.
+
 Feature algorithms and model changes were adapted from Regram iOS at `f61df19a1d19e9821f7adcf5c74cbb23601d1683`, under the repository's GPL license. Update the patch when changing the core submodule; the parent repository does not store its uncommitted files.

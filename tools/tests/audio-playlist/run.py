@@ -22,7 +22,7 @@ for key, value in [
     ('__TRANSITION__', section('public struct APTransition', 'fileprivate func prepareItems(')),
     ('__ENTRY_EQUALITY__', section('public func ==(lhs:APEntry', 'public func <(lhs:APEntry')),
     ('__MERGE__', section('    fileprivate func merge(with transition:', '    public func nextOrderState()')),
-    ('__CHAT_APPLY__', section('            let isFirst = first.swap(false)', '\n        }))')),
+    ('__CHAT_APPLY__', section('        disposable.set(apply.start(next: { [weak self] transition in\n', '\n        }))').split('\n', 1)[1]),
     ('__SONG__', section('    private var _song:APSongItem?', '    public var timebase:')),
     ('__GLOBAL__', section('    public func notifyGlobalStateChanged(', '    public var isPlaying:')),
     ('__NOTIFICATIONS__', section('    private func notifyStateChanged(', '    private let streamable:')),
