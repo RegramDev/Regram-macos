@@ -527,8 +527,7 @@ private final class WallpaperPreviewView: View {
     }
     
     public var croppedRect: NSRect {
-        let fittedSize = WallpaperDimensions.aspectFitted(imageSize)
-        return imageSize.bounds.focus(fittedSize)
+        return imageSize.bounds
     }
     
     deinit {
@@ -1040,7 +1039,7 @@ public enum WallpaperSource {
     }
 }
 
-private func cropWallpaperImage(_ image: CGImage, dimensions: NSSize, rect: NSRect, magnify: CGFloat, settings: WallpaperSettings?) -> CGImage {
+func cropWallpaperImage(_ image: CGImage, dimensions: NSSize, rect: NSRect, magnify: CGFloat, settings: WallpaperSettings?) -> CGImage {
     let fittedSize = NSMakeSize(dimensions.width * magnify, dimensions.height * magnify)//WallpaperDimensions.aspectFitted(representation.dimensions)
     
     let image = generateImage(rect.size, contextGenerator: { size, ctx in
@@ -1051,7 +1050,7 @@ private func cropWallpaperImage(_ image: CGImage, dimensions: NSSize, rect: NSRe
         ctx.draw(image, in: imageRect)
     }, opaque: false, scale: 1.0)!
     
-    let fitted = WallpaperDimensions.aspectFitted(dimensions)
+    let fitted = rect.size.fitted(WallpaperDimensions)
     
     return generateImage(fitted, contextGenerator: { size, ctx in
         let imageRect = NSMakeRect(0, 0, fitted.width, fitted.height)
@@ -1116,7 +1115,7 @@ private func cropWallpaperIfNeeded(_ wallpaper: Wallpaper, account: Account, rec
                         }
                     }
                     
-                    let fittedDimensions = WallpaperDimensions.aspectFitted(representation.dimensions.size)
+                    let fittedDimensions = fittedImage.size
                     
                      disposable.set(putToTemp(image: NSImage(cgImage: fittedImage, size: fittedDimensions), compress: false).start(next: { path in
                          
@@ -1257,7 +1256,7 @@ private func cropWallpaperIfNeeded(_ wallpaper: Wallpaper, account: Account, rec
                         }
                     }
                     
-                    let fittedDimensions = WallpaperDimensions.aspectFitted(dimensions)
+                    let fittedDimensions = fittedImage.size
                     
                     disposable.set(putToTemp(image: NSImage(cgImage: fittedImage, size: fittedDimensions), compress: false).start(next: { path in
                         

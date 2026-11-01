@@ -153,6 +153,7 @@ open class BackgroundView: View {
         private let main: CALayer
         private var tile: NSImage? = nil
         private var shouldTile: Bool = false
+        private var minimumHeight: CGFloat = 0
         private var tileLayers:[CALayer] = []
         
         init(main: CALayer) {
@@ -160,10 +161,11 @@ open class BackgroundView: View {
             tileLayers.append(main)
         }
         
-        func set(superlayer: CALayer?, tile: NSImage?, shouldTile: Bool) {
+        func set(superlayer: CALayer?, tile: NSImage?, shouldTile: Bool, minimumHeight: CGFloat = 0) {
             self.superlayer = superlayer
             self.shouldTile = shouldTile
             self.tile = tile
+            self.minimumHeight = minimumHeight
         }
         
         var validLayout: CGRect? = nil
@@ -173,7 +175,7 @@ open class BackgroundView: View {
             
             var rects:[CGRect] = []
             var frame = frame
-            frame.size.height = max(500, frame.height)
+            frame.size.height = max(minimumHeight, frame.height)
             
             if let superlayer = superlayer {
                 if let tile = tile {
@@ -342,9 +344,9 @@ open class BackgroundView: View {
                         imageView.compositingFilter = nil
                     }
                     if let bg = backgroundView as? AnimatedGradientBackgroundView {
-                        tileControl.set(superlayer: bg.contentView.layer, tile: image, shouldTile: shouldTile)
+                        tileControl.set(superlayer: bg.contentView.layer, tile: image, shouldTile: shouldTile, minimumHeight: 500)
                     } else if let bg = backgroundView as? BackgroundGradientView {
-                        tileControl.set(superlayer: bg.layer, tile: image, shouldTile: shouldTile)
+                        tileControl.set(superlayer: bg.layer, tile: image, shouldTile: shouldTile, minimumHeight: 500)
                     } else {
                         tileControl.set(superlayer: container.layer, tile: image, shouldTile: shouldTile)
                     }

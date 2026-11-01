@@ -4,7 +4,9 @@
 
 ## 13.1.0 (283393) — 2026-11-01
 
-- Merge 17 upstream updates through `8ae5b3a3`, retaining Regram's message menus, filtering and translation extensions.
+- Merge 18 upstream updates through `55830942`, retaining Regram's message menus, filtering and translation extensions.
+- Preserve photo wallpaper proportions and fix extra cropping on apply and excessive zoom in short chat windows.
+- Explicitly request biometric confirmation for wallet access without reusing an earlier evaluation. Keep the previous session when confirmation is cancelled or fails.
 - Fix Chinese, complex emoji and combining-character word selection in messages and both Article editors. Expand rich previews for tables, details, media captions and buttons.
 - Keep Article drafts across relaunches, save inline and standalone edits, and isolate accounts, chats and topics.
 - Recover profile music loading after failures; fix cache refreshes, duplicate pagination and concurrent mutations while retaining playback. Refine download cover and progress presentation.

@@ -13,7 +13,7 @@ NATIVE_DIRECTORIES = [
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--package", choices=["ChatUI", "ChatHistoryModel", "SidebarUI", "GeneralRows", "ChatListUI", "QrStudioUI", "PeerModerationUI", "MessageTextUtils", "TGUIKit"], default="ChatUI")
+    parser.add_argument("--package", choices=["ChatUI", "ChatHistoryModel", "SidebarUI", "GeneralRows", "ChatListUI", "QrStudioUI", "PeerModerationUI", "MessageTextUtils", "TGUIKit", "WallpaperUI"], default="ChatUI")
     parser.add_argument("--filter", default="RegramMentionEntityTests|RegramFilteredReadingTests")
     parser.add_argument("--scratch-path", type=Path, default=ROOT / "packages/ChatUI/.build")
     arguments = parser.parse_args()
@@ -27,7 +27,7 @@ def main():
             raise FileNotFoundError(f"Missing native libraries: {directory}")
         for library in libraries:
             command.extend(["-Xlinker", str(library)])
-    if arguments.package in ["ChatHistoryModel", "SidebarUI", "PeerModerationUI", "MessageTextUtils"]:
+    if arguments.package in ["ChatHistoryModel", "SidebarUI", "PeerModerationUI", "MessageTextUtils", "WallpaperUI"]:
         rnnoise = ROOT / "packages/ChatUI/.build/out/Products/Release/rnoise.o"
         if not rnnoise.is_file():
             raise FileNotFoundError("Run the ChatUI regressions first to build the shared RNNoise object")
