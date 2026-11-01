@@ -2,6 +2,18 @@
 
 [简体中文](CHANGELOG.md) · **English**
 
+## 13.1.0 (283393) — 2026-11-01
+
+- Merge 17 upstream updates through `8ae5b3a3`, retaining Regram's message menus, filtering and translation extensions.
+- Fix Chinese, complex emoji and combining-character word selection in messages and both Article editors. Expand rich previews for tables, details, media captions and buttons.
+- Keep Article drafts across relaunches, save inline and standalone edits, and isolate accounts, chats and topics.
+- Recover profile music loading after failures; fix cache refreshes, duplicate pagination and concurrent mutations while retaining playback. Refine download cover and progress presentation.
+- Translate already-sent foreign-language messages in live chat translation, preserving reply/pinned policies and Regram provider/tone cache identity.
+- Add restrict/ban actions to group recent actions with fresh authorization. Invalidate old avatar-menu actions when rows are rebound or removed.
+- Preserve typed text when sending stickers/GIFs from the panel. Correct folder pinned order and forum video-chat links.
+- Remove individual recent emoji, set status from emoji-pack previews, expand active-device details and add read/unread actions to search menus.
+- Refine hint corner radii, narrow-bubble arrows and resize animations. Correct connection-status header layout and skip interface effects while system audio is muted.
+
 ## 13.1.0 (283392) — 2026-10-30
 
 - Follow upstream through `de608bb0`, including chat-date navigation, menu hover timing, and native interaction fixes.
