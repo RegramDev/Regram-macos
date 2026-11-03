@@ -95,7 +95,7 @@ final class AppMenuScreenPositionTests: XCTestCase {
     func testSmallWindowCanPlaceMenuOutsideOwnerButInsideScreen() throws {
         let screen = try XCTUnwrap(NSScreen.main)
         let visible = screen.visibleFrame
-        let frame = NSMakeRect(visible.midX - 220, visible.midY - 150, 440, 300)
+        let frame = NSMakeRect(visible.midX - 220, visible.midY - 150, 440, 300).integral
         try checkMenu(screen: screen, ownerFrame: frame, point: NSMakePoint(frame.midX, frame.maxY - 5)) { menu, bounds, point in
             XCTAssertEqual(menu.maxY, point.y + 20, accuracy: 0.01)
             XCTAssertGreaterThan(menu.maxY, frame.maxY)
@@ -106,7 +106,7 @@ final class AppMenuScreenPositionTests: XCTestCase {
     func testBetterInsideMenuClampsToOwnerTop() throws {
         let screen = try XCTUnwrap(NSScreen.main)
         let visible = screen.visibleFrame
-        let frame = NSMakeRect(visible.midX - 220, visible.midY - 150, 440, 300)
+        let frame = NSMakeRect(visible.midX - 220, visible.midY - 150, 440, 300).integral
         try checkMenu(screen: screen, ownerFrame: frame, point: NSMakePoint(frame.midX, frame.maxY - 5), betterInside: true) { menu, bounds, _ in
             XCTAssertEqual(menu.maxY, bounds.maxY, accuracy: 0.01)
             XCTAssertGreaterThanOrEqual(menu.minY, bounds.minY)
@@ -131,13 +131,15 @@ final class AppMenuScreenPositionTests: XCTestCase {
         }
     }
 
-    func testHorizontalAdjustmentIsUnchangedAtTheTopEdge() throws {
+    func testHorizontalAdjustmentStaysInsideScreenAtTheTopEdge() throws {
         let screen = try XCTUnwrap(NSScreen.main)
         let visible = screen.visibleFrame
         for x in [visible.minX + 1, visible.maxX - 1] {
-            try checkMenu(screen: screen, point: NSMakePoint(x, visible.maxY - 5)) { frame, bounds, point in
-                let expectedX = x < bounds.midX ? bounds.minX + 40 : point.x - 18 - frame.width + 40
+            try checkMenu(screen: screen, point: NSMakePoint(x, visible.maxY - 5)) { frame, bounds, _ in
+                let expectedX = x < bounds.midX ? bounds.minX + 40 : bounds.maxX - frame.width
                 XCTAssertEqual(frame.minX, expectedX, accuracy: 0.01)
+                XCTAssertGreaterThanOrEqual(frame.minX, bounds.minX)
+                XCTAssertLessThanOrEqual(frame.maxX, bounds.maxX)
                 XCTAssertEqual(frame.maxY, bounds.maxY, accuracy: 0.01)
             }
         }
