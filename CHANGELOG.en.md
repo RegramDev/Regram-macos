@@ -2,6 +2,16 @@
 
 [简体中文](CHANGELOG.md) · **English**
 
+## 13.1.0 (283394) — 2026-11-03
+
+- Display retained deleted messages at 50% opacity, fading the text, media, bubble and timestamp together to distinguish them from ordinary messages.
+- Merge seven upstream updates through `5c8b687e`, preserving Regram's message retention, filtering and translation extensions.
+- Fix video playback when Telegram codec metadata is missing, paused seeks showing stale frames, and stale frames when resuming playback.
+- Preserve structured code and quote formatting through copying, pasting, editing and input-attribute inheritance.
+- Keep reaction actions usable after message-row updates and recheck message eligibility and permissions before applying them.
+- Unmute individual topics with one click while the forum is muted. Ignore empty-peer read indices when switching chats.
+- Read the Mac model from IORegistry to reduce startup waits. Retain Regram's menu screen-boundary constraints and add upstream positioning regressions.
+
 ## 13.1.0 (283393) — 2026-11-01
 
 - Merge 18 upstream updates through `55830942`, retaining Regram's message menus, filtering and translation extensions.

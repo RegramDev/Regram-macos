@@ -6,7 +6,7 @@
     <a href="README.md">简体中文</a> · <strong>English</strong>
   </p>
   <p>
-    <a href="https://github.com/RegramDev/Regram-macos/releases/tag/v13.1.0-283393">Download</a> ·
+    <a href="https://github.com/RegramDev/Regram-macos/releases/tag/v13.1.0-283394">Download</a> ·
     <a href="CHANGELOG.en.md">Changelog</a> ·
     <a href="INSTALL.md">Build instructions</a> ·
     <a href="https://github.com/RegramDev/Regram-macos/issues">Report an issue</a> ·
@@ -30,14 +30,14 @@ Regram is an unofficial client based on [Telegram for macOS](https://github.com/
 
 ## Downloads and updates
 
-Regram 13.1.0 (283393) requires macOS 12.0 or later and provides separate packages:
+Regram 13.1.0 (283394) requires macOS 12.0 or later and provides separate packages:
 
 | Mac | Package |
 | --- | --- |
-| Apple Silicon (M series) | [arm64 DMG](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283393/Regram-13.1.0-283393-arm64.dmg) |
-| Intel | [x86_64 DMG](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283393/Regram-13.1.0-283393-x86_64.dmg) |
+| Apple Silicon (M series) | [arm64 DMG](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283394/Regram-13.1.0-283394-arm64.dmg) |
+| Intel | [x86_64 DMG](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283394/Regram-13.1.0-283394-x86_64.dmg) |
 
-Verify downloads with [SHA256SUMS.txt](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283393/SHA256SUMS.txt). See the [changelog](CHANGELOG.en.md) for additions and fixes.
+Verify downloads with [SHA256SUMS.txt](https://github.com/RegramDev/Regram-macos/releases/download/v13.1.0-283394/SHA256SUMS.txt). See the [changelog](CHANGELOG.en.md) for additions and fixes.
 
 This release is signed with an Apple/Mac Development certificate and has not been notarized by Apple. Open the downloaded DMG, drag Regram to Applications, and launch it from that folder.
 
