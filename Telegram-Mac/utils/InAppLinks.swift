@@ -224,7 +224,7 @@ var globalLinkExecutor:TextViewInteractions {
             let pb = NSPasteboard.general
 
  
-            let modified: NSMutableAttributedString = string.mutableCopy() as! NSMutableAttributedString
+            let modified = NSMutableAttributedString(attributedString: chatTextInputCopyText(string))
             
             var replaceRanges:[(NSRange, String)] = []
             
@@ -251,9 +251,6 @@ var globalLinkExecutor:TextViewInteractions {
                 modified.replaceCharacters(in: range.0, with: range.1)
             }
             
-            //modified.removeAttribute(TextInputAttributes.quote, range: modified.range)
-            modified.removeAttribute(TextInputAttributes.code, range: modified.range)
-            modified.removeAttribute(TextInputAttributes.monospace, range: modified.range)
 
             let input = ChatTextInputState(attributedText: modified, selectionRange: 0 ..< modified.length)
             
