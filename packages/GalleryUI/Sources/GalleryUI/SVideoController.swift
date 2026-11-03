@@ -26,6 +26,8 @@ import FoundationUtils
 import ObjcUtils
 import TelegramMediaResources
 import InputDataUI
+import RegramCore
+import RegramSignals
 
 
 private func makePlayer(account: Account, reference: FileMediaReference, fetchAutomatically: Bool = false, isProtected: Bool = false) -> (UniversalVideoContentView & NSView) {
@@ -376,6 +378,7 @@ public class SVideoController: GenericViewController<SVideoView>, PictureInPictu
     }
     
     private func runAdMessages(_ messages: [Message], _ startDelay: Int32, _ betweenDelay: Int32?) {
+        guard !RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["disableAllAds"].bool else { return }
         
         let context = self.context
         
@@ -414,7 +417,7 @@ public class SVideoController: GenericViewController<SVideoView>, PictureInPictu
         })
         
         makeNext = { [weak self, weak arguments] current, remove in
-            guard let arguments else {
+            guard let arguments, !RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["disableAllAds"].bool else {
                 return
             }
             let index = messages.firstIndex(where: { $0 == current })
@@ -425,6 +428,7 @@ public class SVideoController: GenericViewController<SVideoView>, PictureInPictu
                 }
                 if let betweenDelay {
                     self?.nextAdDisposable.set(delaySignal(Double(betweenDelay)).start(completed: {
+                        guard !RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["disableAllAds"].bool else { return }
                         self?.genericView.set(adMessage: messages[index + 1], arguments: arguments, animated: true)
                     }))
                 }
@@ -464,22 +468,27 @@ public class SVideoController: GenericViewController<SVideoView>, PictureInPictu
         }
         
         if let message, let peer = message.peers[message.id.peerId], peer.isChannel {
-            let adContext = context.engine.messages.adMessages(peerId: message.id.peerId, messageId: message.id)
-            self.adContext = adContext
-            
-            var invoked: Bool = false
-            
-            adStateDisposable.set(combineLatest(queue:.mainQueue(), adContext.state, status).startStrict(next: { [weak self] values in
-               
-                let ( _, messages, startDelay, betweenDelay) = values.0
-                let status = values.1
-                
-                if !messages.isEmpty, let startDelay, !invoked {
-                    if Int32(status.timestamp) >= startDelay {
+            let hidden = regramPreferenceChanges(accountId: context.peerId.toInt64(), keys: ["disableAllAds"]) |> map { $0["disableAllAds"].bool } |> deliverOnMainQueue
+            adStateDisposable.set(regramSponsoredContent(hidden: hidden, empty: false, source: { [weak self] in
+                guard let self else { return .complete() }
+                let adContext = context.engine.messages.adMessages(peerId: message.id.peerId, messageId: message.id)
+                self.adContext = adContext
+                var invoked = false
+                return combineLatest(queue: .mainQueue(), adContext.state, self.status) |> map { [weak self] values in
+                    let (_, messages, startDelay, betweenDelay) = values.0
+                    let status = values.1
+                    if !messages.isEmpty, let startDelay, !invoked, Int32(status.timestamp) >= startDelay {
                         self?.runAdMessages(messages, startDelay, betweenDelay)
                         invoked = true
                     }
+                    return true
                 }
+            }).start(next: { [weak self] enabled in
+                guard let self, !enabled else { return }
+                self.nextAdDisposable.set(nil)
+                self.adContext = nil
+                self.genericView.set(adMessage: nil, arguments: nil, animated: true)
+                self.updateControlVisibility()
             }))
         }
 

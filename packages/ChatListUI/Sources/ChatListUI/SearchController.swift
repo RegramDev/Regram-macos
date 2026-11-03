@@ -1089,11 +1089,11 @@ public class SearchController<Context: AccountContextProtocol>: GenericViewContr
                             let adPeers: Signal<[AdPeer], NoError>
                             
                             if query.length >= 4 {
-                                adPeers = combineLatest(context.engine.peers.searchAdPeers(query: query), searchAdState) |> map { peers, state in
-                                    let peers = peers.filter({
-                                        !state.exclude.contains($0.opaqueId) && !state.excludeAll
-                                    })
-                                    return peers
+                                let hidden = regramPreferenceChanges(accountId: context.peerId.toInt64(), keys: ["disableAllAds"]) |> map { $0["disableAllAds"].bool }
+                                adPeers = regramSponsoredContent(hidden: hidden, empty: []) {
+                                    combineLatest(context.engine.peers.searchAdPeers(query: query), searchAdState) |> map { peers, state in
+                                        peers.filter { !state.exclude.contains($0.opaqueId) && !state.excludeAll }
+                                    }
                                 }
                             } else {
                                 adPeers = .single([])
@@ -1859,12 +1859,14 @@ public class SearchController<Context: AccountContextProtocol>: GenericViewContr
         let refreshRevision = Atomic<Int64>(value: Int64.min)
         let appearanceAndRegram = combineLatest(appearanceSignal, regramContentPreferenceChanges(accountId: context.peerId.toInt64()), regramRemarkChanges(accountId: context.peerId.toInt64())) |> map { appearance, _, _ in appearance }
         let transition = combineLatest(queue: prepareQueue, searchItems, appearanceAndRegram, context.globalPeerHandler.get() |> distinctUntilChanged, pinnedPromise.get()) |> map { value, appearance, location, pinnedItems in
+            let hidesSponsoredMessages = RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["disableAllAds"].bool
             var seenPeers = Set<PeerId>()
             var visible = value.0.filter { entry in
                 switch entry {
                 case let .localPeer(peer, _, _, _, _, _, _):
                     guard seenPeers.insert(peer.peerId).inserted else { return false }
-                case let .globalPeer(peer, _, _, _):
+                case let .globalPeer(peer, _, _, adPeer):
+                    if hidesSponsoredMessages, adPeer != nil { return false }
                     guard seenPeers.insert(peer.peer.id).inserted else { return false }
                 case let .savedMessages(peer):
                     guard seenPeers.insert(peer.id).inserted else { return false }

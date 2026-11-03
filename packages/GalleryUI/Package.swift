@@ -59,6 +59,7 @@ let package = Package(
             name: "GalleryUI",
             dependencies: [
                 .product(name: "RegramCore", package: "RegramCore"),
+                .product(name: "RegramSignals", package: "RegramCore"),
                 .product(name: "SwiftSignalKit", package: "SSignalKit", condition: nil),
                 .product(name: "TelegramCore", package: "TelegramCore", condition: nil),
                 .product(name: "Postbox", package: "Postbox", condition: nil),

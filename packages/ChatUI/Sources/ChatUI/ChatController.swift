@@ -1239,7 +1239,7 @@ public class ChatControllerView : View, ChatInputDelegate {
     }
     
     func updateHeader(_ interfaceState:ChatPresentationInterfaceState, _ animated:Bool, _ animateOnlyHeader: Bool = false) {
-
+        let hidesSponsoredMessages = RegramPreferences.shared.settings(accountId: chatInteraction.interactionContext.peerId.toInt64())["disableAllAds"].bool
     
         var voiceChat: ChatActiveGroupCallInfo?
         if interfaceState.groupCall?.data?.groupCall == nil, interfaceState.threadInfo == nil, interfaceState.chatMode != .preview {
@@ -1303,7 +1303,7 @@ public class ChatControllerView : View, ChatInputDelegate {
             value = .pendingRequests(Int(count), inviteRequestsPendingPeers)
         } else if interfaceState.reportMode != nil {
             value = .none
-        } else if let initialAction = interfaceState.initialAction, case let .ad(kind) = initialAction {
+        } else if !hidesSponsoredMessages, let initialAction = interfaceState.initialAction, case let .ad(kind) = initialAction {
             value = .promo(kind)
         } else if let peerStatus = interfaceState.peerStatus, let settings = peerStatus.peerStatusSettings, !settings.flags.isEmpty {
             
@@ -1377,7 +1377,7 @@ public class ChatControllerView : View, ChatInputDelegate {
             translate = nil
         }
 
-        let botAd: Message? = (interfaceState.historyCount ?? 0) >= 2 ? interfaceState.adMessage : nil
+        let botAd: Message? = !hidesSponsoredMessages && (interfaceState.historyCount ?? 0) >= 2 ? interfaceState.adMessage : nil
         
              
         let state: ChatHeaderState = .init(main: value, voiceChat: voiceChat, translate: translate, botManager: interfaceState.chatMode == .preview ? nil : interfaceState.connectedBot, botAd: botAd.flatMap { .init(message: $0, chatInteraction: chatInteraction) }, monoforumHorizontal: interfaceState.monoforumState == .horizontal ? monoforumHorizontalData : nil)
@@ -3738,7 +3738,8 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         
         let adMessages:Signal<(fixed: Message?, opportunistic: [Message], version: Int), NoError>
         if let ad = self.adMessages {
-            adMessages = ad.allMessages
+            let hidden = regramPreferenceChanges(accountId: context.peerId.toInt64(), keys: ["disableAllAds"]) |> map { $0["disableAllAds"].bool }
+            adMessages = regramSponsoredContent(hidden: hidden, empty: (nil, [], 0), source: { ad.allMessages })
         } else {
             adMessages = .single((nil, [], 0))
         }
@@ -8585,11 +8586,12 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
             }
         }))
 
-        let peerPresentationPreferences = regramPreferenceChanges(accountId: context.peerId.toInt64()) |> map { [$0["hideStories"], $0["features.disableChatAvatarStories"], $0["localPremium"], $0["localPremiumEmojiStatus"]] } |> distinctUntilChanged
+        let peerPresentationPreferences = regramPreferenceChanges(accountId: context.peerId.toInt64()) |> map { [$0["hideStories"], $0["features.disableChatAvatarStories"], $0["localPremium"], $0["localPremiumEmojiStatus"], $0["disableAllAds"]] } |> distinctUntilChanged
         presentationDisposable.add((peerPresentationPreferences |> mapToSignal { _ in titlePeerView |> take(1) } |> deliverOnMainQueue).start(next: { [weak self] titlePeer in
             guard let self else { return }
             let state = self.uiState.with { $0 }
             self.genericView.bubblesView.update(titlePeer, story: state.storyState, counters: state.answersAndOnline, animated: false)
+            self.genericView.updateHeader(self.chatInteraction.presentation, false)
             for (item, _, _) in self.genericView.tableView.visibleItems() where item is ChatRowItem {
                 self.genericView.tableView.reloadData(row: item.index, animated: false)
             }
