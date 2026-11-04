@@ -169,13 +169,9 @@ public final class DevicesContext : NSObject {
         observers.append(NotificationCenter.default.addObserver(forName: NSNotification.Name.AVCaptureDeviceWasDisconnected, object: nil, queue: nil, using: { [weak self] _ in
             self?.update()
         }))
-        AudioListener.retainOutputListener()
-        
-
-        
-        AudioObjectAddPropertyListener(AudioObjectID(kAudioObjectSystemObject), &AudioAddress.inputDevice, AudioListener.input, nil)
-        
-        AudioObjectAddPropertyListener(AudioObjectID(kAudioObjectSystemObject), &AudioAddress.devices, AudioListener.devices, nil)
+        devicesQueue.async {
+            self.installAudioListeners()
+        }
         
         observers.append(NotificationCenter.default.addObserver(forName: AudioNotification.audioDevicesDidChange.notificationName, object: nil, queue: nil, using: { [weak self] _ in
             self?.update()
@@ -286,6 +282,12 @@ public final class DevicesContext : NSObject {
         return resolveOutputDeviceId(selectedId: settings.audioOutputDeviceId, available: available, defaultId: Audio.getDeviceUid(deviceId: Audio.getDefaultOutputDevice()))
     }
     
+    private func installAudioListeners() {
+        AudioListener.retainOutputListener()
+        AudioObjectAddPropertyListener(AudioObjectID(kAudioObjectSystemObject), &AudioAddress.inputDevice, AudioListener.input, nil)
+        AudioObjectAddPropertyListener(AudioObjectID(kAudioObjectSystemObject), &AudioAddress.devices, AudioListener.devices, nil)
+    }
+
     deinit {
         for observer in observers { NotificationCenter.default.removeObserver(observer) }
         AudioListener.releaseOutputListener()

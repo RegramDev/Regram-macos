@@ -1902,7 +1902,7 @@ public class PeerListContainerView : Control {
             return true
         })
         tableView.contentInsets.bottom = contentBottomInset + regramBottomFoldersHeight
-        tableView.scrollerInsets = .init(left: 0, right: 0, top: top, bottom: contentBottomInset + regramBottomFoldersHeight)
+        tableView.scrollerInsets = .init(left: 0, right: 0, top: top, bottom: 0)
         updateTableMask(spaceHeight: top)
     }
 

@@ -411,7 +411,7 @@ public class GalleryViewer: NSResponder {
                 return false
             }
         }
-        window.set(handler: { [weak self] event in
+        window.setGalleryKeyHandler({ [weak self] event in
             guard let `self` = self else {return .rejected}
             if self.pager.selectedItem is MGalleryVideoItem || self.pager.selectedItem is MGalleryExternalVideoItem {
                 self.pager.selectedItem?.togglePlayerOrPause()
@@ -421,13 +421,13 @@ public class GalleryViewer: NSResponder {
             }
         }, with:self, for: .Space)
         
-        window.set(handler: { [weak self] event in
+        window.setGalleryKeyHandler({ [weak self] event in
             guard let `self` = self else {return .rejected}
             self.pager.toggleFullScreen()
             return .invoked
         }, with:self, for: .F)
         
-        window.set(handler: interactions.dismiss, with:self, for: .Escape)
+        window.setGalleryKeyHandler(interactions.dismiss, with:self, for: .Escape)
         
         window.closeInterceptor = { [weak self] in
             if let event = NSApp.currentEvent {
@@ -436,35 +436,35 @@ public class GalleryViewer: NSResponder {
             return true
         }
         
-        window.set(handler: interactions.next, with:self, for: .RightArrow)
-        window.set(handler: interactions.previous, with:self, for: .LeftArrow)
+        window.setGalleryKeyHandler(interactions.next, with:self, for: .RightArrow)
+        window.setGalleryKeyHandler(interactions.previous, with:self, for: .LeftArrow)
         
-        window.set(handler: { [weak self] _ -> KeyHandlerResult in
+        window.setGalleryKeyHandler({ [weak self] _ -> KeyHandlerResult in
             self?.pager.zoomOut()
             return .invoked
         }, with: self, for: .Minus)
         
-        window.set(handler: { [weak self] _ -> KeyHandlerResult in
+        window.setGalleryKeyHandler({ [weak self] _ -> KeyHandlerResult in
             self?.pager.zoomIn()
             return .invoked
         }, with: self, for: .Equal)
         
-        window.set(handler: { [weak self] _ -> KeyHandlerResult in
+        window.setGalleryKeyHandler({ [weak self] _ -> KeyHandlerResult in
             self?.pager.decreaseSpeed()
             return .invoked
         }, with: self, for: .Minus, modifierFlags: [.command, .option])
         
-        window.set(handler: { [weak self] _ -> KeyHandlerResult in
+        window.setGalleryKeyHandler({ [weak self] _ -> KeyHandlerResult in
             self?.pager.increaseSpeed()
             return .invoked
         }, with: self, for: .Equal, modifierFlags: [.command, .option])
         
-        window.set(handler: { [weak self] _ -> KeyHandlerResult in
+        window.setGalleryKeyHandler({ [weak self] _ -> KeyHandlerResult in
             self?.pager.rotateLeft()
             return .invoked
         }, with: self, for: .R, modifierFlags: [.command])
         
-        window.set(handler: { [weak self] _ -> KeyHandlerResult in
+        window.setGalleryKeyHandler({ [weak self] _ -> KeyHandlerResult in
             self?.saveAs()
             return .invoked
         }, with: self, for: .S, priority: .high, modifierFlags: [.command])
@@ -1777,6 +1777,7 @@ public class GalleryViewer: NSResponder {
         readyDispose.set(nil)
         didSetReady = false
         NotificationCenter.default.removeObserver(self)
+        (pager.selectedItem as? MGalleryVideoItem)?.deactivateMediaControls()
         if animated {
             let presentationGeneration = self.presentationGeneration
             backgroundView._change(opacity: 0, animated: true)
