@@ -2617,7 +2617,7 @@ public class ChatRowView: TableRowView, Notifable, MultipleSelectable, ChatTextS
         guard let item = item as? ChatRowItem else {
             return
         }
-        rowView.alphaValue = item.message?.rgIsRevoked == true ? 0.5 : 1.0
+        rowView.alphaValue = item.regramRevokedOpacity
         isPreparingItem = true
         
         if self.animatedView != nil && self.animatedView?.stableId != item.stableId {

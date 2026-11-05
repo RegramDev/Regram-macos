@@ -5,7 +5,7 @@ class MMMenuItem: NSMenuItem {
     override var title: String {
         get {
             if let identifier = identifier?.rawValue {
-                return _NSLocalizedString("\(identifier).title")
+                return _NSLocalizedString("\(identifier).title").replacingOccurrences(of: "Telegram", with: "Regram")
             }
             return super.title
         }
@@ -21,7 +21,7 @@ class MMMenu : NSMenu {
        
         get {
             if let identifier = identifier?.rawValue {
-                return _NSLocalizedString("\(identifier).title")
+                return _NSLocalizedString("\(identifier).title").replacingOccurrences(of: "Telegram", with: "Regram")
             }
             return super.title
         }

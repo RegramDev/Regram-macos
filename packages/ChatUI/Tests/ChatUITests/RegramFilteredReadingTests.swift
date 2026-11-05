@@ -8,8 +8,8 @@ import RegramCore
 final class RegramFilteredReadingTests: XCTestCase {
     private let peerId = PeerId(namespace: Namespaces.Peer.CloudChannel, id: ._internalFromInt64Value(10))
 
-    private func message(_ id: Int32, text: String = "hidden", threadId: Int64? = nil, version: UInt32 = 0, incoming: Bool = true, tagged: Bool = true, pending: Bool = false, consumed: Bool = false) -> Message {
-        Message(stableId: UInt32(id), stableVersion: version, id: MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: id), globallyUniqueId: nil, groupingKey: nil, groupInfo: nil, threadId: threadId, timestamp: id, flags: incoming ? [.Incoming] : [], tags: tagged ? [.unseenPersonalMessage] : [], globalTags: [], localTags: [], customTags: [], forwardInfo: nil, author: nil, text: text, attributes: [ConsumablePersonalMentionMessageAttribute(consumed: consumed, pending: pending)], media: [], peers: SimpleDictionary(), associatedMessages: SimpleDictionary(), associatedMessageIds: [], associatedMedia: [:], associatedThreadInfo: nil, associatedStories: [:])
+    private func message(_ id: Int32, text: String = "hidden", threadId: Int64? = nil, version: UInt32 = 0, incoming: Bool = true, tagged: Bool = true, pending: Bool = false, consumed: Bool = false, revoked: Bool = false) -> Message {
+        Message(stableId: UInt32(id), stableVersion: version, id: MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: id), globallyUniqueId: nil, groupingKey: nil, groupInfo: nil, threadId: threadId, timestamp: id, flags: incoming ? [.Incoming] : [], tags: tagged ? [.unseenPersonalMessage] : [], globalTags: [], localTags: [], customTags: [], forwardInfo: nil, author: nil, text: text, attributes: [ConsumablePersonalMentionMessageAttribute(consumed: consumed, pending: pending)] + (revoked ? [RGRevokedMessageAttribute(date: 1)] : []), media: [], peers: SimpleDictionary(), associatedMessages: SimpleDictionary(), associatedMessageIds: [], associatedMedia: [:], associatedThreadInfo: nil, associatedStories: [:])
     }
 
     func testFilteredTailAdvancesOnlyAtTheLatestEdge() {
@@ -41,4 +41,37 @@ final class RegramFilteredReadingTests: XCTestCase {
         RegramPreferences.shared.update(accountId: accountId) { $0["messageFilterRules"] = .string("[]") }
         XCTAssertFalse(regramShouldHideMessage(message(1), accountId: accountId))
     }
+    func testRevokedMessagesRequireExplicitRetentionEvenWhenTimersAreIgnored() {
+        let accountId = Int64.min + 283395
+        defer {
+            RegramTemporaryReveal.shared.clear(accountId: accountId)
+            RegramPreferences.shared.removeAccount(accountId)
+        }
+        RegramPreferences.shared.update(accountId: accountId) {
+            $0["antiAutoDelete"] = .bool(true)
+            $0["antiSelfDestruct"] = .bool(true)
+        }
+        for incoming in [true, false] {
+            XCTAssertTrue(regramShouldHideMessage(message(1, incoming: incoming, revoked: true), accountId: accountId))
+            XCTAssertFalse(regramShouldHideMessage(message(1, incoming: incoming), accountId: accountId))
+        }
+        RegramTemporaryReveal.shared.setRevealed(true, accountId: accountId, peerId: peerId.toInt64())
+        XCTAssertTrue(regramShouldHideMessage(message(1, revoked: true), accountId: accountId))
+        RegramPreferences.shared.update(accountId: accountId) { $0["antiRevoke"] = .bool(true) }
+        XCTAssertFalse(regramShouldHideMessage(message(1, revoked: true), accountId: accountId))
+        RegramPreferences.shared.update(accountId: accountId) { $0["antiRevoke"] = .bool(false) }
+        XCTAssertTrue(regramShouldHideMessage(message(1, revoked: true), accountId: accountId))
+        RegramPreferences.shared.update(accountId: accountId) { $0["antiRevokePeerIds"] = .strings([String(peerId.toInt64())]) }
+        XCTAssertFalse(regramShouldHideMessage(message(1, revoked: true), accountId: accountId))
+    }
+
+    func testVisibilityPayloadDistinguishesRevokedStateAtTheSameVersion() {
+        let visible = RegramMessageFilterPayload(message(1))
+        let revoked = RegramMessageFilterPayload(message(1, revoked: true))
+        let filter = RegramFilterSnapshot(settings: RegramAccountSettings())
+        XCTAssertNotEqual(visible, revoked)
+        XCTAssertFalse(visible.shouldHide(accountId: 9, filter: filter, revision: 0))
+        XCTAssertTrue(revoked.shouldHide(accountId: 9, filter: filter, revision: 0))
+    }
+
 }

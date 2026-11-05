@@ -3,6 +3,7 @@ import TGUIKit
 import Localization
 import TelegramTheme
 import TelegramUtils
+import RegramCore
 
 public var APP_VERSION_STRING: String {
     var vText = "\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? "1").\(Bundle.main.infoDictionary?["CFBundleVersion"] ?? "0")"
@@ -30,7 +31,8 @@ fileprivate class AboutModalView : Control {
         formatter.dateFormat = "yyyy"
         
         
-        let copyrightLayout = TextViewLayout(.initialize(string: "Copyright © 2016 - \(formatter.string(from: Date(timeIntervalSinceReferenceDate: Date.timeIntervalSinceReferenceDate))) TELEGRAM MESSENGER", color: theme.colors.grayText, font: .normal(.text)), alignment: .center)
+        let attribution = String(format: regramLocalizedString("About.Attribution", languageCode: appCurrentLanguage.primaryLanguage.languageCode), formatter.string(from: Date()))
+        let copyrightLayout = TextViewLayout(.initialize(string: attribution, color: theme.colors.grayText, font: .normal(.small)), alignment: .center)
         copyrightLayout.measure(width:frameRect.width - 40)
         
         
@@ -38,7 +40,7 @@ fileprivate class AboutModalView : Control {
 
         let attr = NSMutableAttributedString()
         
-        _ = attr.append(string: appName, color: theme.colors.text, font: .medium(.header))
+        _ = attr.append(string: "Regram", color: theme.colors.text, font: .medium(.header))
         _ = attr.append(string: "\n\(vText)", color: theme.colors.link, font: .medium(.text))
         
         attr.addAttribute(.link, value: "copy", range: attr.range)
@@ -47,7 +49,7 @@ fileprivate class AboutModalView : Control {
         
         
 
-        _ = attr.append(string: strings().aboutDescription, color: theme.colors.text, font: .normal(.text))
+        _ = attr.append(string: regramLocalizedString("About.Description", languageCode: appCurrentLanguage.primaryLanguage.languageCode), color: theme.colors.text, font: .normal(.text))
         
         let descLayout = TextViewLayout(attr, alignment: .center)
         descLayout.measure(width:frameRect.width - 40)

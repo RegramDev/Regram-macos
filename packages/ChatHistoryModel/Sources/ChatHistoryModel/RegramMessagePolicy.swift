@@ -14,6 +14,8 @@ public struct RegramMessageFilterPayload: Equatable {
     private let text: String
     private let authorId: PeerId?
     private let incoming: Bool
+    private let revoked: Bool
+    private let authorIsBot: Bool
     private let richPages: [RichPage]
 
     fileprivate struct CacheIdentity {
@@ -24,6 +26,8 @@ public struct RegramMessageFilterPayload: Equatable {
         private let text: String
         private let authorId: PeerId?
         private let incoming: Bool
+        private let revoked: Bool
+        private let authorIsBot: Bool
         private let pages: [WeakPage]
         let cost: Int
 
@@ -31,12 +35,14 @@ public struct RegramMessageFilterPayload: Equatable {
             text = payload.text
             authorId = payload.authorId
             incoming = payload.incoming
+            revoked = payload.revoked
+            authorIsBot = payload.authorIsBot
             pages = payload.richPages.map { WeakPage($0.page) }
             cost = text.utf8.count + pages.count * 48 + 128
         }
 
         func matches(_ payload: RegramMessageFilterPayload) -> Bool {
-            guard text == payload.text, authorId == payload.authorId, incoming == payload.incoming, pages.count == payload.richPages.count else { return false }
+            guard text == payload.text, authorId == payload.authorId, incoming == payload.incoming, revoked == payload.revoked, authorIsBot == payload.authorIsBot, pages.count == payload.richPages.count else { return false }
             return zip(pages, payload.richPages).allSatisfy { previous, current in
                 guard let page = previous.page else { return false }
                 return page === current.page || page.blocks == current.blocks
@@ -50,6 +56,8 @@ public struct RegramMessageFilterPayload: Equatable {
         text = message.text
         authorId = message.author?.id
         incoming = !message.flags.intersection(.IsIncomingMask).isEmpty
+        revoked = message.rgIsRevoked
+        authorIsBot = (message.author as? TelegramUser)?.botInfo != nil
         richPages = message.attributes.compactMap { attribute in
             guard let rich = attribute as? RichTextMessageAttribute else { return nil }
             let page = rich.fullInstantPage ?? rich.instantPage
@@ -64,6 +72,7 @@ public struct RegramMessageFilterPayload: Equatable {
     }
 
     public func shouldHide(accountId: Int64, filter: RegramFilterSnapshot, revision: Int64) -> Bool {
+        if revoked && !filter.shouldRetainRevokedMessage(peerId: messageId.peerId.toInt64(), authorIsBot: authorIsBot) { return true }
         guard incoming, !filter.isEmpty else { return false }
         let key = RegramMessageVisibilityCache.Key(accountId: accountId, messageId: messageId)
         if let hidden = RegramMessageVisibilityCache.shared.value(key, version: version, revision: revision, payload: self) { return hidden }
@@ -73,7 +82,7 @@ public struct RegramMessageFilterPayload: Equatable {
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
-        guard lhs.messageId == rhs.messageId, lhs.version == rhs.version, lhs.text == rhs.text, lhs.authorId == rhs.authorId, lhs.incoming == rhs.incoming, lhs.richPages.count == rhs.richPages.count else { return false }
+        guard lhs.messageId == rhs.messageId, lhs.version == rhs.version, lhs.text == rhs.text, lhs.authorId == rhs.authorId, lhs.incoming == rhs.incoming, lhs.revoked == rhs.revoked, lhs.authorIsBot == rhs.authorIsBot, lhs.richPages.count == rhs.richPages.count else { return false }
         return zip(lhs.richPages, rhs.richPages).allSatisfy { $0.page === $1.page || $0.blocks == $1.blocks }
     }
 }
@@ -172,15 +181,14 @@ public func regramMessageText(_ message: Message) -> String {
 
 public func regramShouldHideMessage(_ message: Message, accountId: Int64, temporaryReveal: Bool = true) -> Bool {
     let peerId = message.id.peerId.toInt64()
-    if temporaryReveal, RegramTemporaryReveal.shared.isRevealed(accountId: accountId, peerId: peerId) { return false }
-    guard !message.flags.intersection(.IsIncomingMask).isEmpty else { return false }
     let captured = RegramPreferences.shared.captureFilter(accountId: accountId)
+    if message.rgIsRevoked && !captured.filter.shouldRetainRevokedMessage(peerId: peerId, authorIsBot: (message.author as? TelegramUser)?.botInfo != nil) { return true }
+    if temporaryReveal, RegramTemporaryReveal.shared.isRevealed(accountId: accountId, peerId: peerId) { return false }
     return regramShouldHideMessage(message, accountId: accountId, filter: captured.filter, revision: captured.revision)
 }
 
 public func regramShouldHideMessage(_ message: Message, accountId: Int64, filter: RegramFilterSnapshot, revision: Int64) -> Bool {
-    guard !message.flags.intersection(.IsIncomingMask).isEmpty else { return false }
-    guard !filter.isEmpty else { return false }
+    if !message.rgIsRevoked && (filter.isEmpty || message.flags.intersection(.IsIncomingMask).isEmpty) { return false }
     let payload = RegramMessageFilterPayload(message)
     return payload.shouldHide(accountId: accountId, filter: filter, revision: revision)
 }

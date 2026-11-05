@@ -28,6 +28,7 @@ func regramChatListPreviewUpperBound(_ messages: [Message]) -> MessageIndex? {
 }
 
 func regramChatListMessageIsHidden(_ message: Message, filter: RegramFilterSnapshot) -> Bool {
+    if message.rgIsRevoked && !filter.shouldRetainRevokedMessage(peerId: message.id.peerId.toInt64(), authorIsBot: (message.author as? TelegramUser)?.botInfo != nil) { return true }
     guard !filter.isEmpty, !message.flags.intersection(.IsIncomingMask).isEmpty else { return false }
     return filter.shouldHide(peerId: message.id.peerId.toInt64(), authorId: message.author?.id.toInt64(), incoming: true, text: { regramMessageText(message) })
 }
@@ -46,8 +47,7 @@ struct RegramChatListPreparedVisibility {
     private var hidden: [MessageId: Value] = [:]
 
     init(messages: [Message], accountId: Int64, filter: RegramFilterSnapshot, revision: Int64) {
-        guard !filter.isEmpty else { return }
-        for message in messages where !message.flags.intersection(.IsIncomingMask).isEmpty {
+        for message in messages where message.rgIsRevoked || (!filter.isEmpty && !message.flags.intersection(.IsIncomingMask).isEmpty) {
             let payload = RegramMessageFilterPayload(message)
             if payload.shouldHide(accountId: accountId, filter: filter, revision: revision) {
                 hidden[message.id] = Value(version: message.stableVersion, payload: payload)

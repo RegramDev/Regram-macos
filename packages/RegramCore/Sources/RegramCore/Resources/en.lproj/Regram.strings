@@ -5,7 +5,7 @@
 "AntiFeatures.DisableAds" = "Hide sponsored messages";
 "AntiFeatures.EditHistory" = "Save Edit History";
 "AntiFeatures.Header" = "ANTI-DELETION & RESTRICTIONS";
-"AntiFeatures.Notice" = "Only affects what is kept on this device. Messages you delete yourself are still removed.";
+"AntiFeatures.Notice" = "Only affects this device. Ignoring timers does not enable Keep Deleted Messages. Messages you delete yourself are still removed.";
 "AntiFeatures.Revoke" = "Keep deleted messages";
 "AntiFeatures.SaveProtected" = "Allow saving protected content";
 "AntiFeatures.SaveProtectedStories" = "Allow saving protected stories";
@@ -2847,3 +2847,8 @@
 "ImageTranslation.TooLarge" = "This image has too much text to translate at once. Select some text or crop the image and try again.";
 "webTranslation.translate" = "Translate";
 "Settings.Transcription.ConfigurationNotice" = "Choose a recognition service. Custom API settings appear when that service is selected; switching services keeps your saved configuration.";
+"About.Description" = "A Telegram client for macOS with Regram customization and privacy features.";
+"About.Attribution" = "Regram · Based on Telegram for macOS\nCopyright © 2016 – %@ Telegram Messenger";
+"RevokedMarker.DimMessages" = "Show Deleted Messages at Half Opacity";
+"RevokedMarker.RequiresEnabled" = "Turn on Keep Deleted Messages to customize deleted message markers and opacity.";
+"setting.revokedMarkerDimMessages" = "Show Deleted Messages at Half Opacity";

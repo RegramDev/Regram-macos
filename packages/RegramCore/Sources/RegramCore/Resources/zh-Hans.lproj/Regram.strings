@@ -5,7 +5,7 @@
 "AntiFeatures.DisableAds" = "隐藏赞助消息";
 "AntiFeatures.EditHistory" = "保存消息编辑历史";
 "AntiFeatures.Header" = "防删除与限制解除";
-"AntiFeatures.Notice" = "仅影响本机保留的内容。你自己删除的消息仍会被删除。";
+"AntiFeatures.Notice" = "仅影响本机。忽略计时不会开启防撤回；你自己删除的消息仍会被删除。";
 "AntiFeatures.Revoke" = "保留被撤回的消息";
 "AntiFeatures.SaveProtected" = "允许保存受保护内容";
 "AntiFeatures.SaveProtectedStories" = "允许保存受保护的快拍";
@@ -2847,3 +2847,8 @@
 "ImageTranslation.TooLarge" = "图片中的文字过多，无法一次翻译。请选择部分文字，或裁剪图片后重试。";
 "webTranslation.translate" = "翻译";
 "Settings.Transcription.ConfigurationNotice" = "选择语音识别服务。选用自定义 API 后可配置连接参数；切换服务会保留已保存的配置。";
+"About.Description" = "基于 Telegram 的 macOS 客户端，提供 Regram 的个性化与隐私功能。";
+"About.Attribution" = "Regram · 基于 Telegram for macOS\nCopyright © 2016 – %@ Telegram Messenger";
+"RevokedMarker.DimMessages" = "半透明显示已撤回消息";
+"RevokedMarker.RequiresEnabled" = "开启“保留被撤回的消息”后，才能设置撤回标记和半透明效果。";
+"setting.revokedMarkerDimMessages" = "半透明显示已撤回消息";

@@ -216,6 +216,7 @@ public enum RegramSettingsCatalog {
         .init("antiFeatures", "antiRevokeSkipBots", "AntiFeatures.SkipBots", keywords: "bot 机器人 機器人 防撤回"),
         .init("antiFeatures", "revokedMarker", "RevokedMarker.Title"),
         .init("revokedMarker", "style", "RevokedMarker.Style"),
+        .init("revokedMarker", "dimMessages", "RevokedMarker.DimMessages", keywords: "opacity transparent 半透明 透明度"),
         .init("revokedMarker", "text", "RevokedMarker.Text"),
         .init("revokedMarker", "color", "RevokedMarker.Color"),
         .init("revokedMarker", "apply", "NetworkPolicy.Apply"),

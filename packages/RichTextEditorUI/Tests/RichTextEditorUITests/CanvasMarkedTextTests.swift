@@ -41,6 +41,20 @@ final class CanvasMarkedTextTests: AppKitTestCase {
         }
     }
 
+    func testNativeReturnAndKeypadEnterReachTheHostSendHandler() throws {
+        for keyCode: UInt16 in [36, 76] {
+            for modifiers: NSEvent.ModifierFlags in [[], .command] {
+                let view = canvas("draft")
+                var sends = 0
+                view.onReturnKey = { sends += 1; return true }
+                let event = try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: modifiers, timestamp: 0, windowNumber: 0, context: nil, characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: keyCode))
+                view.keyDown(with: event)
+                XCTAssertEqual(sends, 1)
+                XCTAssertEqual(text(view), "draft")
+            }
+        }
+    }
+
     func testMarkedUpdatesReplaceTheWholeComposition() {
         let view = canvas("before after")
         let start = view.firstRenderableGlobal() + 7

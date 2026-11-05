@@ -2565,7 +2565,7 @@ index 7256668bf953823b2c324642f04290174fbf3825..34cf846dc4a736aefa80d0123f4b81f9
          if isOnline {
              let timer = SignalKitTimer(timeout: 30.0, repeat: false, completion: { [weak self] in
 diff --git a/submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift b/submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift
-index 713bf6f417f5126de698975d6577fdcac694f019..4b7bd3224a4fe9f67a5ff3eaee3fe207683923df 100644
+index 713bf6f417..d6ddee2f4b 100644
 --- a/submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift
 +++ b/submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift
 @@ -1,4 +1,7 @@
@@ -2582,10 +2582,10 @@ index 713bf6f417f5126de698975d6577fdcac694f019..4b7bd3224a4fe9f67a5ff3eaee3fe207
                      if let message = transaction.getMessage(entry.messageId) {
 +                        #if os(macOS)
 +                        let settings = RegramAccountScope.shared.settings(for: network)
-+                        let retentionKey = message.id.peerId.namespace == Namespaces.Peer.SecretChat ? "antiSelfDestruct" : "antiAutoDelete"
++                        let retentionKey = !isRemove || message.id.peerId.namespace == Namespaces.Peer.SecretChat ? "antiSelfDestruct" : "antiAutoDelete"
 +                        if settings[retentionKey].bool {
 +                            transaction.clearTimestampBasedAttribute(id: entry.messageId, tag: tag)
-+                            rgMarkMessageRevoked(transaction: transaction, id: entry.messageId, clearTimers: true)
++                            rgIgnoreMessageExpiry(transaction: transaction, id: entry.messageId, tag: tag)
 +                            return
 +                        }
 +                        #endif
@@ -2715,10 +2715,10 @@ index e38c0f96c77041c97293f8cc2c0386ebf62274ed..b875edf9b7def7decb627ee601fc3e1c
      }
 diff --git a/submodules/TelegramCore/Sources/State/RegramMessageRetention.swift b/submodules/TelegramCore/Sources/State/RegramMessageRetention.swift
 new file mode 100644
-index 0000000000000000000000000000000000000000..9b67f48eed71fcfcc01180e153138a9ed6d5d8c3
+index 0000000000..a4ea48c4f5
 --- /dev/null
 +++ b/submodules/TelegramCore/Sources/State/RegramMessageRetention.swift
-@@ -0,0 +1,32 @@
+@@ -0,0 +1,51 @@
 +#if os(macOS)
 +import Foundation
 +import Postbox
@@ -2747,6 +2747,25 @@ index 0000000000000000000000000000000000000000..9b67f48eed71fcfcc01180e153138a9e
 +    transaction.updateMessage(id, update: { message in
 +        guard !message.rgIsRevoked || clearTimers else { return .skip }
 +        let attributes = rgRevokedMessageAttributes(message: message, clearTimers: clearTimers, date: Int32(clamping: Int64(Date().timeIntervalSince1970)))
++        return .update(StoreMessage(id: message.id, customStableId: nil, globallyUniqueId: message.globallyUniqueId, groupingKey: message.groupingKey, threadId: message.threadId, timestamp: message.timestamp, flags: StoreMessageFlags(message.flags), tags: message.tags, globalTags: message.globalTags, localTags: message.localTags, forwardInfo: message.forwardInfo.flatMap(StoreMessageForwardInfo.init), authorId: message.author?.id, text: message.text, attributes: attributes, media: message.media))
++    })
++}
++
++func rgIgnoreMessageExpiry(transaction: Transaction, id: MessageId, tag: UInt16) {
++    transaction.updateMessage(id, update: { message in
++        var changed = false
++        let attributes: [MessageAttribute] = message.attributes.map { attribute in
++            if tag == 0, let timeout = attribute as? AutoremoveTimeoutMessageAttribute, !timeout.rgCountdownPaused {
++                changed = true
++                return AutoremoveTimeoutMessageAttribute(timeout: timeout.timeout, countdownBeginTime: timeout.countdownBeginTime, rgCountdownPaused: true)
++            }
++            if tag == 1, let timeout = attribute as? AutoclearTimeoutMessageAttribute, !timeout.rgCountdownPaused {
++                changed = true
++                return AutoclearTimeoutMessageAttribute(timeout: timeout.timeout, countdownBeginTime: timeout.countdownBeginTime, rgCountdownPaused: true)
++            }
++            return attribute
++        }
++        guard changed else { return .skip }
 +        return .update(StoreMessage(id: message.id, customStableId: nil, globallyUniqueId: message.globallyUniqueId, groupingKey: message.groupingKey, threadId: message.threadId, timestamp: message.timestamp, flags: StoreMessageFlags(message.flags), tags: message.tags, globalTags: message.globalTags, localTags: message.localTags, forwardInfo: message.forwardInfo.flatMap(StoreMessageForwardInfo.init), authorId: message.author?.id, text: message.text, attributes: attributes, media: message.media))
 +    })
 +}
@@ -2941,10 +2960,90 @@ index beaf799980ba9c20251f597b5187388091365635..ac0f5638e64af05118fc74df1e54b170
      }
  }
 diff --git a/submodules/TelegramCore/Sources/SyncCore/SyncCore_AutoremoveTimeoutMessageAttribute.swift b/submodules/TelegramCore/Sources/SyncCore/SyncCore_AutoremoveTimeoutMessageAttribute.swift
-index e8cc0f30ef101bc89202e9f43dfed413dfae753b..0f62be89d037f470a192d6ac2db4be9547a46949 100644
+index e8cc0f30ef..2b621b5ec6 100644
 --- a/submodules/TelegramCore/Sources/SyncCore/SyncCore_AutoremoveTimeoutMessageAttribute.swift
 +++ b/submodules/TelegramCore/Sources/SyncCore/SyncCore_AutoremoveTimeoutMessageAttribute.swift
-@@ -142,6 +142,9 @@ public extension Message {
+@@ -11,16 +11,18 @@ public func autoremoveExpiryTimestamp(countdownBeginTime: Int32, timeout: Int32)
+ public class AutoremoveTimeoutMessageAttribute: MessageAttribute {
+     public let timeout: Int32
+     public let countdownBeginTime: Int32?
++    public let rgCountdownPaused: Bool
+     
+     public var associatedMessageIds: [MessageId] = []
+     
+     public let automaticTimestampBasedAttribute: (UInt16, Int32)?
+     
+-    public init(timeout: Int32, countdownBeginTime: Int32?) {
++    public init(timeout: Int32, countdownBeginTime: Int32?, rgCountdownPaused: Bool = false) {
+         self.timeout = timeout
+         self.countdownBeginTime = countdownBeginTime
++        self.rgCountdownPaused = rgCountdownPaused
+         
+-        if let countdownBeginTime = countdownBeginTime {
++        if let countdownBeginTime = countdownBeginTime, !rgCountdownPaused {
+             self.automaticTimestampBasedAttribute = (0, autoremoveExpiryTimestamp(countdownBeginTime: countdownBeginTime, timeout: timeout))
+         } else {
+             self.automaticTimestampBasedAttribute = nil
+@@ -30,8 +32,9 @@ public class AutoremoveTimeoutMessageAttribute: MessageAttribute {
+     required public init(decoder: PostboxDecoder) {
+         self.timeout = decoder.decodeInt32ForKey("t", orElse: 0)
+         self.countdownBeginTime = decoder.decodeOptionalInt32ForKey("c")
++        self.rgCountdownPaused = decoder.decodeInt32ForKey("rgp", orElse: 0) != 0
+         
+-        if let countdownBeginTime = self.countdownBeginTime {
++        if let countdownBeginTime = self.countdownBeginTime, !self.rgCountdownPaused {
+             self.automaticTimestampBasedAttribute = (0, autoremoveExpiryTimestamp(countdownBeginTime: countdownBeginTime, timeout: self.timeout))
+         } else {
+             self.automaticTimestampBasedAttribute = nil
+@@ -39,6 +42,7 @@ public class AutoremoveTimeoutMessageAttribute: MessageAttribute {
+     }
+     
+     public func encode(_ encoder: PostboxEncoder) {
++        if rgCountdownPaused { encoder.encodeInt32(1, forKey: "rgp") }
+         encoder.encodeInt32(self.timeout, forKey: "t")
+         if let countdownBeginTime = self.countdownBeginTime {
+             encoder.encodeInt32(countdownBeginTime, forKey: "c")
+@@ -51,16 +55,18 @@ public class AutoremoveTimeoutMessageAttribute: MessageAttribute {
+ public class AutoclearTimeoutMessageAttribute: MessageAttribute {
+     public let timeout: Int32
+     public let countdownBeginTime: Int32?
++    public let rgCountdownPaused: Bool
+     
+     public var associatedMessageIds: [MessageId] = []
+     
+     public let automaticTimestampBasedAttribute: (UInt16, Int32)?
+     
+-    public init(timeout: Int32, countdownBeginTime: Int32?) {
++    public init(timeout: Int32, countdownBeginTime: Int32?, rgCountdownPaused: Bool = false) {
+         self.timeout = timeout
+         self.countdownBeginTime = countdownBeginTime
++        self.rgCountdownPaused = rgCountdownPaused
+         
+-        if let countdownBeginTime = countdownBeginTime {
++        if let countdownBeginTime = countdownBeginTime, !rgCountdownPaused {
+             if self.timeout == viewOnceTimeout {
+                 self.automaticTimestampBasedAttribute = (1, countdownBeginTime)
+             } else {
+@@ -74,8 +80,9 @@ public class AutoclearTimeoutMessageAttribute: MessageAttribute {
+     required public init(decoder: PostboxDecoder) {
+         self.timeout = decoder.decodeInt32ForKey("t", orElse: 0)
+         self.countdownBeginTime = decoder.decodeOptionalInt32ForKey("c")
++        self.rgCountdownPaused = decoder.decodeInt32ForKey("rgp", orElse: 0) != 0
+         
+-        if let countdownBeginTime = self.countdownBeginTime {
++        if let countdownBeginTime = self.countdownBeginTime, !self.rgCountdownPaused {
+             if self.timeout == viewOnceTimeout {
+                 self.automaticTimestampBasedAttribute = (1, countdownBeginTime)
+             } else {
+@@ -87,6 +94,7 @@ public class AutoclearTimeoutMessageAttribute: MessageAttribute {
+     }
+     
+     public func encode(_ encoder: PostboxEncoder) {
++        if rgCountdownPaused { encoder.encodeInt32(1, forKey: "rgp") }
+         encoder.encodeInt32(self.timeout, forKey: "t")
+         if let countdownBeginTime = self.countdownBeginTime {
+             encoder.encodeInt32(countdownBeginTime, forKey: "c")
+@@ -142,6 +150,9 @@ public extension Message {
      }
      
      var containsSecretMedia: Bool {

@@ -28,6 +28,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--derived", type=Path, default=Path.home() / "Library/Caches/RegramReleaseDerivedData-arm64")
     parser.add_argument("--output", type=Path, default=Path("/tmp/regram-native-ui"))
+    parser.add_argument("--resources-app", type=Path, default=Path("/Applications/Regram.app"))
     parser.add_argument("--compile-only", action="store_true")
     parser.add_argument("--search-only", action="store_true")
     parser.add_argument("--search-navigation-only", action="store_true")
@@ -46,8 +47,8 @@ def main():
     executable.parent.mkdir(parents=True, exist_ok=True)
     resources.mkdir(parents=True, exist_ok=True)
     (bundle / "Info.plist").write_bytes(plistlib.dumps({"CFBundleIdentifier": "local.regram.NativeUIChecks", "CFBundleExecutable": executable.name, "CFBundleName": "Native UI Checks", "CFBundlePackageType": "APPL", "LSUIElement": True}))
-    shutil.copyfile(Path("/Applications/Regram.app/Contents/Resources/Assets.car"), resources / "Assets.car")
-    shutil.copytree(Path("/Applications/Regram.app/Contents/Resources/RegramCore_RegramCore.bundle"), resources / "RegramCore_RegramCore.bundle", dirs_exist_ok=True)
+    shutil.copyfile(options.resources_app / "Contents/Resources/Assets.car", resources / "Assets.car")
+    shutil.copytree(options.resources_app / "Contents/Resources/RegramCore_RegramCore.bundle", resources / "RegramCore_RegramCore.bundle", dirs_exist_ok=True)
     generated_assets = intermediates / "Telegram.build/Release/Telegram.build/DerivedSources/GeneratedAssetSymbols.swift"
     assets = output / "GeneratedAssetSymbols.swift"
     assets.write_text(generated_assets.read_text().replace("Foundation.Bundle.module", "Foundation.Bundle.main"))

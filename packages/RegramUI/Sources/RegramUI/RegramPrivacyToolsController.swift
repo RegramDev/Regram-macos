@@ -30,7 +30,7 @@ private func regramPrivacyToolsController(context: any AccountContextProtocol, g
         var rows: [InputDataEntry] = [.sectionId(0, type: .normal)]
         for (groupIndex, keys) in groups.enumerated() {
             let sectionId = Int32(groupIndex + 1)
-            let showsMarker = !ghostMode && groupIndex + 1 == groups.count
+            let showsMarker = !ghostMode && groupIndex == 0
             let count = keys.count + (showsMarker ? 1 : 0)
             for (index, item) in keys.enumerated() {
                 let enabled = item.0 != "antiRevokeSkipBots" || settings["antiRevoke"].bool
@@ -42,7 +42,11 @@ private func regramPrivacyToolsController(context: any AccountContextProtocol, g
                 })))
             }
             if showsMarker {
-                rows.append(.general(sectionId: sectionId, index: Int32(keys.count), value: .none, error: nil, identifier: InputDataIdentifier("antiFeatures.revokedMarker"), data: .init(name: regramString("RevokedMarker.Title"), color: theme.colors.text, type: .next, viewType: .lastItem, action: { context.bindings.rootNavigation().push(RegramRevokedMarkerController(context: context)) })))
+                let enabled = settings["antiRevoke"].bool
+                rows.append(.general(sectionId: sectionId, index: Int32(keys.count), value: .none, error: nil, identifier: InputDataIdentifier("antiFeatures.revokedMarker"), data: .init(name: regramString("RevokedMarker.Title"), color: enabled ? theme.colors.text : theme.colors.grayText, type: .next, viewType: .lastItem, enabled: enabled, action: {
+                    guard RegramPreferences.shared.settings(accountId: accountId)["antiRevoke"].bool else { return }
+                    context.bindings.rootNavigation().push(RegramRevokedMarkerController(context: context))
+                })))
             }
             if groupIndex + 1 < groups.count {
                 rows.append(.sectionId(sectionId, type: .normal))
@@ -70,8 +74,12 @@ public func RegramRevokedMarkerController(context: any AccountContextProtocol, f
     let state = Atomic(value: initial)
     let promise = ValuePromise(initial, ignoreRepeated: true)
     func update(_ transform: (inout RegramRevokedMarker) -> Void) { promise.set(state.modify { current in var value = current; transform(&value); return value }) }
-    let signal = combineLatest(promise.get(), appearanceSignal) |> map { marker, _ -> InputDataSignalValue in
+    let signal = combineLatest(promise.get(), regramPreferenceChanges(accountId: accountId), appearanceSignal) |> map { marker, settings, _ -> InputDataSignalValue in
         var rows: [InputDataEntry] = [.sectionId(0, type: .normal)]
+        guard settings["antiRevoke"].bool else {
+            rows.append(.desc(sectionId: 1, index: 0, text: .plain(regramString("RevokedMarker.RequiresEnabled")), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
+            return InputDataSignalValue(entries: rows)
+        }
         let invalidColor = marker.style != .none && !marker.color.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && RegramRevokedMarker.rgb(marker.color) == nil
         let choices = RegramRevokedMarker.Style.allCases.map { style in ContextMenuItem(regramString("RevokedMarker.Style." + style.rawValue), handler: { update { $0.style = style } }, state: marker.style == style ? .on : .off) }
         rows.append(.general(sectionId: 1, index: 0, value: .none, error: nil, identifier: InputDataIdentifier("revokedMarker.style"), data: .init(name: regramString("RevokedMarker.Style"), color: theme.colors.text, type: .contextSelector(regramString("RevokedMarker.Style." + marker.style.rawValue), choices), viewType: marker.style == .none ? .singleItem : .firstItem)))
@@ -84,18 +92,25 @@ public func RegramRevokedMarkerController(context: any AccountContextProtocol, f
         }
         rows.append(.desc(sectionId: 1, index: 4, text: .plain(regramString("RevokedMarker.Notice")), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
         rows.append(.sectionId(1, type: .normal))
-        rows.append(.desc(sectionId: 2, index: 5, text: .plain(regramString("RevokedMarker.Preview")), data: .init(color: theme.colors.listGrayText, viewType: .textTopItem)))
+        rows.append(.general(sectionId: 2, index: 0, value: .none, error: nil, identifier: InputDataIdentifier("revokedMarker.dimMessages"), data: .init(name: regramString("RevokedMarker.DimMessages"), color: theme.colors.text, type: .switchable(settings["revokedMarkerDimMessages"].bool), viewType: .singleItem, action: {
+            guard RegramPreferences.shared.settings(accountId: accountId)["antiRevoke"].bool else { return }
+            RegramPreferences.shared.update(accountId: accountId) { $0["revokedMarkerDimMessages"] = .bool(!$0["revokedMarkerDimMessages"].bool) }
+            update { $0.dimMessages = RegramPreferences.shared.settings(accountId: accountId)["revokedMarkerDimMessages"].bool }
+        })))
+        rows.append(.sectionId(2, type: .normal))
+        rows.append(.desc(sectionId: 3, index: 5, text: .plain(regramString("RevokedMarker.Preview")), data: .init(color: theme.colors.listGrayText, viewType: .textTopItem)))
         let preview = NSMutableAttributedString(string: "")
         if let label = marker.label(defaultText: regramString("RevokedMarker.DefaultText")) {
             let color = RegramRevokedMarker.rgb(marker.color).map { NSColor(calibratedRed: CGFloat(($0 >> 16) & 255) / 255, green: CGFloat(($0 >> 8) & 255) / 255, blue: CGFloat($0 & 255) / 255, alpha: 1) } ?? theme.colors.grayText
             preview.append(NSAttributedString(string: label + " ", attributes: [.foregroundColor: color]))
         }
         preview.append(NSAttributedString(string: "12:34", attributes: [.foregroundColor: theme.colors.grayText]))
-        rows.append(.desc(sectionId: 2, index: 6, text: .attributed(preview), data: .init(color: theme.colors.grayText, viewType: .singleItem)))
-        rows.append(.sectionId(2, type: .normal))
-        rows.append(.general(sectionId: 3, index: 7, value: .none, error: nil, identifier: InputDataIdentifier("revokedMarker.apply"), data: .init(name: regramString("NetworkPolicy.Apply"), color: theme.colors.accent, type: .none, viewType: .singleItem, enabled: !invalidColor, action: {
-            let marker = state.with { $0 }
-            guard !context.isFrozen, marker.style == .none || marker.color.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || RegramRevokedMarker.rgb(marker.color) != nil else { return }
+        rows.append(.desc(sectionId: 3, index: 6, text: .attributed(preview), data: .init(color: theme.colors.grayText, viewType: .singleItem)))
+        rows.append(.sectionId(3, type: .normal))
+        rows.append(.general(sectionId: 4, index: 7, value: .none, error: nil, identifier: InputDataIdentifier("revokedMarker.apply"), data: .init(name: regramString("NetworkPolicy.Apply"), color: theme.colors.accent, type: .none, viewType: .singleItem, enabled: !invalidColor, action: {
+            var marker = state.with { $0 }
+            marker.dimMessages = RegramPreferences.shared.settings(accountId: accountId)["revokedMarkerDimMessages"].bool
+            guard !context.isFrozen, RegramPreferences.shared.settings(accountId: accountId)["antiRevoke"].bool, marker.style == .none || marker.color.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || RegramRevokedMarker.rgb(marker.color) != nil else { return }
             RegramPreferences.shared.update(accountId: accountId) { marker.apply(to: &$0) }
             showModalText(for: context.window, text: regramString("RevokedMarker.Saved"))
         })))

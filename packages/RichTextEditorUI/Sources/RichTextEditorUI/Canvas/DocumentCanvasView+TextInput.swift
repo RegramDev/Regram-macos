@@ -185,6 +185,8 @@ struct CanvasInputComposition {
     let head: Int
     let typingAttributes: [NSAttributedString.Key: Any]
     let pendingFormat: Set<PendingFormatToggle>
+    let undoTarget = NSObject()
+    let undoManager: UndoManager?
 }
 
 @available(macOS 12, *)
@@ -208,7 +210,9 @@ extension DocumentCanvasView: NSTextInputClient {
         let range = inputReplacementRange(replacementRange)
         if inputComposition == nil {
             guard !text.isEmpty else { return }
-            inputComposition = CanvasInputComposition(range: range, blocks: currentModelBlocks(), anchor: anchor, head: head, typingAttributes: typingAttributesAtGlobal(range.location), pendingFormat: pendingFormatToggles)
+            let composition = CanvasInputComposition(range: range, blocks: currentModelBlocks(), anchor: anchor, head: head, typingAttributes: typingAttributesAtGlobal(range.location), pendingFormat: pendingFormatToggles, undoManager: effectiveUndoManager)
+            inputComposition = composition
+            registerUndo(snapshot: composition.blocks, anchor: composition.anchor, head: composition.head, undoTarget: composition.undoTarget)
             breakUndoCoalescing()
         }
         let composition = inputComposition!
@@ -216,6 +220,7 @@ extension DocumentCanvasView: NSTextInputClient {
         if text.isEmpty {
             if composition.anchor == composition.head && range == composition.range {
                 inputComposition = nil
+                composition.undoManager?.removeAllActions(withTarget: composition.undoTarget)
                 setModelBlocks(composition.blocks, width: effectiveWidth)
                 anchor = composition.anchor
                 head = composition.head
@@ -238,9 +243,7 @@ extension DocumentCanvasView: NSTextInputClient {
         guard let composition = inputComposition else { return }
         inputComposition = nil
         breakUndoCoalescing()
-        if currentModelBlocks() != composition.blocks {
-            registerUndo(snapshot: composition.blocks, anchor: composition.anchor, head: composition.head)
-        }
+        if currentModelBlocks() == composition.blocks { composition.undoManager?.removeAllActions(withTarget: composition.undoTarget) }
         needsDisplay = true
     }
 

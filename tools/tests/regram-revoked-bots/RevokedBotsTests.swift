@@ -42,6 +42,7 @@ final class RevokedBotsTests: XCTestCase {
     private let peer = PeerId(value: 20)
 
     override func setUp() {
+        fixtureMarkerOpens = 0
         suite = "RegramRevokedBotsTests." + UUID().uuidString
         defaults = UserDefaults(suiteName: suite)!
         fixturePreferences = RegramPreferences(defaults: defaults)
@@ -71,6 +72,7 @@ final class RevokedBotsTests: XCTestCase {
         configure(global: false)
         let child = try row("antiRevokeSkipBots").data
         XCTAssertFalse(child.enabled)
+        XCTAssertFalse(try row("revokedMarker").data.enabled)
         XCTAssertEqual(child.color, theme.colors.grayText)
         child.action?()
         XCTAssertFalse(fixturePreferences.settings(accountId: 1)["antiRevokeSkipBots"].bool)
@@ -81,6 +83,7 @@ final class RevokedBotsTests: XCTestCase {
         try row("antiRevoke").data.action?()
         let child = try row("antiRevokeSkipBots").data
         XCTAssertTrue(child.enabled)
+        XCTAssertTrue(try row("revokedMarker").data.enabled)
         XCTAssertEqual(child.color, theme.colors.text)
         child.action?()
         XCTAssertEqual(try row("antiRevokeSkipBots").data.type, .switchable(true))
@@ -120,8 +123,9 @@ final class RevokedBotsTests: XCTestCase {
         XCTAssertEqual(parent.section, child.section)
         XCTAssertNotEqual(child.section, history.section)
         XCTAssertEqual(parent.data.viewType, .firstItem)
-        XCTAssertEqual(child.data.viewType, .lastItem)
+        XCTAssertEqual(child.data.viewType, .innerItem)
         XCTAssertEqual(history.data.viewType, .firstItem)
+        XCTAssertEqual(try row("revokedMarker").section, parent.section)
         XCTAssertEqual(try row("revokedMarker").data.viewType, .lastItem)
         XCTAssertTrue(privacyRows().entries.contains { if case .sectionId(parent.section, _) = $0 { return true }; return false })
     }
@@ -232,5 +236,17 @@ final class RevokedBotsTests: XCTestCase {
             XCTAssertNotEqual(label, "AntiFeatures.SkipBots")
         }
         XCTAssertTrue(RegramSettingsCatalog.results(query: "机器人", language: "zh-Hans").contains { $0.key == "antiRevokeSkipBots" })
+    }
+    func testMarkerNavigationRejectsDisabledAndStaleActions() throws {
+        configure(global: false)
+        try row("revokedMarker").data.action?()
+        XCTAssertEqual(fixtureMarkerOpens, 0)
+        configure()
+        let enabled = try row("revokedMarker").data
+        enabled.action?()
+        XCTAssertEqual(fixtureMarkerOpens, 1)
+        configure(global: false)
+        enabled.action?()
+        XCTAssertEqual(fixtureMarkerOpens, 1)
     }
 }

@@ -15,7 +15,10 @@ def section(text, start, end):
 
 delegate = (root / 'Telegram-Mac/app/AppDelegate.swift').read_text()
 launch = section(delegate, 'func applicationDidFinishLaunching', 'launchInterface()')
-devices = section((root / 'packages/TelegramMediaUtils/Sources/TelegramMediaUtils/DevicesContext.swift').read_text(), 'public init(_ accountManager', '    private func update()')
+devices_source = (root / 'packages/TelegramMediaUtils/Sources/TelegramMediaUtils/DevicesContext.swift').read_text()
+devices = section(devices_source, 'public init(_ accountManager', '    private func update()')
+listener_install = section(devices_source, '    private func installAudioListeners()', '    deinit {')
+registration_source = devices + listener_install
 
 registration = ['AudioListener.retainOutputListener()', '&AudioAddress.inputDevice', '&AudioAddress.devices']
 queued = devices[devices.index('devicesQueue.async {'):] if 'devicesQueue.async {' in devices else ''
@@ -23,8 +26,8 @@ queued_block = queued[:queued.index('\n        }\n')] if queued else ''
 
 results = {
     'launch-creates-no-audio-player': 'AVAudioPlayer(' not in launch,
-    'listeners-register-off-the-main-thread': all(item in queued_block for item in registration),
-    'listeners-register-only-once': all(devices.count(item) == 1 for item in registration),
+    'listeners-register-off-the-main-thread': 'self.installAudioListeners()' in queued_block and all(item in listener_install for item in registration),
+    'listeners-register-only-once': all(registration_source.count(item) == 1 for item in registration),
     'device-list-loads-after-registration': bool(queued) and 'update()\n    }' in queued[len(queued_block):],
 }
 

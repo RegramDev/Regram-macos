@@ -8,15 +8,17 @@ public struct RegramRevokedMarker: Equatable {
     public var style: Style
     public var text: String
     public var color: String
+    public var dimMessages: Bool
 
-    public init(style: Style = .icon, text: String = "", color: String = "") {
+    public init(style: Style = .icon, text: String = "", color: String = "", dimMessages: Bool = true) {
         self.style = style
         self.text = text
         self.color = color
+        self.dimMessages = dimMessages
     }
 
     public init(settings: RegramAccountSettings) {
-        self.init(style: Style(rawValue: settings["revokedMarkerStyle"].string) ?? .icon, text: settings["revokedMarkerText"].string, color: settings["revokedMarkerColor"].string)
+        self.init(style: Style(rawValue: settings["revokedMarkerStyle"].string) ?? .icon, text: settings["revokedMarkerText"].string, color: settings["revokedMarkerColor"].string, dimMessages: settings["revokedMarkerDimMessages"].bool)
     }
 
     public static func normalizedText(_ value: String) -> String {
@@ -46,5 +48,6 @@ public struct RegramRevokedMarker: Equatable {
         settings["revokedMarkerStyle"] = .string(style.rawValue)
         settings["revokedMarkerText"] = .string(Self.normalizedText(text))
         settings["revokedMarkerColor"] = .string(Self.rgb(color).map { String(format: "#%06X", $0) } ?? "")
+        settings["revokedMarkerDimMessages"] = .bool(dimMessages)
     }
 }

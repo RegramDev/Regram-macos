@@ -84,6 +84,11 @@ public final class RichTextMessageAttribute: MessageAttribute, Equatable {
 }
 func regramBlockText(_ blocks: [String]) -> String { blocks.joined(separator: "\n") }
 
+public final class TelegramUser: Peer {
+    public var botInfo: Bool? = nil
+}
+public final class RGRevokedMessageAttribute: MessageAttribute {}
+
 public struct Message: Equatable {
     public var id: MessageId
     public var timestamp: Int32
@@ -95,6 +100,7 @@ public struct Message: Equatable {
     public var attributes: [MessageAttribute] = []
     public var media: [String] = []
     public var threadId: Int64?
+    public var rgIsRevoked: Bool { attributes.contains { $0 is RGRevokedMessageAttribute } }
     public var index: MessageIndex { MessageIndex(id: id, timestamp: timestamp) }
     public static func == (lhs: Message, rhs: Message) -> Bool { lhs.id == rhs.id && lhs.timestamp == rhs.timestamp && lhs.stableVersion == rhs.stableVersion && lhs.groupingKey == rhs.groupingKey && lhs.threadId == rhs.threadId && lhs.media == rhs.media && RegramMessageFilterPayload(lhs) == RegramMessageFilterPayload(rhs) }
     public func withUpdatedText(_ text: String) -> Message { var value = self; value.text = text; return value }

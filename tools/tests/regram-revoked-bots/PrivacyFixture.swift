@@ -60,7 +60,8 @@ struct FixtureContext {
     let peerId = PeerId(value: 1)
     let bindings = FixtureBindings()
 }
-func RegramRevokedMarkerController(context: FixtureContext) -> Int { 0 }
+var fixtureMarkerOpens = 0
+func RegramRevokedMarkerController(context: FixtureContext) -> Int { fixtureMarkerOpens += 1; return 0 }
 
 func privacyRows(ghostMode: Bool = false) -> InputDataSignalValue {
     let context = FixtureContext()

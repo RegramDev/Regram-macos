@@ -1403,11 +1403,7 @@ public final class InputTextView: BaseTextView, NSLayoutManagerDelegate, NSTextS
 
     public override func performKeyEquivalent(with event: NSEvent) -> Bool {
         if window?.firstResponder === self, isEnterEvent(event), event.modifierFlags.contains(.command) {
-            if hasMarkedText() {
-                super.keyDown(with: event)
-            } else {
-                super.insertNewline(self)
-            }
+            keyDown(with: event)
             return true
         }
         return super.performKeyEquivalent(with: event)

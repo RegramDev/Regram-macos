@@ -145,7 +145,14 @@ final class RegramChatListPreviewCoordinator {
             inFlight.removeAll()
             lastVisibleTopMessages.removeAll()
         }
-        if filter.isEmpty {
+        let hasHiddenRevokedMessages = entries.contains { entry in
+            guard case let .chat(item, _, _, _, _, _, _, _, _, _, _, _) = entry else { return false }
+            return item.messages.contains { message in
+                let message = message._asMessage()
+                return message.rgIsRevoked && regramChatListMessageIsHidden(message, filter: filter)
+            }
+        }
+        if filter.isEmpty && !hasHiddenRevokedMessages {
             clearPreviewWork()
             replaceUnreadRequests([])
             return Presentation(entries: entries, previews: [:])

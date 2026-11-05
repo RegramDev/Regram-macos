@@ -5,15 +5,25 @@ public struct RegramFilterSnapshot {
     private let hiddenAuthors: Set<Int64>
     private let ignoredChats: Set<Int64>
     private let hasEnabledRules: Bool
+    private let retainRevokedMessages: Bool
+    private let retainedChats: Set<Int64>
+    private let excludeRevokedBots: Bool
 
     public init(settings: RegramAccountSettings) {
         rules = settings.filterRules
         hasEnabledRules = rules.contains { $0.isEnabled && !$0.pattern.isEmpty }
         hiddenAuthors = Set(settings["blockedPeerIds"].strings.compactMap(Int64.init))
         ignoredChats = Set(settings["messageFilterDisabledPeerIds"].strings.compactMap(Int64.init))
+        retainRevokedMessages = settings["antiRevoke"].bool
+        retainedChats = Set(settings["antiRevokePeerIds"].strings.compactMap(Int64.init))
+        excludeRevokedBots = settings["antiRevokeSkipBots"].bool
     }
 
     public var isEmpty: Bool { hiddenAuthors.isEmpty && !hasEnabledRules }
+
+    public func shouldRetainRevokedMessage(peerId: Int64, authorIsBot: Bool) -> Bool {
+        (retainRevokedMessages || retainedChats.contains(peerId)) && (!excludeRevokedBots || !authorIsBot)
+    }
 
     public func shouldHide(text: String, peerId: Int64, authorId: Int64?, incoming: Bool) -> Bool {
         shouldHide(peerId: peerId, authorId: authorId, incoming: incoming, text: { text })

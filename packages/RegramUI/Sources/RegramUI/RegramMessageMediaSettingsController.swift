@@ -9,6 +9,7 @@ import InputDataUI
 import GeneralRows
 import RegramCore
 import RegramSignals
+import InAppSettings
 
 private enum RegramParityRow {
     case header(String)
@@ -32,6 +33,7 @@ private struct RegramMessageMediaState: Equatable {
     var settings: RegramAccountSettings
     var tab: String
     var folders: [ChatListFilter] = []
+    var sendWithReturn = FastSettings.sendingType == .enter
 }
 
 private final class RegramMessageMediaArguments {
@@ -227,7 +229,7 @@ private func regramMessageMediaEntries(_ state: RegramMessageMediaState, categor
         case let .notice(key):
             rows.append(.desc(sectionId: section, index: index, text: .plain(regramParityText(key)), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
         case let .toggle(key, title, inverted):
-            let current = state.settings[key].bool
+            let current = key == "sendWithReturnKey" ? state.sendWithReturn : state.settings[key].bool
             general(regramParityText(title), .switchable(inverted ? !current : current), action: { arguments.toggle(key) })
         case let .picker(key, title):
             if key == "features.chatListStartupFolderMode" {
@@ -287,6 +289,13 @@ private func regramMessageMediaController(context: any AccountContextProtocol, c
     let arguments = RegramMessageMediaArguments(context: context, set: { key, value in
         RegramPreferences.shared.update(accountId: accountId) { $0[key] = value }
     }, toggle: { key in
+        if key == "sendWithReturnKey" {
+            let sendWithReturn = FastSettings.sendingType != .enter
+            FastSettings.changeSendingType(sendWithReturn ? .enter : .cmdEnter)
+            RegramPreferences.shared.update(accountId: accountId) { $0[key] = .bool(sendWithReturn) }
+            update { $0.sendWithReturn = sendWithReturn }
+            return
+        }
         RegramPreferences.shared.update(accountId: accountId) { $0[key] = .bool(!$0[key].bool) }
     }, tab: { tab in update { $0.tab = tab } }, open: { id in
         let controller: ViewController?
@@ -313,6 +322,10 @@ private func regramMessageMediaController(context: any AccountContextProtocol, c
         }
     })
     disposables.add(regramPreferenceChanges(accountId: accountId).start(next: { settings in update { $0.settings = settings } }))
+    let inputObserver = NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: UserDefaults.standard, queue: .main) { _ in
+        update { $0.sendWithReturn = FastSettings.sendingType == .enter }
+    }
+    disposables.add(ActionDisposable { NotificationCenter.default.removeObserver(inputObserver) })
     disposables.add((context.engine.peers.updatedChatListFilters() |> deliverOnMainQueue).start(next: { folders in update { $0.folders = folders } }))
     controller.onDeinit = { disposables.dispose() }
     return controller

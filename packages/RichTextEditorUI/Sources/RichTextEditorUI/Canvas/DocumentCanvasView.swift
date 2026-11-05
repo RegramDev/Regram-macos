@@ -362,6 +362,7 @@ final class DocumentCanvasView: NSView {
         // stays in the paragraph/cell. Handled here so it's deterministic regardless of input-context
         // routing.
         if event.keyCode == 36 || event.keyCode == 76 {   // Return / keypad Enter
+            if onReturnKey?() == true { return }
             // Return in a code block's LANGUAGE line moves the caret to the start of the code text. It
             // inserts nothing and splits nothing: a `.Pre` language has no second line. (The quote author
             // splits instead, because it is a TRAILING region — the tail becomes a paragraph after the

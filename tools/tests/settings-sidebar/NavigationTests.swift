@@ -87,6 +87,7 @@ final class MainController: ViewController {
     let calls = ViewController()
     let tabController: TabController
     var quickController: QuickController?
+    var settingsIndex: Int { tabController.tabs.firstIndex(where: { $0.controller === settings })! }
     var chatIndex: Int { tabController.tabs.firstIndex(where: { $0.controller === navigation })! }
     init(_ root: ViewController = ChatController()) {
         context = Context(Navigation(root))

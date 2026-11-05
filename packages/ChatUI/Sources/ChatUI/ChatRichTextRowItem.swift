@@ -1425,9 +1425,8 @@ public final class RichTextDraftPreviewView: View {
             }
             editor.onReturnKey = { [weak self] in
                 guard let self, let interaction = self.chatInteraction, let event = NSApp.currentEvent else { return false }
-                let settings = RegramPreferences.shared.settings(accountId: interaction.interactionContext.peerId.toInt64())
                 let marked = (interaction.interactionContext.window.firstResponder as? NSTextInputClient)?.hasMarkedText() == true
-                guard RegramInputReturnPolicy.shouldSend(sendWithReturn: settings["sendWithReturnKey"].bool, modifiers: event.modifierFlags, hasMarkedText: marked) else { return false }
+                guard RegramInputReturnPolicy.shouldSend(sendWithReturn: FastSettings.sendingType == .enter, modifiers: event.modifierFlags, hasMarkedText: marked) else { return false }
                 self.onSend?()
                 return true
             }

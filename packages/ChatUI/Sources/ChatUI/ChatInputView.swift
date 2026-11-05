@@ -5,6 +5,7 @@ import TGUIKit
 import SwiftSignalKit
 import TelegramCore
 import InputView
+import KeyboardKey
 import RichTextEditorCore
 import RichTextEditorUI
 import Postbox
@@ -987,7 +988,7 @@ public class ChatInputView: View, Notifable {
 
         let commandReturn: (NSEvent) -> KeyHandlerResult = { [weak self] event in
             guard let self else { return .rejected }
-            return RegramInputReturnPolicy.handleCommandReturn(event, responder: self.chatInteraction.interactionContext.window.firstResponder, inputRoot: self) ? .invoked : .rejected
+            return RegramInputReturnPolicy.handleCommandReturn(event, sendWithReturn: FastSettings.sendingType == .enter, responder: self.chatInteraction.interactionContext.window.firstResponder, inputRoot: self) ? .invoked : .rejected
         }
         window.set(handler: commandReturn, with: self, for: .Return, priority: .supreme, modifierFlags: [.command])
         window.set(handler: commandReturn, with: self, for: .KeypadEnter, priority: .supreme, modifierFlags: [.command])
@@ -1002,16 +1003,18 @@ public class ChatInputView: View, Notifable {
         }()
 
         if isInlineEditable {
-            window.set(handler: { [weak self] event -> KeyHandlerResult in
+            let sendRichDraft: (NSEvent) -> KeyHandlerResult = { [weak self] event -> KeyHandlerResult in
                 guard let self = self, self.chatInteraction.richTextDraft != nil else { return .rejected }
-                let settings = RegramPreferences.shared.settings(accountId: self.chatInteraction.interactionContext.peerId.toInt64())
                 let marked = (self.chatInteraction.interactionContext.window.firstResponder as? NSTextInputClient)?.hasMarkedText() == true
-                if RegramInputReturnPolicy.shouldSend(sendWithReturn: settings["sendWithReturnKey"].bool, modifiers: event.modifierFlags, hasMarkedText: marked) {
+                if RegramInputReturnPolicy.shouldSend(sendWithReturn: FastSettings.sendingType == .enter, modifiers: event.modifierFlags, hasMarkedText: marked) {
                     self.chatInteraction.sendMessage(false, nil, self.chatInteraction.presentation.messageEffect)
                     return .invoked
                 }
                 return .rejected
-            }, with: self, for: .Return, priority: .high, modifierFlags: nil)
+            }
+            for key in [KeyboardKey.Return, .KeypadEnter] {
+                window.set(handler: sendRichDraft, with: self, for: key, priority: .high, modifierFlags: nil)
+            }
             // ⌘Z / ⌘⇧Z drive the editor's undo / redo.
             window.set(handler: { [weak self] _ -> KeyHandlerResult in
                 self?.container.richDraftPreview?.undoInline()
@@ -1022,16 +1025,18 @@ public class ChatInputView: View, Notifable {
                 return .invoked
             }, with: self, for: .Z, priority: .high, modifierFlags: [.command, .shift])
         } else if chatInteraction.richTextDraft != nil {
-            window.set(handler: { [weak self] event -> KeyHandlerResult in
+            let sendRichDraft: (NSEvent) -> KeyHandlerResult = { [weak self] event -> KeyHandlerResult in
                 guard let self = self, self.chatInteraction.richTextDraft != nil else { return .rejected }
-                let settings = RegramPreferences.shared.settings(accountId: self.chatInteraction.interactionContext.peerId.toInt64())
                 let marked = (self.chatInteraction.interactionContext.window.firstResponder as? NSTextInputClient)?.hasMarkedText() == true
-                if RegramInputReturnPolicy.shouldSend(sendWithReturn: settings["sendWithReturnKey"].bool, modifiers: event.modifierFlags, hasMarkedText: marked) {
+                if RegramInputReturnPolicy.shouldSend(sendWithReturn: FastSettings.sendingType == .enter, modifiers: event.modifierFlags, hasMarkedText: marked) {
                     self.chatInteraction.sendMessage(false, nil, self.chatInteraction.presentation.messageEffect)
                     return .invoked
                 }
                 return .rejected
-            }, with: self, for: .Return, priority: .high, modifierFlags: nil)
+            }
+            for key in [KeyboardKey.Return, .KeypadEnter] {
+                window.set(handler: sendRichDraft, with: self, for: key, priority: .high, modifierFlags: nil)
+            }
 
             // Delete removes the whole draft, stashing it for ⌘Z.
             window.set(handler: { [weak self] _ -> KeyHandlerResult in
@@ -1066,7 +1071,7 @@ public class ChatInputView: View, Notifable {
         let interaction = self.chatInteraction
         let context = interaction.interactionContext
         
-        let sendWithReturn = RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["sendWithReturnKey"].bool
+        let sendWithReturn = FastSettings.sendingType == .enter
         if RegramInputReturnPolicy.shouldSend(sendWithReturn: sendWithReturn, modifiers: event.modifierFlags, hasMarkedText: textView.inputView.hasMarkedText()) {
             let text = textView.string().trimmed
             if text.length > interaction.maxInputCharacters {
@@ -1123,7 +1128,7 @@ public class ChatInputView: View, Notifable {
     
     
     public override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        if let window, window.isKeyWindow, RegramInputReturnPolicy.handleCommandReturn(event, responder: window.firstResponder, inputRoot: self) {
+        if let window, window.isKeyWindow, RegramInputReturnPolicy.handleCommandReturn(event, sendWithReturn: FastSettings.sendingType == .enter, responder: window.firstResponder, inputRoot: self) {
             return true
         }
         return super.performKeyEquivalent(with: event)

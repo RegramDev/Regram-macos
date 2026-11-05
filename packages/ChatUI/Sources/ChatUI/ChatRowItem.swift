@@ -143,6 +143,7 @@ public class ChatRowItem: TableRowItem {
     public private(set) var peer:Peer?
     public private(set) var entry:ChatHistoryEntry
     public private(set) var message:Message?
+    public private(set) var regramRevokedOpacity: CGFloat = 1
     
     public var monoforumState: MonoforumUIState? {
         return entry.additionalData.monoforumState
@@ -2637,6 +2638,8 @@ public class ChatRowItem: TableRowItem {
             }
             
             let regramSettings = RegramPreferences.shared.settings(accountId: context.peerId.toInt64())
+            let showsRevokedMarker = message.rgIsRevoked && regramSettings.shouldRetainRevokedMessage(peerId: message.id.peerId.toInt64(), authorIsBot: (message.author as? TelegramUser)?.botInfo != nil)
+            self.regramRevokedOpacity = showsRevokedMarker && regramSettings["revokedMarkerDimMessages"].bool ? 0.5 : 1
             let dateFormatter = DateSelectorUtil.chatDateFormatter.copy() as! DateFormatter
             if regramSettings["secondsInMessages"].bool, !dateFormatter.dateFormat.contains("ss") {
                 if let minutes = dateFormatter.dateFormat.range(of: "mm") {
@@ -2666,7 +2669,7 @@ public class ChatRowItem: TableRowItem {
                 
                 let attr: NSMutableAttributedString = NSAttributedString.initialize(string: dateFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(time))), color: dateColor, font: dateFont).mutableCopy() as! NSMutableAttributedString
                 
-                if message.rgIsRevoked {
+                if showsRevokedMarker {
                     let marker = RegramRevokedMarker(settings: regramSettings)
                     if let label = marker.label(defaultText: regramLocalizedString("RevokedMarker.DefaultText", languageCode: appAppearance.languageCode)) {
                         let color = RegramRevokedMarker.rgb(marker.color).map { NSColor(calibratedRed: CGFloat(($0 >> 16) & 255) / 255, green: CGFloat(($0 >> 8) & 255) / 255, blue: CGFloat($0 & 255) / 255, alpha: 1) } ?? dateColor

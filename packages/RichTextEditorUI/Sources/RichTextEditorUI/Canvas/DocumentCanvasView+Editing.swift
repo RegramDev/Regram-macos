@@ -40,8 +40,12 @@ extension DocumentCanvasView {
 
     /// Restores a whole-document snapshot, then re-registers the inverse for redo (Phase 1 trick).
     /// Snapshots in `CanvasModelBlock` (not `[Block]`) so macOS-only media blocks survive undo/redo.
-    func registerUndo(snapshot blocks: [CanvasModelBlock], anchor: Int, head: Int) {
-        effectiveUndoManager?.registerUndo(withTarget: self) { target in
+    func registerUndo(snapshot blocks: [CanvasModelBlock], anchor: Int, head: Int, undoTarget: NSObject? = nil) {
+        guard let manager = effectiveUndoManager else { return }
+        let needsGroup = !manager.groupsByEvent && manager.groupingLevel == 0 && !manager.isUndoing && !manager.isRedoing
+        if needsGroup { manager.beginUndoGrouping() }
+        manager.registerUndo(withTarget: undoTarget ?? self) { [weak self] _ in
+            guard let target = self else { return }
             let redo = target.currentModelBlocks()
             let redoAnchor = target.anchor, redoHead = target.head
             target.setModelBlocks(blocks, width: target.effectiveWidth)
@@ -51,6 +55,7 @@ extension DocumentCanvasView {
             target.invalidateIntrinsicContentSize(); target.needsLayout = true
             target.needsDisplay = true; target.notifySelectionChanged()
         }
+        if needsGroup { manager.endUndoGrouping() }
     }
 
     /// The structural-edit engine, now operating on the `BlockStack` that owns the selection (the

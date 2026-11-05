@@ -1525,17 +1525,7 @@ public class PreviewSenderController: ModalViewController, Notifable {
     
     public override func returnKeyAction() -> KeyHandlerResult {
         if let currentEvent = NSApp.currentEvent {
-            let input = genericView.textView.inputView
-            if currentEvent.modifierFlags.contains(.command), let input = input as? NSView, input.window?.firstResponder === input {
-                if let client = input as? NSTextInputClient, client.hasMarkedText() {
-                    input.keyDown(with: currentEvent)
-                } else {
-                    input.insertNewline(nil)
-                }
-                return .invoked
-            }
-            if !input.hasMarkedText(), currentEvent.modifierFlags.intersection([.command, .shift, .control, .option]).isEmpty, FastSettings.checkSendingAbility(for: currentEvent), didSetReady {
-                send(false)
+            if processEnter(currentEvent) {
                 return .invoked
             }
         }
@@ -3072,7 +3062,8 @@ public class PreviewSenderController: ModalViewController, Notifable {
 
     
     func processEnter(_ event: NSEvent) -> Bool {
-        if !genericView.textView.inputView.hasMarkedText(), event.modifierFlags.intersection([.command, .shift, .control, .option]).isEmpty, FastSettings.checkSendingAbility(for: event) {
+        if !genericView.textView.inputView.hasMarkedText(), event.modifierFlags.intersection([.shift, .control, .option]).isEmpty, FastSettings.checkSendingAbility(for: event), didSetReady {
+            send(false)
             return true
         }
         return false
