@@ -2417,16 +2417,6 @@ open class PeersListController<Context: AccountContextProtocol>: TelegramGeneric
         }
     }
     
-    open func updatePinnedItems(_ items: [PinnedItemId]) {
-        if let searchSection {
-            for section in searchSection.sections {
-                if let controller = section.controller as? SearchController<Context>, controller.isLoaded() {
-                    controller.pinnedItems = items
-                }
-            }
-        }
-    }
-    
     open func updateHighlightEvents(_ hasChat: Bool) {
         if let searchSection {
             for section in searchSection.sections {
@@ -3280,7 +3270,6 @@ open class PeersListController<Context: AccountContextProtocol>: TelegramGeneric
                     }
                 }, options: self.searchOptions, frame: rect, target: target, communityId: searchCommunityId, tags: initialTags)
 //                searchController.defaultQuery = self.genericView.searchView.query
-                searchController.pinnedItems = self.collectPinnedItems
                     
                 searchController.setPeerAsTag = { [weak self] peer in
                     self?.genericView.searchView.setString("")
@@ -3307,8 +3296,7 @@ open class PeersListController<Context: AccountContextProtocol>: TelegramGeneric
                         }
                     }, options: tag.searchOptions, frame: rect, target: target, communityId: searchCommunityId, tags: tag.searchTags(state.peerTag?.id, hashtag: state.hashtag))
 //                    searchController.defaultQuery = self.genericView.searchView.query
-                    searchController.pinnedItems = self.collectPinnedItems
-                    
+
                     searchController.navigationController = self.navigationController
                     
                     
@@ -3421,10 +3409,6 @@ open class PeersListController<Context: AccountContextProtocol>: TelegramGeneric
         }
     }
    
-    
-    open var collectPinnedItems:[PinnedItemId] {
-        return []
-    }
     
 
     
