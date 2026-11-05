@@ -2,6 +2,15 @@
 
 [简体中文](CHANGELOG.md) · **English**
 
+## 13.1.0 (283395) — 2026-11-05
+
+- Stop showing revoked messages when retention is disabled. Ignoring auto-delete or self-destruct timers now pauses only the corresponding timer without adding a revoked-message marker.
+- Group retention, bot exclusion, and revoked-message markers together. Enable the latter two only while retention is on, and add an independent dimming switch to marker settings.
+- Unify native and Regram sending preferences. Enter or ⌘Enter sends according to the selected option, while the other inserts a newline in plain input, rich text, and media previews, preserving composition and undo behavior.
+- Fix sponsored-message filtering across chat, search, and video ad surfaces.
+- Use Regram branding in the app menu and About window while preserving the existing Preferences navigation.
+- Merge upstream through `56116933`, including search peer menus, accessibility labels, gift layouts, and the Recent Actions header and search entry, retaining Regram filtering and translation features.
+
 ## 13.1.0 (283394) — 2026-11-03
 
 - Display retained deleted messages at 50% opacity, fading the text, media, bubble and timestamp together to distinguish them from ordinary messages.
