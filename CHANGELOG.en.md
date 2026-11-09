@@ -2,6 +2,12 @@
 
 [简体中文](CHANGELOG.md) · **English**
 
+## 13.1.0 (283396) — 2026-11-09
+
+- Skip deleted messages in chat-list previews and fall back to the previous visible message. Retained deleted messages remain available inside chats.
+- Add “Align my messages to the left” under Regram Pro chat and message settings, off by default. Preserve outgoing colors and read receipts, with matching group avatar and side-action layouts.
+- Keep the community add-chat button above the bottom navigation bar and reserve scrolling space for the last row, including bar visibility and window-size changes.
+
 ## 13.1.0 (283395) — 2026-11-05
 
 - Stop showing revoked messages when retention is disabled. Ignoring auto-delete or self-destruct timers now pauses only the corresponding timer without adding a revoked-message marker.
