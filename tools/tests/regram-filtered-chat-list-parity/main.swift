@@ -783,5 +783,42 @@ expect(captureWorkers.wait(timeout: .now() + 15) == .success && !captureMismatch
 expect(TestCounters.shared.count("captureStores") > 0 && TestCounters.shared.count("captureMismatch") == 0, "legacy entry never stores a decision under another rule revision")
 let finalCapture = preferences.captureFilter(accountId: captureAccountId)
 expect(finalCapture.revision == 502 && !finalCapture.filter.shouldHide(text: "odd", peerId: peer.toInt64(), authorId: nil, incoming: true), "final capture reflects all concurrent rule writes")
+let revokedAccountId: Int64 = 98124
+preferences.update(accountId: revokedAccountId) { $0["antiRevoke"] = .bool(true) }
+let revokedCapture = preferences.captureFilter(accountId: revokedAccountId)
+var revokedTop = message(40, text: "deleted advertisement")
+revokedTop.attributes = [RGRevokedMessageAttribute()]
+var revokedEarlier = message(39, text: "earlier deleted advertisement")
+revokedEarlier.attributes = [RGRevokedMessageAttribute()]
+let normalEarlier = message(38, text: "normal conversation")
+expect(!regramShouldHideMessage(revokedTop, accountId: revokedAccountId, filter: revokedCapture.filter, revision: revokedCapture.revision), "anti-revoke still retains deleted messages inside history")
+expect(regramChatListMessageIsHidden(revokedTop, filter: revokedCapture.filter), "retained deleted advertisements never become list previews without filter rules")
+expect(regramChatListMessageIsHidden(revokedTop, accountId: revokedAccountId, filter: revokedCapture.filter, revision: revokedCapture.revision), "cached list policy skips retained revoked messages")
+var revokedOutgoing = revokedTop
+revokedOutgoing.flags = []
+let revokedVisibility = RegramChatListPreparedVisibility(messages: [revokedTop, revokedOutgoing, normalEarlier], accountId: revokedAccountId, filter: revokedCapture.filter, revision: revokedCapture.revision)
+expect(revokedVisibility.isHidden(revokedOutgoing) && !revokedVisibility.isHidden(normalEarlier), "prepared visibility excludes outgoing revoked messages and keeps normal messages")
+prepareQueue.reset()
+let revokedAccount = Account()
+for value in [revokedTop, revokedEarlier, normalEarlier] { revokedAccount.postbox.storage.messages[value.id] = value }
+let revokedCoordinator = RegramChatListPreviewCoordinator(account: revokedAccount, accountId: revokedAccountId)
+let revokedEntry = coordinatorEntry(revokedTop)
+_ = revokedCoordinator.update([revokedEntry], filterRevision: 1, pagingFloor: nil)
+drainCoordinator()
+let revokedPresentation = revokedCoordinator.update([revokedEntry], filterRevision: 1, pagingFloor: nil)
+expect(revokedPresentation.previews[revokedEntry.stableId]?.first?.id == normalEarlier.id, "preview scans past consecutive deleted advertisements to the last normal message")
+if case let .chat(item, _, _, _, _, _, _, _, _, _, _, _)? = revokedPresentation.entries.first {
+    expect(item.index == .chatList(ChatListIndex(pinningIndex: nil, messageIndex: normalEarlier.index)), "preview ordering follows the last normal message")
+} else {
+    fatalError("Missing chat-list entry after skipping revoked messages")
+}
+reveal.setRevealed(true, accountId: revokedAccountId, peerId: peer.toInt64())
+_ = revokedCoordinator.update([revokedEntry], filterRevision: 2, pagingFloor: nil)
+drainCoordinator()
+let revealedRevoked = revokedCoordinator.update([revokedEntry], filterRevision: 2, pagingFloor: nil)
+expect(revealedRevoked.previews[revokedEntry.stableId]?.first?.id == normalEarlier.id, "temporary filter reveal still excludes deleted advertisements from list previews")
+reveal.setRevealed(false, accountId: revokedAccountId, peerId: peer.toInt64())
+revokedCoordinator.dispose()
+drainCoordinator()
 print("Measured stable decisions: 200 calls -> 1 text + 1 match; folder changes: 200 -> 3 initial queries + 0 further matches; failed proofs: 200 updates -> 0 extra queries/transactions/matches")
 print("Passed \(checks) filtered chat-list parity checks")

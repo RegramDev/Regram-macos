@@ -2852,3 +2852,5 @@
 "RevokedMarker.DimMessages" = "半透明显示已撤回消息";
 "RevokedMarker.RequiresEnabled" = "开启“保留被撤回的消息”后，才能设置撤回标记和半透明效果。";
 "setting.revokedMarkerDimMessages" = "半透明显示已撤回消息";
+"setting.alignOwnMessagesLeft" = "自己的消息靠左显示";
+"setting.alignOwnMessagesLeft.notice" = "在气泡聊天中，将自己发送的消息也显示在左侧，保留消息颜色和已读状态。";

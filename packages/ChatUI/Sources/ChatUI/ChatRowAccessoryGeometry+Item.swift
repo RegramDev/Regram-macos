@@ -3,7 +3,7 @@ import Cocoa
 extension ChatRowGeometry.SideAccessory {
     @inline(__always) init(item: ChatRowItem, size: NSSize, offset: CGFloat, contentFrame: NSRect) {
         let isOnSide = item.isBubbled && !item.hasBubble
-        self.init(contentFrame: contentFrame, size: size, offset: offset, elementsInset: item.elementsContentInset, isOnSide: isOnSide, isIncoming: isOnSide && item.isIncoming, hasSideAction: isOnSide && (item.isSharable || item.hasSource || item.commentsBubbleDataOverlay != nil))
+        self.init(contentFrame: contentFrame, size: size, offset: offset, elementsInset: item.elementsContentInset, isOnSide: isOnSide, isIncoming: isOnSide && item.isLeftAligned, hasSideAction: isOnSide && (item.isSharable || item.hasSource || item.commentsBubbleDataOverlay != nil))
     }
 }
 
@@ -18,7 +18,7 @@ extension ChatRowGeometry.ForwardName {
     @inline(__always) init(item: ChatRowItem, bubbleFrame: NSRect, contentFrame: NSRect, accessoryWidth: CGFloat?) {
         let isBubbled = item.isBubbled
         let hasBubble = isBubbled && item.hasBubble
-        let isIncoming = item.isIncoming
+        let isIncoming = item.isLeftAligned
         self.init(inset: item.forwardNameInset, bubbleFrame: bubbleFrame, contentFrame: contentFrame, isBubbled: isBubbled, hasBubble: hasBubble, isIncoming: isIncoming, bubbleInset: hasBubble ? item.bubbleContentInset : 0, additionInset: hasBubble && isIncoming ? item.additionBubbleInset : 0, accessoryWidth: accessoryWidth, hasAuthor: item.authorText != nil)
     }
 }

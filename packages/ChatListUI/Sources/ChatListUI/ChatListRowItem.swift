@@ -501,7 +501,7 @@ public class ChatListRowItem: TableRowItem {
         self.groupId = groupId
         self.peer = nil
         self.mode = .chat
-        let messages = messages.filter { !regramShouldHideMessage($0, accountId: context.peerId.toInt64()) }
+        let messages = messages.filter { !$0.rgIsRevoked && !regramShouldHideMessage($0, accountId: context.peerId.toInt64()) }
         self.messages = messages
         self.chatListIndex = nil
         self.activities = activities
@@ -796,7 +796,7 @@ public class ChatListRowItem: TableRowItem {
         self.story = story
         self.openStory = openStory
         let originalMessages = messages
-        let messages = (previewMessages ?? messages).filter { !regramShouldHideMessage($0, accountId: context.peerId.toInt64()) }
+        let messages = (previewMessages ?? messages).filter { !$0.rgIsRevoked && !regramShouldHideMessage($0, accountId: context.peerId.toInt64()) }
         self.messages = messages
         let hideActivities = RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["features.hidePrivateChatActivities"].bool && renderedPeer.chatMainPeer?._asPeer() is TelegramUser
         self.activities = hideActivities ? [] : activities

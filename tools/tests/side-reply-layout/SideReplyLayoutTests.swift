@@ -21,6 +21,8 @@ final class ChatRowItem {
     var rightInset: CGFloat = 12
     var defLeftInset: CGFloat = 20
     var isIncoming = false
+    var alignOwnMessagesLeft = false
+    var isLeftAligned: Bool { isIncoming || (isBubbled && alignOwnMessagesLeft) }
     var isBubbled = true
     var hasBubble = false
     var isBubbleFullFilled = true
@@ -52,7 +54,7 @@ final class ChatRowItem {
         return height
     }
     var replyFrame: NSRect {
-        let bubble = ChatRowGeometry.bubbleFrame(.init(rowWidth: width, layoutFrame: NSRect(x: defLeftInset, y: 0, width: bubbleFrameWidth, height: 0), leftInset: leftInset, isIncoming: isIncoming, isCenteredThread: false))
+        let bubble = ChatRowGeometry.bubbleFrame(.init(rowWidth: width, layoutFrame: NSRect(x: defLeftInset, y: 0, width: bubbleFrameWidth, height: 0), leftInset: leftInset, isIncoming: isLeftAligned, isCenteredThread: false))
         let content = ChatRowGeometry.contentFrame(.init(item: self, bubbleFrame: bubble))
         return ChatRowGeometry.sideAccessoryFrame(.init(item: self, size: replyModel!.size, offset: replyOffset, contentFrame: content))
     }
@@ -64,19 +66,21 @@ func expect(_ condition: @autoclosure () -> Bool, _ name: String) {
     if !condition() { failures += 1; print("FAIL: \(name)") }
 }
 for width in [CGFloat(300), 320, 350, 400, 640, 1280] {
-    for incoming in [false, true] {
+    for mode in 0..<3 {
+        let incoming = mode == 1
         for sideAction in [false, true] {
             for contentWidth in [CGFloat(80), 160, 200] {
                 for longQuote in [false, true] {
                     let row = ChatRowItem()
                     row.width = width
                     row.isIncoming = incoming
+                    row.alignOwnMessagesLeft = mode == 2
                     row.isSharable = sideAction
                     row._contentSize.width = contentWidth
                     row.replyModel!.longQuote = longQuote
                     row.measureReply()
                     let frame = row.replyFrame
-                    let tag = "width=\(width) incoming=\(incoming) action=\(sideAction) content=\(contentWidth) quote=\(longQuote)"
+                    let tag = "width=\(width) incoming=\(incoming) alignLeft=\(row.alignOwnMessagesLeft) action=\(sideAction) content=\(contentWidth) quote=\(longQuote)"
                     expect(frame.minX >= row.leftInset, "reply keeps left margin: \(tag)")
                     expect(frame.maxX <= width - row.rightInset, "reply keeps right margin: \(tag)")
                     expect(frame.maxY <= row.height - row.defaultContentTopOffset, "entire quoted reply fits row height: \(tag)")

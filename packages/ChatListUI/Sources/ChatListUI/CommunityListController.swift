@@ -465,17 +465,25 @@ open class CommunityListController<Context: AccountContextProtocol>: PeersListCo
         let size = genericView.frame.size
         guard size.width > 0, size.height > 0 else { return }
         let height: CGFloat = 40
-        let width = min(size.width - 40, addChatButtonNaturalWidth)
+        let width = max(0, min(size.width - 40, addChatButtonNaturalWidth))
         let x = round((size.width - width) / 2)
-        let y = size.height - height - 16
+        let y = size.height - containerContentInsets.bottom - height - 16
         addChatButton.frame = NSMakeRect(x, y, width, height)
         addChatButton.layer?.cornerRadius = height / 2
+        genericView.contentBottomInset = containerContentInsets.bottom + (addChatButton.isHidden ? 0 : height + 16)
     }
 
     private func updateAddChatButtonVisibility() {
         let canAdd = communityStateValue.with { $0.canAddChats }
         let searching = genericView.searchView.state == .Focus
         addChatButton.isHidden = !canAdd || searching
+        updateAddChatButtonFrame()
+    }
+
+    open override func updateContainerContentInsets(_ insets: NSEdgeInsets, transition: ContainedViewLayoutTransition) {
+        super.updateContainerContentInsets(insets, transition: transition)
+        guard isLoaded() else { return }
+        updateAddChatButtonFrame()
     }
 
     open override func viewDidResized(_ size: NSSize) {

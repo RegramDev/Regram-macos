@@ -1142,7 +1142,7 @@ public class ChatRowView: TableRowView, Notifable, MultipleSelectable, ChatTextS
         
         if item.hasBubble {
             frame.origin.y = bubbleFrame.maxY + item.defaultReplyMarkupInset
-            frame.origin.x = bubbleFrame.minX + (item.isIncoming ? item.additionBubbleInset : 0)
+            frame.origin.x = bubbleFrame.minX + (item.isLeftAligned ? item.additionBubbleInset : 0)
         } else if item.isBubbled {
             frame.origin.y = bubbleFrame.maxY
         }
@@ -1175,7 +1175,7 @@ public class ChatRowView: TableRowView, Notifable, MultipleSelectable, ChatTextS
 
         var point: NSPoint = NSMakePoint(contentFrame.minX + item.elementsContentInset, item.defaultContentTopOffset)
         if item.isBubbled, !item.hasBubble {
-            if item.isIncoming {
+            if item.isLeftAligned {
                 point.x = contentFrame.maxX + 10
             } else {
                 point.x = contentFrame.minX - viaAccessory.frame.width - 10
@@ -1310,7 +1310,7 @@ public class ChatRowView: TableRowView, Notifable, MultipleSelectable, ChatTextS
             frame.size.height = self.cachedContentFrame(item).height
             frame.size.width -= item.additionBubbleInset
             frame.origin.y = base.minY
-            if item.isIncoming {
+            if item.isLeftAligned {
                 frame.origin.x += item.additionBubbleInset
             }
             return frame
@@ -1335,7 +1335,7 @@ public class ChatRowView: TableRowView, Notifable, MultipleSelectable, ChatTextS
         if let swipeDelta = swipeDelta {
             return NSMakePoint(swipeDelta, 0)
         } else if item.isBubbled {
-            return NSMakePoint((self.selectingView != nil && !item.isIncoming ? -32 : 0), 0)
+            return NSMakePoint((self.selectingView != nil && !item.isLeftAligned ? -32 : 0), 0)
         } else {
             return NSMakePoint(0, 0)
         }
@@ -1378,7 +1378,7 @@ public class ChatRowView: TableRowView, Notifable, MultipleSelectable, ChatTextS
         if item.isBubbled {
             let bubbleFrame = self.bubbleFrame(item)
             let rightFrame = self.rightFrame(item)
-            point = NSMakePoint(item.isIncoming ? max(bubbleFrame.maxX + 10, rightFrame.maxX + 10) : bubbleFrame.minX - size.width - 10, bubbleFrame.maxY - (size.height) + 3)
+            point = NSMakePoint(item.isLeftAligned ? max(bubbleFrame.maxX + 10, rightFrame.maxX + 10) : bubbleFrame.minX - size.width - 10, bubbleFrame.maxY - (size.height) + 3)
         } else {
             let rightFrame = self.rightFrame(item)
             point = NSMakePoint(frame.width - 20.0 - size.width, rightFrame.maxY)
@@ -1907,7 +1907,7 @@ public class ChatRowView: TableRowView, Notifable, MultipleSelectable, ChatTextS
         if item.hasBubble {
             if item.isBubbleFullFilled, item.captionLayouts.isEmpty {
                 frame.origin.y = bubbleFrame.maxY + item.defaultReactionsInset
-                frame.origin.x = bubbleFrame.minX + (item.isIncoming ? item.additionBubbleInset : 0)
+                frame.origin.x = bubbleFrame.minX + (item.isLeftAligned ? item.additionBubbleInset : 0)
             } else {
                 if item.captionLayouts.isEmpty {
                     frame.origin.y = contentFrame.maxY + item.defaultReactionsInset
@@ -1934,7 +1934,7 @@ public class ChatRowView: TableRowView, Notifable, MultipleSelectable, ChatTextS
         } else if let replyMarkup = item.replyMarkupModel {
             frame.origin.y += replyMarkup.size.height + item.defaultContentInnerInset
         }
-        if reactionsLayout.presentation.isOutOfBounds, !item.isIncoming {
+        if reactionsLayout.presentation.isOutOfBounds, !item.isLeftAligned {
             frame.origin.x = contentFrame.maxX - reactionsLayout.size.width
         } else if reactionsLayout.presentation.isOutOfBounds {
             if let replyMarkupModel = item.replyMarkupModel {
@@ -2456,7 +2456,7 @@ public class ChatRowView: TableRowView, Notifable, MultipleSelectable, ChatTextS
     /// Cuts the bands out of the bubble and renders the row's frosted surfaces below `bubbleView`, so
     /// the bubble's own mask clips them to the torn edges.
     private func applyCutBands(_ item: ChatRowItem) {
-        bubbleView.setCutBands(self.cutBands(item), incoming: item.isIncoming)
+        bubbleView.setCutBands(self.cutBands(item), incoming: item.isLeftAligned)
 
         let panels = self.frostedPanels(item)
 
@@ -3082,7 +3082,7 @@ public class ChatRowView: TableRowView, Notifable, MultipleSelectable, ChatTextS
     public override func onInsert(_ animation: NSTableView.AnimationOptions, appearAnimated: Bool) {
         if let item = item as? ChatRowItem, visibleRect != .zero, !TelegramUtilsHooks.shared.isLite(.animations) {
             if item.isBubbled, appearAnimated {
-                if item.isIncoming {
+                if item.isLeftAligned {
                     self.rowView.layer?.animateScaleSpringFrom(anchor: NSMakePoint(bubbleView.frame.minX, rowView.frame.height / 2), from: 0.1, to: 1, duration: 0.35, bounce: false)
                 } else {
                     self.rowView.layer?.animateScaleSpringFrom(anchor: NSMakePoint(rowView.frame.width - 20, rowView.frame.height / 2), from: 0.1, to: 1, duration: 0.35, bounce: false)

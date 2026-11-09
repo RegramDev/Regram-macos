@@ -1192,7 +1192,7 @@ public final class ChatRichTextRowView: ChatMessageView, ChatBubbleCustomTextSel
         let bubble = self.bubbleFrame(item)
         let content = self.contentFrame(item)
         var body = NSRect(
-            x: bubble.minX + (item.isIncoming ? item.additionBubbleInset : 0),
+            x: bubble.minX + (item.isLeftAligned ? item.additionBubbleInset : 0),
             y: bubble.minY,
             width: bubble.width - item.additionBubbleInset,
             height: bubble.height

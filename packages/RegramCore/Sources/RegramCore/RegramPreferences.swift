@@ -119,6 +119,7 @@ public struct RegramSetting: Equatable {
         .init("allChatsHidden", .messages, .bool(false)),
         .init("native.foldersAtBottom", .messages, .bool(false)),
         .init("messageBookmarksEnabled", .messages, .bool(true)),
+        .init("alignOwnMessagesLeft", .messages, .bool(false)),
         .init("showMessageId", .messages, .bool(false)),
         .init("secondsInMessages", .messages, .bool(false)),
         .init("showForwardedMessageDate", .messages, .bool(false)),
@@ -237,6 +238,7 @@ public struct RegramSetting: Equatable {
     ]
 
     public static let availableKeys: Set<String> = [
+        "alignOwnMessagesLeft",
         "allChatsHidden",
         "allChatsTitleLengthOverride",
         "allowDownloadingStories",

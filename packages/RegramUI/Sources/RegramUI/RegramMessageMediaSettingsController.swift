@@ -73,6 +73,8 @@ private func regramParityRows(_ page: String) -> [RegramParityRow] {
         .action("contextMenuOrder", "Settings.ContextMenu.Customize"),
         .notice("Settings.ContextMenu.Notice"),
         .header("Settings.Category.messageActions"),
+        .toggle("alignOwnMessagesLeft", "setting.alignOwnMessagesLeft", inverted: false),
+        .notice("setting.alignOwnMessagesLeft.notice"),
         .toggle("messageBookmarksEnabled", "Bookmarks.Title", inverted: false),
         .toggle("hideChannelBottomButton", "Settings.showChannelBottomButton", inverted: true),
         .toggle("secondsInMessages", "Settings.secondsInMessages", inverted: false),

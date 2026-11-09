@@ -153,6 +153,7 @@ public enum RegramSettingsCatalog {
         .init("settings.app", "hideChannelBottomButton", "Settings.showChannelBottomButton"),
         .init("settings.appearance", "wideChannelPosts", "Settings.wideChannelPosts"),
         .init("settings.messageActions", "secondsInMessages", "Settings.secondsInMessages"),
+        .init("settings.messageActions", "alignOwnMessagesLeft", "setting.alignOwnMessagesLeft", keywords: "left align outgoing own messages group fullscreen 左侧 左側 左对齐 靠左 自己 消息 全屏 群组 群組"),
         .init("settings.messageActions", "showMessageId", "Settings.ShowMessageId"),
         .init("settings.messageActions", "messageBookmarksEnabled", "Bookmarks.Title", keywords: "message bookmarks bookmark tags labels enable toggle 书签 标签 开关 启用 書籤 標籤 開關 啟用"),
         .init("settings.messageActions", "automaticallyRevealSpoilers", "Settings.AutomaticallyRevealSpoilers", keywords: "spoiler 剧透 劇透 reveal"),

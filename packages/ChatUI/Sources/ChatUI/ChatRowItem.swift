@@ -298,7 +298,7 @@ public class ChatRowItem: TableRowItem {
         var inset: CGFloat = 13
         if let monoforum = entry.additionalData.monoforumState {
             if case .vertical = monoforum {
-                if isIncoming || !isBubbled {
+                if isLeftAligned || !isBubbled {
                     inset += 80 + 9
                 }
             }
@@ -370,7 +370,7 @@ public class ChatRowItem: TableRowItem {
             if case .vertical = monoforumState {
                 if self is ChatServiceItem {
                     widthForContent -= 80
-                } else if !isIncoming, isBubbled {
+                } else if !isLeftAligned, isBubbled {
                     widthForContent -= 80
                 }
             }
@@ -715,7 +715,7 @@ public class ChatRowItem: TableRowItem {
         if isBubbled {
             if hasPhoto {
                 inset += 36
-            } else if self.isIncoming, let message = message {
+            } else if self.isLeftAligned, let message = message {
                 if let peer = message.peers[message.id.peerId] {
                     if peer.isGroup || peer.isSupergroup {
                         if peer.isForumOrMonoForum, peer.isBot {
@@ -754,13 +754,13 @@ public class ChatRowItem: TableRowItem {
                 if chatInteraction.chatLocation.threadMsgId == effectiveCommentMessage?.id {
                     return false
                 }
-                if (isIncoming && message.id.peerId == context.peerId) {
+                if (isLeftAligned && message.id.peerId == context.peerId) {
                     return true
                 }
                 if message.id.peerId == repliesPeerId && message.author?.id != context.peerId {
                     return true
                 }
-                if !peer.isUser && !peer.isSecretChat && !peer.isChannel && isIncoming {
+                if !peer.isUser && !peer.isSecretChat && !peer.isChannel && isLeftAligned {
                     if peer.isForumOrMonoForum, peer.isBot {
                         return false
                     }
@@ -1265,6 +1265,7 @@ public class ChatRowItem: TableRowItem {
     }
     
     public let isIncoming: Bool
+    public let isLeftAligned: Bool
     
     public var canHasFloatingPhoto: Bool {
         if chatInteraction.mode.isSavedMode {
@@ -1272,7 +1273,7 @@ public class ChatRowItem: TableRowItem {
         } else if chatInteraction.mode.isThreadMode, chatInteraction.chatLocation.threadMsgId == message?.id {
             return false
         } else {
-            return isIncoming && self.hasPhoto
+            return isLeftAligned && self.hasPhoto
         }
     }
     
@@ -1583,7 +1584,7 @@ public class ChatRowItem: TableRowItem {
         guard let neighbors = bubbleNeighbors else {
             return nil
         }
-        return messageBubbleCorners(incoming: isIncoming, neighbors: neighbors, inset: inset)
+        return messageBubbleCorners(incoming: isLeftAligned, neighbors: neighbors, inset: inset)
     }
 
     private var bubbleShapeSize: CGSize? {
@@ -1597,7 +1598,7 @@ public class ChatRowItem: TableRowItem {
         guard let neighbors = bubbleNeighbors else {
             return nil
         }
-        return messageBubbleImageModern(incoming: isIncoming, fillColor: .black, strokeColor: .clear, neighbors: neighbors, fitting: bubbleShapeSize)
+        return messageBubbleImageModern(incoming: isLeftAligned, fillColor: .black, strokeColor: .clear, neighbors: neighbors, fitting: bubbleShapeSize)
     }
 
     var isWallpaperGlass: Bool {
@@ -2149,6 +2150,7 @@ public class ChatRowItem: TableRowItem {
             let isIncoming: Bool = message.isIncoming(context.account, renderType == .bubble)
 
             self.isIncoming = isIncoming
+            self.isLeftAligned = isIncoming || (isBubbled && RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["alignOwnMessagesLeft"].bool)
 
             
             if case .bubble = renderType , hasBubble{
@@ -2726,6 +2728,7 @@ public class ChatRowItem: TableRowItem {
 
         } else {
             self.isIncoming = false
+            self.isLeftAligned = false
             self.hasBubble = false
         }
  
@@ -2953,6 +2956,7 @@ public class ChatRowItem: TableRowItem {
         self.downloadSettings = .defaultSettings
         self.presentation = theme
         self.isIncoming = false
+        self.isLeftAligned = false
         self.hasBubble = false
         self._isScam = false
         self.isForwardScam = false
@@ -3346,12 +3350,12 @@ public class ChatRowItem: TableRowItem {
                     rowWidth: width,
                     layoutFrame: NSMakeRect(defLeftInset, 0, bubbleFrameWidth, 0),
                     leftInset: leftInset,
-                    isIncoming: isIncoming,
+                    isIncoming: isLeftAligned,
                     isCenteredThread: chatInteraction.mode.isThreadMode && chatInteraction.chatLocation.threadMsgId == message?.id
                 ))
                 let contentFrame = ChatRowGeometry.contentFrame(.init(item: self, bubbleFrame: bubbleFrame))
                 let sideFrame = ChatRowGeometry.sideAccessoryFrame(.init(item: self, size: .zero, offset: 0, contentFrame: contentFrame))
-                let availableWidth = max(1, isIncoming ? width - rightInset - sideFrame.minX : sideFrame.maxX - leftInset)
+                let availableWidth = max(1, isLeftAligned ? width - rightInset - sideFrame.minX : sideFrame.maxX - leftInset)
                 let preferredWidth = _contentSize.width == 0 ? 200 : _contentSize.width - bubbleContentInset * 2
                 replyModel.measureSize(min(preferredWidth, availableWidth), sizeToFit: true)
                 if replyModel.size.width > availableWidth {

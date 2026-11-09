@@ -169,12 +169,12 @@ final class RegramChatListPreviewCoordinator {
         for entry in entries {
             guard case let .chat(item, _, additionalItem, _, _, _, _, _, _, _, _, _) = entry, additionalItem == nil else { continue }
             let messages = item.messages.map { $0._asMessage() }
-            guard let newest = regramChatListSourceTop(messages),
-                  !RegramTemporaryReveal.shared.isRevealed(accountId: accountId, peerId: newest.id.peerId.toInt64()) else { continue }
+            guard let newest = regramChatListSourceTop(messages) else { continue }
+            let filter = RegramTemporaryReveal.shared.isRevealed(accountId: accountId, peerId: newest.id.peerId.toInt64()) ? RegramFilterSnapshot(settings: RegramAccountSettings()) : filter
             let threadId: Int64?
             if case let .forum(id) = item.id { threadId = id } else { threadId = nil }
             let cacheId = CacheId(accountId: accountId, peerId: newest.id.peerId, threadId: threadId)
-            let visible = messages.filter { !regramShouldHideMessage($0, accountId: accountId, filter: filter, revision: preferencesRevision) }
+            let visible = messages.filter { !regramChatListMessageIsHidden($0, accountId: accountId, filter: filter, revision: preferencesRevision) }
             if case .chatList = item.id, let visibleTop = visible.max(by: { $0.index < $1.index }) {
                 lastVisibleTopMessages[cacheId] = visibleTop
             }
@@ -205,7 +205,7 @@ final class RegramChatListPreviewCoordinator {
             if var state = states[cacheId], state.key == key {
                 let payloads = state.messages.map(RegramMessageFilterPayload.init)
                 if !state.usesSuppliedMessages, payloads != state.previewPayloads {
-                    state.messages = state.messages.filter { !regramShouldHideMessage($0, accountId: accountId, filter: filter, revision: preferencesRevision) }
+                    state.messages = state.messages.filter { !regramChatListMessageIsHidden($0, accountId: accountId, filter: filter, revision: preferencesRevision) }
                     state.previewPayloads = state.messages.map(RegramMessageFilterPayload.init)
                     if state.messages.isEmpty {
                         state.completed = false
@@ -220,7 +220,7 @@ final class RegramChatListPreviewCoordinator {
                 let upperBound = regramChatListPreviewUpperBound(messages) ?? newest.index
                 let provisional = lastVisibleTopMessages[cacheId].flatMap { message -> Message? in
                     guard visible.isEmpty, message.id.peerId == newest.id.peerId, message.index < upperBound,
-                          !regramShouldHideMessage(message, accountId: accountId, filter: filter, revision: preferencesRevision) else { return nil }
+                          !regramChatListMessageIsHidden(message, accountId: accountId, filter: filter, revision: preferencesRevision) else { return nil }
                     return message
                 }
                 let previewMessages = provisional.map { [$0] } ?? visible
@@ -286,8 +286,7 @@ final class RegramChatListPreviewCoordinator {
             guard allHiddenIds.contains(entry.stableId), let cacheId = activeEntries[entry.stableId], let state = states[cacheId], !state.usesSuppliedMessages,
                   let replacement = state.messages.max(by: { $0.index < $1.index }), replacement.index < state.upperBound,
                   replacement.id.peerId == state.key.messageId.peerId,
-                  !regramShouldHideMessage(replacement, accountId: accountId, filter: filter, revision: preferencesRevision),
-                  !RegramTemporaryReveal.shared.isRevealed(accountId: accountId, peerId: replacement.id.peerId.toInt64()),
+                  !regramChatListMessageIsHidden(replacement, accountId: accountId, filter: state.filter, revision: preferencesRevision),
                   case let .chat(item, activities, additionalItem, filter, status, forum, appearance, hideContent, folders, categories, canPreview, revision) = entry,
                   additionalItem == nil, case .chatList = item.id, case let .chatList(nativeIndex) = item.index,
                   let sourceTop = regramChatListSourceTop(item.messages.map({ $0._asMessage() })) else { return entry }
@@ -482,7 +481,7 @@ final class RegramChatListPreviewCoordinator {
                 for (namespace, messages) in result.pages {
                     guard let stream = result.request.streams[namespace] else { continue }
                     let ordered = messages.sorted { $0.index > $1.index }
-                    let candidate = ordered.first { $0.index < result.request.upperBound && !regramShouldHideMessage($0, accountId: self.accountId, filter: result.request.filter, revision: result.request.key.preferencesRevision) }
+                    let candidate = ordered.first { $0.index < result.request.upperBound && !regramChatListMessageIsHidden($0, accountId: self.accountId, filter: result.request.filter, revision: result.request.key.preferencesRevision) }
                     let nextCursor = ordered.last?.index
                     state.streams[namespace] = Stream(cursor: nextCursor ?? stream.cursor, candidate: candidate, exhausted: messages.count < 32 || nextCursor == nil || nextCursor! >= stream.cursor)
                 }
@@ -563,7 +562,7 @@ final class RegramChatListPreviewCoordinator {
             guard let self, self.isCurrentRemoteRequest(request, disposable: disposable) else { return }
             guard let response else { self.finishRemote(request, candidate: nil); return }
             let candidate = response.messages.sorted { $0.index > $1.index }.first { message in
-                message.index < request.upperBound && !regramShouldHideMessage(message, accountId: self.accountId, filter: request.filter, revision: request.key.preferencesRevision)
+                message.index < request.upperBound && !regramChatListMessageIsHidden(message, accountId: self.accountId, filter: request.filter, revision: request.key.preferencesRevision)
             }
             if let candidate { self.finishRemote(request, candidate: candidate) }
             else if let offset = response.nextOffsetId, offset > 0, offset != offsetId, number < 20 {
@@ -581,7 +580,7 @@ final class RegramChatListPreviewCoordinator {
         sourceTokens[id] = token
         disposable.set((combineLatest(messages.map { postbox.messageView($0.id) }) |> deliverOn(self.queue)).start(next: { [weak self] views in
             guard let self, !self.disposed.with({ $0 }), self.sourceTokens[id] == token, var current = self.states[id], current.key == state.key else { return }
-            let visible = views.compactMap(\.message).filter { !regramShouldHideMessage($0, accountId: self.accountId, filter: current.filter, revision: current.key.preferencesRevision) }
+            let visible = views.compactMap(\.message).filter { !regramChatListMessageIsHidden($0, accountId: self.accountId, filter: current.filter, revision: current.key.preferencesRevision) }
             if !visible.isEmpty {
                 let keys = regramChatListSourceKeys(visible)
                 let previous = regramChatListSourceKeys(current.messages)
@@ -620,7 +619,7 @@ final class RegramChatListPreviewCoordinator {
         candidateTokens[id] = token
         disposable.set((postbox.messageView(candidate.id) |> deliverOn(self.queue)).start(next: { [weak self] view in
             guard let self, !self.disposed.with({ $0 }), self.candidateTokens[id] == token, var current = self.states[id], current.key == state.key else { return }
-            if let message = view.message, message.index < current.upperBound, !regramShouldHideMessage(message, accountId: self.accountId, filter: current.filter, revision: current.key.preferencesRevision) {
+            if let message = view.message, message.index < current.upperBound, !regramChatListMessageIsHidden(message, accountId: self.accountId, filter: current.filter, revision: current.key.preferencesRevision) {
                 guard current.messages.first?.id != message.id || current.messages.first?.stableVersion != message.stableVersion || current.previewPayloads != [RegramMessageFilterPayload(message)] else { return }
                 current.messages = [message]
                 current.previewPayloads = [RegramMessageFilterPayload(message)]

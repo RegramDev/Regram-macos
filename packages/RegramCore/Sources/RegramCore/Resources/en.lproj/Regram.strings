@@ -2852,3 +2852,5 @@
 "RevokedMarker.DimMessages" = "Show Deleted Messages at Half Opacity";
 "RevokedMarker.RequiresEnabled" = "Turn on Keep Deleted Messages to customize deleted message markers and opacity.";
 "setting.revokedMarkerDimMessages" = "Show Deleted Messages at Half Opacity";
+"setting.alignOwnMessagesLeft" = "Align my messages to the left";
+"setting.alignOwnMessagesLeft.notice" = "Display your outgoing messages on the left in bubble chats. Message colors and read receipts stay the same.";
