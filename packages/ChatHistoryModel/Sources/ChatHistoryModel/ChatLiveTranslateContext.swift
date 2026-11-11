@@ -1159,3 +1159,36 @@ public func chatTranslationState(context: any AccountContextProtocol, peerId: En
         }
     }
 }
+
+public func chatDictationLanguage(context: any AccountContextProtocol, peerId: EnginePeer.Id) -> Signal<String?, NoError> {
+    return cachedChatTranslationState(engine: context.engine, peerId: peerId)
+    |> take(1)
+    |> mapToSignal { cached -> Signal<String?, NoError> in
+        if let language = cached?.fromLang, !language.isEmpty {
+            return .single(language)
+        }
+        return context.account.viewTracker.aroundMessageHistoryViewForLocation(.peer(peerId: peerId, threadId: nil), index: .upperBound, anchorIndex: .upperBound, count: 32, fixedCombinedReadStates: nil)
+        |> filter { !$0.0.isLoading }
+        |> take(1)
+        |> deliverOn(prepareQueue)
+        |> map { history, _, _ -> String? in
+            var languages: [String] = []
+            for entry in history.entries where entry.message.text.count > 10 {
+                let message = entry.message
+                let codeRanges = (message.textEntitiesAttribute?.entities ?? []).compactMap { entity -> NSRange? in
+                    guard entity.type.isCode else { return nil }
+                    return NSRange(location: entity.range.lowerBound, length: entity.range.count)
+                }
+                let text = RegramChatLanguagePolicy.recognitionText(.init(text: message.text, incoming: true, excludedRanges: codeRanges))
+                if text.count >= 10, let language = Translate.detectLanguage(for: text) {
+                    languages.append(language)
+                    if languages.count == 16 { break }
+                }
+            }
+            guard languages.count >= 2 else { return nil }
+            let counts = languages.reduce(into: [String: Int]()) { $0[$1, default: 0] += 1 }
+            return languages.max { counts[$0, default: 0] < counts[$1, default: 0] }
+        }
+    }
+    |> timeout(0.5, queue: prepareQueue, alternate: .single(nil))
+}

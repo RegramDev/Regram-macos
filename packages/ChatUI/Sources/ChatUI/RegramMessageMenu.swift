@@ -114,7 +114,7 @@ func regramMessageMenu(message: Message, messages: [Message], interaction: ChatI
     }, itemImage: MenuAnimation.menu_copy.value).regramAction(.json))
     if canForward, !protected, message.id.namespace == Namespaces.Message.Cloud, messages.allSatisfy({ canForwardMessage($0, chatInteraction: interaction) }) {
         let forward = ChatForwardMenuAction(chatInteraction: interaction, sources: messages)
-        let object = ChatHistoryUIHooks.shared.makeForwardMessagesObjectObserved(context, messages, false, interaction.getMessages)
+        let object = ChatHistoryUIHooks.shared.makeForwardMessagesObjectObserved(context, messages, false, interaction.getMessages, analyticsContext: forward.analyticsContext)
         if canReply, regramCanRepeatHere(messages, interaction: interaction), let peer = interaction.presentation.peer, object.possibilityPerformTo(peer) {
             let action = interaction.captureDeferredSendAction()
             result.append(ContextMenuItem(menuTitle("menu.repeatForward"), handler: {
