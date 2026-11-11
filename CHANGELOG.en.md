@@ -2,6 +2,12 @@
 
 [简体中文](CHANGELOG.md) · **English**
 
+## 13.2.0 (283467) — 2026-11-11
+
+- Fix stale sync results moving a group back to the main chat list after you send a message in the archived group.
+- Merge Telegram for macOS 13.2 through `ec221d85`.
+- Preserve retained deletions and edit state when chats refresh, and prevent background refreshes from restoring stale profile music.
+
 ## 13.1.0 (283396) — 2026-11-09
 
 - Skip deleted messages in chat-list previews and fall back to the previous visible message. Retained deleted messages remain available inside chats.
