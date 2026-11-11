@@ -13,6 +13,7 @@ import SystemPermissions
 import TelegramUtils
 import Localization
 import TelegramContext
+import AppAnalytics
 
 public enum PCallResult {
     case success(PCallSession)
@@ -113,6 +114,7 @@ private func performPhoneCall(account: Account, sharedContext: any SharedAccount
             }
             |> deliverOnMainQueue
             |> map { id, data in
+                Analytics.shared.send(AnalyticsEvents.callStart(video: isVideo))
                 return .success(PCallSession(sharedContext: sharedContext, account: account, isOutgoing: true, incomingConferenceSource: nil, incomingParticipants: [], peerId: peerId, id: id, initialState: nil, startWithVideo: isVideo, isVideoPossible: isVideoPossible, data: data))
             }
         } else {

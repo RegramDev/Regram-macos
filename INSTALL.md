@@ -155,7 +155,7 @@ committed; every machine builds it.
 ## 4. Build the app
 
 Open `Telegram-Mac.xcworkspace` in Xcode, not `Telegram.xcodeproj`. The workspace also
-contains the `RLottie_Xcode`, `CodeSyntax` and `Sparkle` projects that the app links,
+contains the `CodeSyntax` and `Sparkle` projects that the app links,
 and a bare `Telegram.xcodeproj` build cannot find them.
 
 Schemes:
@@ -188,6 +188,13 @@ python3 scripts/package-regram-release.py --output ~/Downloads/Regram
 The script builds the architectures sequentially with four build jobs, retains the shared build cache, verifies Release/STABLE and nested signatures, and produces a checksum and size report beside each DMG. It uses the fixed certificate configured by the local installer. The source app is removed only after both packages succeed; installed applications and user data are untouched.
 
 To package one existing build, use `--source-app /path/to/Regram.app --architecture arm64` (or `x86_64`). This works on a copy and preserves the source bundle. The previous 283368 release remains available as a Universal download.
+
+### Telegram-iOS compatibility
+
+The Telegram-iOS submodule points to the official upstream commit. Framework
+preparation applies both the upstream macOS compatibility patch and the Regram
+core patch. If the frameworks are already built, run
+`bash scripts/prepare-regram-core.sh` before opening Xcode or resolving packages.
 
 ### Generated TelegramApi sources
 
@@ -402,7 +409,7 @@ cd packages/TGUIKit && swift build
 - **`duplicate symbol '_rust_eh_personality'`**: tlottie was built with a different Rust
   toolchain than the engines. Delete `core-xprojects/tlottie/build` and rerun
   `sh core-xprojects/tlottie/build.sh`.
-- **RLottie or CodeSyntax not found**: you opened `Telegram.xcodeproj`. Open the
+- **CodeSyntax or Sparkle not found**: you opened `Telegram.xcodeproj`. Open the
   workspace instead.
 - **"The macOS deployment target 'MACOSX_DEPLOYMENT_TARGET' is set to 10.13, but the range
   of supported deployment target versions is 12.0 to 27.0.x"**: you are building with

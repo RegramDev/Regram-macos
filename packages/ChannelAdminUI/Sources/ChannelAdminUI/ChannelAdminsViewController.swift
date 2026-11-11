@@ -11,6 +11,7 @@ import GeneralRows
 import ShortPeerRow
 import SelectPeersUI
 import ChatUI
+import AlertsUI
 
 fileprivate final class ChannelAdminsControllerArguments {
     let context: any AccountContextProtocol
@@ -499,6 +500,9 @@ open class ChannelAdminsViewController<Context: AccountContextProtocol>: Editabl
         let viewValue:Atomic<PeerView?> = Atomic(value: nil)
         
         
+        let peerView = Promise<PeerView>()
+        peerView.set(context.account.viewTracker.peerView(peerId))
+
         let arguments = ChannelAdminsControllerArguments(context: context, addAdmin: {
             let behavior = peerId.namespace == Namespaces.Peer.CloudGroup ? SelectGroupMembersBehavior(peerId: peerId, limit: 1) : SelectChannelMembersBehavior(peerId: peerId, peerChannelMemberContextsManager: context.peerChannelMemberCategoriesContextsManager, limit: 1)
             
@@ -536,7 +540,13 @@ open class ChannelAdminsViewController<Context: AccountContextProtocol>: Editabl
                     }))
             } else {
                 self?.removeAdminDisposable.set((context.peerChannelMemberCategoriesContextsManager.updateMemberAdminRights(peerId: peerId, memberId: adminId, adminRights: nil, rank: nil)
-                    |> deliverOnMainQueue).start(completed: {
+                    |> deliverOnMainQueue).start(error: { error in
+                        updateState { $0.withUpdatedRemovingPeerId(nil) }
+                        let _ = (peerView.get() |> take(1) |> deliverOnMainQueue).start(next: { view in
+                            let peer = peerViewMainPeer(view)
+                            alert(for: context.window, info: channelAdminRightsErrorText(error, isGroup: peer?.isGroup == true || peer?.isSupergroup == true))
+                        })
+                    }, completed: {
                         updateState {
                             return $0.withUpdatedRemovingPeerId(nil)
                         }
@@ -563,8 +573,6 @@ open class ChannelAdminsViewController<Context: AccountContextProtocol>: Editabl
         
        
         
-        let peerView = Promise<PeerView>()
-        peerView.set(context.account.viewTracker.peerView(peerId))
         
         let stateValue = self.stateValue
 
@@ -656,7 +664,7 @@ open class ChannelAdminsViewController<Context: AccountContextProtocol>: Editabl
         
         let previousEntries:Atomic<[AppearanceWrapperEntry<ChannelAdminsEntry>]> = Atomic(value: [])
         
-        let signal = combineLatest(statePromise.get(), peerView.get(), adminsPromise.get(), appearanceSignal)
+        let signal: Signal<(TableUpdateTransition, Bool), NoError> = combineLatest(statePromise.get(), peerView.get(), adminsPromise.get(), appearanceSignal)
             |> map { state, view, admins, appearance -> (TableUpdateTransition, Bool) in
                 
                 var isCreator = false

@@ -29,6 +29,7 @@ import TelegramMediaUtils
 import TelegramTheme
 import TelegramUtils
 import InlineStickerLayer
+import AppAnalytics
 
 extension AddGroupMemberError {
     var channelError: AddChannelMemberError {
@@ -110,6 +111,12 @@ struct GroupInfoEditingState: Equatable {
     func withUpdatedEditingDescriptionText(_ editingDescriptionText: String) -> GroupInfoEditingState {
         return GroupInfoEditingState(editingName: self.editingName, editingDescriptionText: editingDescriptionText)
     }
+}
+
+public func selectForumMembers<Context: AccountContextProtocol>(context: Context, peerId: PeerId) -> Disposable {
+    let arguments = GroupInfoArguments(context: context, peerId: peerId, state: GroupInfoState(), isAd: false, pushViewController: { context.bindings.rootNavigation().push($0) }, pullNavigation: { context.bindings.rootNavigation() }, mediaController: { nil })
+    arguments.addMember(true)
+    return ActionDisposable { withExtendedLifetime(arguments) {} }
 }
 
 private struct Result {
@@ -237,6 +244,7 @@ final class GroupInfoArguments<Context: AccountContextProtocol> : PeerInfoArgume
     }
     
     func updateEditingName(_ name:String) -> Void {
+        manageStep?(.changeTitle)
         updateState { state in
             if let editingState = state.editingState {
                 return state.withUpdatedEditingState(GroupInfoEditingState(editingName: name, editingDescriptionText: editingState.editingDescriptionText))
@@ -246,6 +254,7 @@ final class GroupInfoArguments<Context: AccountContextProtocol> : PeerInfoArgume
         }
     }
     func updateEditingDescriptionText(_ text:String) -> Void {
+        manageStep?(.changeDescription)
         updateState { state in
             if let editingState = state.editingState {
                 return state.withUpdatedEditingState(editingState.withUpdatedEditingDescriptionText(text))
@@ -255,6 +264,7 @@ final class GroupInfoArguments<Context: AccountContextProtocol> : PeerInfoArgume
     }
     
     func visibilitySetup() {
+        manageStep?(.changeType)
         let setup = PeerInfoNavigationHooks.shared.makeChannelVisibilityController(context, peerId, false, linksManager)
         let context = context
         let signal: Signal<Peer?, NoError> = setup.onComplete |> take(1) |> mapToSignal { peerId in
@@ -278,6 +288,7 @@ final class GroupInfoArguments<Context: AccountContextProtocol> : PeerInfoArgume
     }
     
     func openInviteLinks() {
+        manageStep?(.openInviteLinks)
         pushViewController(InviteLinksController(context: context, peerId: peerId, isChannel: false, manager: linksManager))
     }
     func openRequests() {
@@ -286,6 +297,7 @@ final class GroupInfoArguments<Context: AccountContextProtocol> : PeerInfoArgume
         }))
     }
     func openReactions(allowedReactions: PeerAllowedReactions?, availableReactions: AvailableReactions?) {
+        manageStep?(.openReactions)
         pushViewController(PeerInfoNavigationHooks.shared.makeGroupReactionsSettingsController(context, peerId, allowedReactions, availableReactions))
     }
 
@@ -361,6 +373,7 @@ final class GroupInfoArguments<Context: AccountContextProtocol> : PeerInfoArgume
     }
     
     func preHistorySetup() {
+        manageStep?(.toggleHistoryVisible)
         let context = self.context
         let setup = PreHistorySettingsController(context: context, peerId: peerId, onComplete: { [weak self] resultPeerId in
             let signal: Signal<Peer?, NoError>
@@ -389,6 +402,7 @@ final class GroupInfoArguments<Context: AccountContextProtocol> : PeerInfoArgume
             }
             showModalText(for: context.window, text: text)
         } else {
+            manageStep?(.toggleForum)
             if convert {
                 let upgrade = upgradeToSupergroup()
                 
@@ -412,12 +426,15 @@ final class GroupInfoArguments<Context: AccountContextProtocol> : PeerInfoArgume
     }
     
     func blacklist() {
+        manageStep?(.openPermissions)
         pushViewController(PeerInfoNavigationHooks.shared.makeChannelPermissionsController(context, peerId))
     }
     func admins() {
+        manageStep?(.openAdmins)
         pushViewController(ChannelAdminsViewController(context, peerId: peerId))
     }
     func members() {
+        manageStep?(.openMembers)
         pushViewController(PeerInfoNavigationHooks.shared.makeChannelMembersController(context, peerId))
     }
     func addToCommunity() {
@@ -447,9 +464,9 @@ final class GroupInfoArguments<Context: AccountContextProtocol> : PeerInfoArgume
     
     func stats(_ datacenterId: Int32) {
         if self.peer?.isSupergroup == true {
-            self.pushViewController(ChannelStatsSegmentController(context, peerId: peerId, isChannel: false))
+            self.pushViewController(ChannelStatsSegmentController(context, peerId: peerId, isChannel: false, analyticsContext: captureAnalyticsContext()))
         } else {
-            self.pushViewController(GroupStatsViewController(context, peerId: peerId))
+            self.pushViewController(GroupStatsViewController(context, peerId: peerId, analyticsContext: captureAnalyticsContext()))
         }
     }
     
@@ -463,6 +480,7 @@ final class GroupInfoArguments<Context: AccountContextProtocol> : PeerInfoArgume
     }
     
     func updatePhoto(_ path:String) -> Void {
+        manageStep?(.changePhoto)
         
         let updateState:((GroupInfoState)->GroupInfoState)->Void = { [weak self] f in
             self?.updateState(f)
@@ -520,6 +538,7 @@ final class GroupInfoArguments<Context: AccountContextProtocol> : PeerInfoArgume
     }
     
     func updateVideo(_ signal:Signal<VideoAvatarGeneratorState, NoError>) -> Void {
+        manageStep?(.changePhoto)
         
         let updateState:((GroupInfoState)->GroupInfoState)->Void = { [weak self] f in
             self?.updateState(f)
@@ -870,6 +889,7 @@ final class GroupInfoArguments<Context: AccountContextProtocol> : PeerInfoArgume
 
     
     func setGroupStickerset() {
+        manageStep?(.openStickers)
         pullNavigation()?.push(PeerInfoNavigationHooks.shared.makeGroupStickerSetController(context, peerId))
         
     }

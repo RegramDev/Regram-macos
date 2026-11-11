@@ -33,6 +33,7 @@ import FoundationUtils
 import InputView
 import InputTextView
 import InlineStickerLayer
+import AppAnalytics
 
 private final class LimitedRowItem : GeneralRowItem {
     fileprivate let availability: StarGift.Gift.Availability
@@ -1419,6 +1420,7 @@ public func PreviewStarGiftController(context: (any AccountContextProtocol), opt
     }
     
     let controller = InputDataController(dataSignal: signal, title: context.peerId == peer.id ? strings().starGiftPreviewTitleBuy : strings().starGiftPreviewTitle)
+    controller.analyticsScreen = .giftsPreview
     
     
     getController = { [weak controller] in

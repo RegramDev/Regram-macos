@@ -16,6 +16,7 @@ import InAppSettings
 import ShortPeerRow
 import StatisticsUI
 import InlineStickerLayer
+import AppAnalytics
 import LocalAnimations
 import ChatHistoryModel
 
@@ -348,6 +349,7 @@ public func PollResultController(context: any AccountContextProtocol, message: M
     }
     
     let controller = InputDataController(dataSignal: signal, title: !poll.isQuiz ? strings().pollResultsTitlePoll : strings().pollResultsTitleQuiz)
+    controller.analyticsScreen = .chatPollResults
     
     controller.getBackgroundColor = {
         theme.colors.background

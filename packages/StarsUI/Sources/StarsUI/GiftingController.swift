@@ -33,6 +33,7 @@ import FoundationUtils
 import InputView
 import InputTextView
 import InlineStickerLayer
+import AppAnalytics
 
 
 
@@ -1066,6 +1067,7 @@ public func GiftingController(context: (any AccountContextProtocol), peerId: Pee
         return InputDataSignalValue(entries: entries(state, arguments: arguments))
     }
     let controller = InputDataController(dataSignal: signal, title: context.peerId == peerId ? strings().giftOptionsGiftSelfTitle : strings().giftingTitle)
+    controller.analyticsScreen = .giftsCatalog
     
     getController = { [weak controller] in
         return controller

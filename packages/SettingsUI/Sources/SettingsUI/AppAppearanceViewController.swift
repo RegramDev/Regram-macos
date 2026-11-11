@@ -22,6 +22,7 @@ import ChatHistoryModel
 import FilePanels
 import WallpaperUI
 import RegramServices
+import AppAnalytics
 
 public func generateSingleColorImage(size: CGSize, color: NSColor) -> CGImage? {
     return generateImage(size, contextGenerator: { size, context in
@@ -558,7 +559,7 @@ private func appAppearanceEntries(appearance: Appearance, state: State, settings
     sectionId += 1
     
     
-    #if BETA || STABLE
+    #if BETA || STABLE || DEBUG
     
     struct DockSelection: Equatable {
         let icon: String
@@ -849,6 +850,7 @@ public func AppAppearanceViewController(context: any AccountContextProtocol, foc
         return view
         
     })
+    controller.analyticsScreen = .settingsAppearance
     
     controller.preparationQueue = settingsQueue
     controller.makeFirstFast = focusOnItemTag == nil
@@ -905,7 +907,9 @@ public func toggleDarkMode(context: any AccountContextProtocol) {
 }
 
 func sendThemeModeChange(dark: Bool) {
+    Analytics.shared.send(AnalyticsEvents.settingsChange(.appearanceThemeMode(dark ? .dark : .light)))
 }
 
 func sendThemeModeSystem() {
+    Analytics.shared.send(AnalyticsEvents.settingsChange(.appearanceThemeMode(.system)))
 }

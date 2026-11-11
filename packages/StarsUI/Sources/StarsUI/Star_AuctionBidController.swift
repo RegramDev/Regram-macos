@@ -33,6 +33,7 @@ import FoundationUtils
 import InputView
 import InputTextView
 import InlineStickerLayer
+import AppAnalytics
 
 
 private final class TitleRowItem : GeneralRowItem {
@@ -1103,6 +1104,7 @@ public func Star_AuctionBidController(context: (any AccountContextProtocol), pee
         dataSignal: signal,
         title: ""
     )
+    controller.analyticsScreen = .giftsAuctionBid
 
    
     
@@ -1384,6 +1386,7 @@ private func InputCustomController(context: (any AccountContextProtocol), curren
     }, afterDisappear: {
         bidDisposable.dispose()
     }, hasDone: true)
+    controller.analyticsScreen = .giftsAuctionCustomBid
     
     controller.autoInputAction = true
     

@@ -137,6 +137,9 @@ public class InputPasteboardParser: NSObject {
     }
     
     public class func proccess(pasteboard:NSPasteboard, chatInteraction:ChatInteraction, window:Window) -> Bool {
+        let analyticsContext = chatInteraction.captureAnalyticsContext()
+        let analyticsPresentation = analyticsContext.beginPresentation()
+        defer { analyticsPresentation.end() }
         let originalImages = RegramPreferences.shared.settings(accountId: chatInteraction.interactionContext.peerId.toInt64())["clipboardOriginalImages"].bool
         if let original = RegramClipboardImages.snapshot(from: pasteboard), original.containsImage {
             let valid = original.urls.filter { fileSize($0.path).map { fileSizeLimitExceed(context: chatInteraction.interactionContext, fileSize: $0) } ?? false }
@@ -144,11 +147,11 @@ public class InputPasteboardParser: NSObject {
             if let peer = chatInteraction.presentation.peer, let text = permissionText(from: peer, for: .banSendMedia) { alert(for: window, info: text); return false }
             guard let photos = try? RegramClipboardImages.preparingPhotos(original, originalQuality: originalImages) else { alert(for: window, info: strings().unknownError); return false }
             if valid.count == 1, chatInteraction.presentation.interfaceState.editState?.canEditMedia == true {
-                let replacement = chatInteraction.beginMediaReplacement()
+                let replacement = chatInteraction.beginMediaReplacement(entry: .clipboard, mode: .media, context: analyticsContext)
                 _ = (Sender.generateMedia(for: MediaSenderContainer(path: photos.urls[0].path, isFile: false), account: chatInteraction.interactionContext.account, isSecretRelated: chatInteraction.peerId.namespace == Namespaces.Peer.SecretChat) |> deliverOnMainQueue).start(next: { [weak chatInteraction] media, _ in
                     chatInteraction?.applyMediaReplacement(media, request: replacement)
                 })
-            } else { chatInteraction.showPreviewSender(photos.urls, photos.asMedia, nil) }
+            } else { chatInteraction.showPreviewSender(photos.urls, photos.asMedia, nil, analyticsContext: analyticsContext) }
             return false
         }
         let items = pasteboard.pasteboardItems
@@ -191,6 +194,7 @@ public class InputPasteboardParser: NSObject {
             var exceedSize: Int64?
             var rejectedForSize = false
             let isMediaReplacement = chatInteraction.presentation.interfaceState.editState?.canEditMedia == true && (files.count == 1 || image != nil)
+            let journey = previous > 0 || image != nil ? chatInteraction.makeMediaAnalyticsJourney(context: analyticsContext, entry: .clipboard, mode: .media) : nil
 
             
             
@@ -210,41 +214,47 @@ public class InputPasteboardParser: NSObject {
             
             if afterSizeCheck == 0 && previous != afterSizeCheck {
                 if isMediaReplacement {
+                    chatInteraction.rejectMediaReplacement(entry: .clipboard, mode: .media, context: analyticsContext, reason: rejectedForSize ? .sizeLimit : .fileUnavailable)
                 }
+                journey?.fail(rejectedForSize ? .sizeLimit : .fileUnavailable)
                 showFileLimit(context: chatInteraction.interactionContext, fileSize: exceedSize)
                 return false
             }
             if afterSizeCheck < previous {
+                journey?.blocked(rejectedForSize ? .sizeLimit : .fileUnavailable)
             }
             if let peer = chatInteraction.presentation.peer, let permissionText = permissionText(from: peer, for: .banSendMedia) {
                 if !files.isEmpty || image != nil {
                     if isMediaReplacement {
+                        chatInteraction.rejectMediaReplacement(entry: .clipboard, mode: .media, context: analyticsContext, reason: .permission)
                     }
+                    journey?.fail(.permission)
                     alert(for: mainWindow, info: permissionText)
                     return false
                 }
             }
             
             if files.count == 1, let editState = chatInteraction.presentation.interfaceState.editState, editState.canEditMedia {
-                let replacement = chatInteraction.beginMediaReplacement()
-                _ = (Sender.generateMedia(for: MediaSenderContainer(path: files[0].path, isFile: false), account: chatInteraction.interactionContext.account, isSecretRelated: chatInteraction.peerId.namespace == Namespaces.Peer.SecretChat) |> deliverOnMainQueue).start(next: { [weak chatInteraction] media, _ in
+                let replacement = chatInteraction.beginMediaReplacement(entry: .clipboard, mode: .media, context: analyticsContext)
+                _ = analyticsContext.preservingPresentation(Sender.generateMedia(for: MediaSenderContainer(path: files[0].path, isFile: false), account: chatInteraction.interactionContext.account, isSecretRelated: chatInteraction.peerId.namespace == Namespaces.Peer.SecretChat) |> deliverOnMainQueue).start(next: { [weak chatInteraction] media, _ in
                     chatInteraction?.applyMediaReplacement(media, request: replacement)
                 })
                 return false
             } else if let image = image, let editState = chatInteraction.presentation.interfaceState.editState, editState.canEditMedia {
-                let replacement = chatInteraction.beginMediaReplacement()
-                _ = (putToTemp(image: image, compress: false) |> mapToSignal {Sender.generateMedia(for: MediaSenderContainer(path: regramPastedPhotoPath($0), isFile: false), account: chatInteraction.interactionContext.account, isSecretRelated: chatInteraction.peerId.namespace == Namespaces.Peer.SecretChat) } |> deliverOnMainQueue).start(next: { [weak chatInteraction] media, _ in
+                let replacement = chatInteraction.beginMediaReplacement(entry: .clipboard, mode: .media, context: analyticsContext)
+                _ = analyticsContext.preservingPresentation(putToTemp(image: image, compress: false) |> mapToSignal {Sender.generateMedia(for: MediaSenderContainer(path: regramPastedPhotoPath($0), isFile: false), account: chatInteraction.interactionContext.account, isSecretRelated: chatInteraction.peerId.namespace == Namespaces.Peer.SecretChat) } |> deliverOnMainQueue).start(next: { [weak chatInteraction] media, _ in
                     chatInteraction?.applyMediaReplacement(media, request: replacement)
                 })
                 return false
             }
             
             if !files.isEmpty {
-                chatInteraction.showPreviewSender(files, true, nil)
+                chatInteraction.showPreviewSender(files, true, nil, analyticsContext: analyticsContext, journey: journey)
                 return false
             } else if let image = image {
+                journey?.preparing()
                 _ = (putToTemp(image: image, compress: false) |> deliverOnMainQueue).start(next: { [weak chatInteraction] (path) in
-                    chatInteraction?.showPreviewSender([URL(fileURLWithPath: regramPastedPhotoPath(path))], true, nil)
+                    chatInteraction?.showPreviewSender([URL(fileURLWithPath: regramPastedPhotoPath(path))], true, nil, analyticsContext: analyticsContext, journey: journey)
                 })
                 return false
             }

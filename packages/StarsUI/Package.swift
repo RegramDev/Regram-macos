@@ -40,7 +40,7 @@ let deps: [(String, String)] = [
     ("ShortPeerRow", "../ShortPeerRow"),
     ("CalendarUI", "../CalendarUI"),
     ("MessageUtils", "../MessageUtils"),
-
+    ("AppAnalytics", "../AppAnalytics"),
 ]
 
 let package = Package(

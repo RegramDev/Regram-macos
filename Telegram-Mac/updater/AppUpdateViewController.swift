@@ -7,6 +7,7 @@ import Sparkle
 import CrashRecoveryUI
 import RegramCore
 import CryptoKit
+import AppAnalytics
 
 
 
@@ -281,7 +282,7 @@ func AppUpdateViewController() -> InputDataController {
         return .none
     }, afterDisappear: {
 
-    }, hasDone: false, identifier: "app_update")
+    }, hasDone: false, identifier: "app_update").analytics(.settingsAppUpdate)
     
     
 }
@@ -485,6 +486,9 @@ private class ExternalUpdateDriver: SUBasicUpdateDriver {
             guard current.acceptsCallbacks else { return }
             current.extractUpdate()
         }
+        if isCurrentDriver {
+            removeUnusedUpdateDownloads(keeping: self)
+        }
     }
 
     override func unarchiverDidFinish(_ unarchiver: Any!) {
@@ -657,6 +661,26 @@ private func promoteStagedUpdate(_ staged: ExternalUpdateDriver, prepared: Bool)
     driver = staged
     updateState { _ in
         AppUpdateState(items: [staged.updateItem], loadingState: prepared ? .readyToInstall(staged.updateItem) : .hasUpdate(staged.updateItem))
+    }
+    removeUnusedUpdateDownloads(keeping: staged)
+}
+
+private func removeUnusedUpdateDownloads(keeping ready: ExternalUpdateDriver) {
+    guard let bundleIdentifier = Bundle.main.bundleIdentifier, let cachesURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first, let downloadPath = ready.downloadPath else {
+        return
+    }
+    let root = cachesURL.appendingPathComponent(bundleIdentifier).appendingPathComponent("org.sparkle-project.Sparkle").appendingPathComponent("PersistentDownloads").standardizedFileURL.path
+    let readyComponents = (downloadPath as NSString).standardizingPath.components(separatedBy: "/")
+    let rootComponents = root.components(separatedBy: "/")
+    guard readyComponents.count > rootComponents.count, Array(readyComponents.prefix(rootComponents.count)) == rootComponents else {
+        return
+    }
+    let readyDirectory = readyComponents[rootComponents.count]
+    resourcesQueue.async {
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: root)) ?? []
+        for name in names where name != readyDirectory {
+            try? FileManager.default.removeItem(atPath: (root as NSString).appendingPathComponent(name))
+        }
     }
 }
 

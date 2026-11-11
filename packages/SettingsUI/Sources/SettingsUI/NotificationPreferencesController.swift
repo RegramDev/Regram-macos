@@ -21,6 +21,7 @@ import FilePanels
 import TelegramMediaUtils
 import AvatarEditorUI
 import SystemPermissions
+import AppAnalytics
 
 public enum NotificationsAndSoundsEntryTag: ItemListItemTag {
     case allAccounts
@@ -486,6 +487,7 @@ public func NotificationPreferencesController(_ context: any AccountContextProto
     
     let controller = InputDataController(dataSignal: entriesSignal |> deliverOnMainQueue |> map { InputDataSignalValue(entries: $0) }, title: strings().telegramNotificationSettingsViewController, removeAfterDisappear: false, hasDone: false, identifier: "notification-settings")
     controller.preparationQueue = settingsQueue
+    controller.analyticsScreen = .settingsNotifications
     
     
     

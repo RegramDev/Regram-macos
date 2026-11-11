@@ -19,6 +19,7 @@ import LocalAnimations
 import AudioPlayerCore
 import FilePanels
 import InputView
+import AppAnalytics
 
 private final class SendAudioMessageIds {
     private let lock = NSLock()
@@ -438,6 +439,7 @@ public func SendAudioModalController(context: any AccountContextProtocol, chatIn
     }
 
     let controller = InputDataController(dataSignal: signal, title: strings().sendAudioTitle)
+    controller.analyticsScreen = .chatAttachAudio
 
     getController = { [weak controller] in controller }
 

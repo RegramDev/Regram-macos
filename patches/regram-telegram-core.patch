@@ -457,10 +457,10 @@ index 8fb647e978d694851c2eba7f5bbbb7faa9bb5a56..a3f42bb6c525ab0fb37ef2c3c534d7d6
  
          // Dependencies declare other packages that this package depends on.
 diff --git a/submodules/MediaPlayer/Sources/SoftwareVideoSource.swift b/submodules/MediaPlayer/Sources/SoftwareVideoSource.swift
-index f4284bf769431ab6918833a8847d4df92d24b09c..eab921978b659ea8c9a06369b430f4ea2f44e8ac 100644
+index f2b77471ce35e8f5302a69cc55d3bbe246cfc7c2..68ba34d6f82d0bc5c6e88410a54c884abf5725bc 100644
 --- a/submodules/MediaPlayer/Sources/SoftwareVideoSource.swift
 +++ b/submodules/MediaPlayer/Sources/SoftwareVideoSource.swift
-@@ -593,11 +593,14 @@ public final class SoftwareAudioSource {
+@@ -595,11 +595,14 @@ public final class SoftwareAudioSource {
          }
      }
      
@@ -476,7 +476,7 @@ index f4284bf769431ab6918833a8847d4df92d24b09c..eab921978b659ea8c9a06369b430f4ea
          while true {
              if let decodableFrame = self.readDecodableFrame() {
                  if audioStream.decoder.send(frame: decodableFrame) {
-@@ -606,6 +609,9 @@ public final class SoftwareAudioSource {
+@@ -608,6 +611,9 @@ public final class SoftwareAudioSource {
                      }
                  }
              } else {
@@ -1035,10 +1035,10 @@ index e885caeef302f5f82d7a103bea032ad204f5e635..b62bec1b0d386ba456b866d16f1236a4
      MTSignal *optimalSignal = [[MTSignal mergeSignals:@[optimalTcp4Match, optimalTcp6Match]] take:1];
      
 diff --git a/submodules/MtProtoKit/Sources/MTProto.m b/submodules/MtProtoKit/Sources/MTProto.m
-index 1f9355d90e6bf93406f37dd2bfba3a965215fe69..3fffa475cce982b3803d61c71bbd7c58e1eb2cf0 100644
+index f249024d9586fedcfda828ee5896f14f0239f852..161df3f0e5cf052628621c30d5a0c962b9313017 100644
 --- a/submodules/MtProtoKit/Sources/MTProto.m
 +++ b/submodules/MtProtoKit/Sources/MTProto.m
-@@ -2807,12 +2807,13 @@ - (void)contextDatacenterPublicKeysUpdated:(MTContext *)context datacenterId:(NS
+@@ -2808,12 +2808,13 @@ - (void)contextDatacenterPublicKeysUpdated:(MTContext *)context datacenterId:(NS
      
  - (void)contextApiEnvironmentUpdated:(MTContext *)context apiEnvironment:(MTApiEnvironment *)apiEnvironment {
      [[MTProto managerQueue] dispatchOnQueue:^{
@@ -1959,7 +1959,7 @@ index 522a92dbfa7a748d4d4f3fe7ca666196659b8c7d..618b8910e44b657d2610ca701754e17b
                              .product(name: "MtProtoKit", package: "MtProtoKit", condition: nil),
                             .product(name: "WebProxyTransport", package: "WebProxyTransport", condition: nil),
 diff --git a/submodules/TelegramCore/Sources/Account/Account.swift b/submodules/TelegramCore/Sources/Account/Account.swift
-index af6b6078e71eee8936a7090bf8699b44a7a47454..fc95d6609ac3e0b3de3d2be9d79abb9dc8fe48e9 100644
+index 510cb791803236ef8b530fee856b569bbc22d814..15dc150a619f42f555929cbe7529f2e23255a181 100644
 --- a/submodules/TelegramCore/Sources/Account/Account.swift
 +++ b/submodules/TelegramCore/Sources/Account/Account.swift
 @@ -1,4 +1,7 @@
@@ -1979,7 +1979,7 @@ index af6b6078e71eee8936a7090bf8699b44a7a47454..fc95d6609ac3e0b3de3d2be9d79abb9d
                                          |> map { network -> AccountResult in
                                              return .authorized(Account(accountManager: accountManager, id: id, basePath: path, testingEnvironment: authorizedState.isTestingEnvironment, postbox: postbox, network: network, networkArguments: networkArguments, peerId: authorizedState.peerId, auxiliaryMethods: auxiliaryMethods, supplementary: supplementary, isSupportUser: isSupportUser))
                                          }
-@@ -1320,6 +1323,12 @@ public class Account {
+@@ -1324,6 +1327,12 @@ public class Account {
      public let hiddenStorySubscriptionsContext: StorySubscriptionsContext?
      
      public init(accountManager: AccountManager<TelegramAccountManagerTypes>, id: AccountRecordId, basePath: String, testingEnvironment: Bool, postbox: Postbox, network: Network, networkArguments: NetworkInitializationArguments, peerId: PeerId, auxiliaryMethods: AccountAuxiliaryMethods, supplementary: Bool, isSupportUser: Bool) {
@@ -1992,7 +1992,7 @@ index af6b6078e71eee8936a7090bf8699b44a7a47454..fc95d6609ac3e0b3de3d2be9d79abb9d
          self.accountManager = accountManager
          self.id = id
          self.basePath = basePath
-@@ -1885,7 +1894,8 @@ public func standaloneStateManager(
+@@ -1889,7 +1898,8 @@ public func standaloneStateManager(
                                      networkEngine: networkEngine,
                                      phoneNumber: phoneNumber,
                                      useRequestTimeoutTimers: false,
@@ -2003,10 +2003,10 @@ index af6b6078e71eee8936a7090bf8699b44a7a47454..fc95d6609ac3e0b3de3d2be9d79abb9d
                                  |> map { [postbox] network -> AccountStateManager? in
                                      Logger.shared.log("StandaloneStateManager", "received network")
 diff --git a/submodules/TelegramCore/Sources/Account/AccountManager.swift b/submodules/TelegramCore/Sources/Account/AccountManager.swift
-index bf9069805593a66603d84f434ac37c4e6c78f098..75db8ce2d588bb6ece2c72693828667d6e22a684 100644
+index c3c37c555de662b93fa00d8d5cfec50c5ed5f661..14dd53cef4b427def286f7fb4bdec67bba0af9d3 100644
 --- a/submodules/TelegramCore/Sources/Account/AccountManager.swift
 +++ b/submodules/TelegramCore/Sources/Account/AccountManager.swift
-@@ -222,6 +222,10 @@ private var declaredEncodables: Void = {
+@@ -223,6 +223,10 @@ private var declaredEncodables: Void = {
      declareEncodable(MediaSpoilerMessageAttribute.self, f: { MediaSpoilerMessageAttribute(decoder: $0) })
      declareEncodable(AuthSessionInfoAttribute.self, f: { AuthSessionInfoAttribute(decoder: $0) })
      declareEncodable(TranslationMessageAttribute.self, f: { TranslationMessageAttribute(decoder: $0) })
@@ -2017,8 +2017,88 @@ index bf9069805593a66603d84f434ac37c4e6c78f098..75db8ce2d588bb6ece2c72693828667d
      declareEncodable(TranslationMessageAttribute.Additional.self, f: { TranslationMessageAttribute.Additional(decoder: $0) })
      declareEncodable(SynchronizeAutosaveItemOperation.self, f: { SynchronizeAutosaveItemOperation(decoder: $0) })
      declareEncodable(TelegramMediaStory.self, f: { TelegramMediaStory(decoder: $0) })
+diff --git a/submodules/TelegramCore/Sources/MacOS/RegramConditionalRead.swift b/submodules/TelegramCore/Sources/MacOS/RegramConditionalRead.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..0c2f3c4a15d064b4b1d19d4d5f6554a31e426e52
+--- /dev/null
++++ b/submodules/TelegramCore/Sources/MacOS/RegramConditionalRead.swift
+@@ -0,0 +1,15 @@
++import Postbox
++import SwiftSignalKit
++
++public func regramApplyMaxReadIndexInteractively(account: Account, index: MessageIndex, when validate: @escaping (Transaction, () -> Void) -> Void) -> Signal<Bool, NoError> {
++    account.postbox.transaction { transaction -> Bool in
++        guard index.id.peerId.namespace != Namespaces.Peer.SecretChat, peerKeepsReadState(transaction.getPeer(index.id.peerId)) else { return false }
++        var applied = false
++        validate(transaction, {
++            guard !applied else { return }
++            applied = true
++            _internal_applyMaxReadIndexInteractively(transaction: transaction, stateManager: account.stateManager, index: index)
++        })
++        return applied
++    }
++}
+diff --git a/submodules/TelegramCore/Sources/MacOS/RegramMessageHistory.swift b/submodules/TelegramCore/Sources/MacOS/RegramMessageHistory.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..1f8a5bf8ab251aab6f3c1e0f65da6cd19de76268
+--- /dev/null
++++ b/submodules/TelegramCore/Sources/MacOS/RegramMessageHistory.swift
+@@ -0,0 +1,53 @@
++import Postbox
++import SwiftSignalKit
++internal import TelegramApi
++
++public enum RegramMessageHistoryError {
++    case unavailable
++}
++
++public struct RegramMessageHistoryPage {
++    public let messages: [Message]
++    public let nextOffsetId: Int32?
++}
++
++public func regramMessageHistoryPage(account: Account, peerId: PeerId, threadId: Int64?, offsetId: Int32, offsetDate: Int32, limit: Int32 = 100) -> Signal<RegramMessageHistoryPage, RegramMessageHistoryError> {
++    account.postbox.transaction { transaction -> (Peer, Api.InputPeer, Api.InputPeer?)? in
++        guard peerId.namespace != Namespaces.Peer.SecretChat, let peer = transaction.getPeer(peerId), let inputPeer = apiInputPeer(peer) else { return nil }
++        let savedPeer = threadId.flatMap { transaction.getPeer(PeerId($0)) }.flatMap(apiInputPeer)
++        return (peer, inputPeer, savedPeer)
++    }
++    |> castError(RegramMessageHistoryError.self)
++    |> mapToSignal { value -> Signal<RegramMessageHistoryPage, RegramMessageHistoryError> in
++        guard let (peer, inputPeer, savedPeer) = value else { return .fail(.unavailable) }
++        let request: Signal<Api.messages.Messages, RegramMessageHistoryError>
++        if threadId != nil, peerId == account.peerId || peer.isMonoForum {
++            guard let savedPeer else { return .fail(.unavailable) }
++            request = account.network.request(Api.functions.messages.getSavedHistory(flags: peerId == account.peerId ? 0 : 1, parentPeer: peerId == account.peerId ? nil : inputPeer, peer: savedPeer, offsetId: offsetId, offsetDate: offsetDate, addOffset: 0, limit: limit, maxId: 0, minId: 0, hash: 0), automaticFloodWait: false) |> mapError { _ in .unavailable }
++        } else if let threadId {
++            guard let messageId = Int32(exactly: threadId) else { return .fail(.unavailable) }
++            request = account.network.request(Api.functions.messages.getReplies(peer: inputPeer, msgId: messageId, offsetId: offsetId, offsetDate: offsetDate, addOffset: 0, limit: limit, maxId: 0, minId: 0, hash: 0), automaticFloodWait: false) |> mapError { _ in .unavailable }
++        } else {
++            request = account.network.request(Api.functions.messages.getHistory(peer: inputPeer, offsetId: offsetId, offsetDate: offsetDate, addOffset: 0, limit: limit, maxId: 0, minId: 0, hash: 0), automaticFloodWait: false) |> mapError { _ in .unavailable }
++        }
++        return request |> mapToSignal { result in
++            account.postbox.transaction { transaction -> RegramMessageHistoryPage in
++                let messages: [Api.Message]
++                let chats: [Api.Chat]
++                let users: [Api.User]
++                switch result {
++                case let .messages(data): (messages, chats, users) = (data.messages, data.chats, data.users)
++                case let .messagesSlice(data): (messages, chats, users) = (data.messages, data.chats, data.users)
++                case let .channelMessages(data): (messages, chats, users) = (data.messages, data.chats, data.users)
++                case .messagesNotModified: (messages, chats, users) = ([], [], [])
++                }
++                let peers = AccumulatedPeers(transaction: transaction, chats: chats, users: users)
++                updatePeers(transaction: transaction, accountPeerId: account.peerId, peers: peers)
++                let stored = messages.compactMap { StoreMessage(apiMessage: $0, accountPeerId: account.peerId, peerIsForum: peer.isForumOrMonoForum) }
++                _ = transaction.addMessages(stored, location: .Random)
++                let ids: [MessageId] = stored.compactMap { if case let .Id(id) = $0.id { return id }; return nil }
++                return RegramMessageHistoryPage(messages: ids.compactMap(transaction.getMessage), nextOffsetId: ids.map(\.id).min())
++            } |> castError(RegramMessageHistoryError.self)
++        }
++    }
++}
 diff --git a/submodules/TelegramCore/Sources/Network/FetchV2.swift b/submodules/TelegramCore/Sources/Network/FetchV2.swift
-index a93454b38e33c3cfaa382deec413c8cfe5ce88ae..9bc86643a96f41e7551e1b8d03764153b6803e02 100644
+index c916f267d9232cea1f3362aa5c365174531b46b4..839229160f13b5fd3337929df634d7ed2cc93a4c 100644
 --- a/submodules/TelegramCore/Sources/Network/FetchV2.swift
 +++ b/submodules/TelegramCore/Sources/Network/FetchV2.swift
 @@ -1,4 +1,7 @@
@@ -2029,7 +2109,7 @@ index a93454b38e33c3cfaa382deec413c8cfe5ce88ae..9bc86643a96f41e7551e1b8d03764153
  import Postbox
  import SwiftSignalKit
  import MtProtoKit
-@@ -460,14 +463,31 @@ private final class FetchImpl {
+@@ -503,14 +506,31 @@ private final class FetchImpl {
              }
              
              self.fastDownloads = network.engineKind == .rust
@@ -2061,7 +2141,7 @@ index a93454b38e33c3cfaa382deec413c8cfe5ce88ae..9bc86643a96f41e7551e1b8d03764153
              
              // The resource id tells concurrent downloads apart; an Api value prints only its constructor name.
              self.loggingIdentifier = resource.id.stringRepresentation
-@@ -914,6 +934,9 @@ private final class FetchImpl {
+@@ -935,6 +955,9 @@ private final class FetchImpl {
                                  memcpy(bytes.advanced(by: partIvCount - 4), &ivOffset, 4)
                              }
                              
@@ -2071,10 +2151,10 @@ index a93454b38e33c3cfaa382deec413c8cfe5ce88ae..9bc86643a96f41e7551e1b8d03764153
                              let fetchedData = bytes.makeData()
                              guard let decryptedData = MTAesCtrDecrypt(fetchedData, cdnData.encryptionKey, partIv) else {
                                  return .failure
-@@ -968,6 +991,9 @@ private final class FetchImpl {
-                             switch result {
+@@ -995,6 +1018,9 @@ private final class FetchImpl {
                              case let .file(fileData):
                                  let bytes = fileData.bytes
+                                 throughputMeter.add(bytes: Int64(bytes.size), networkDuration: info.networkDuration, isWifi: info.networkType == .wifi, completedAt: CFAbsoluteTimeGetCurrent())
 +                                #if os(macOS)
 +                                RegramTransferStatistics.shared.recordReceived(byteCount: bytes.size)
 +                                #endif
@@ -2082,7 +2162,7 @@ index a93454b38e33c3cfaa382deec413c8cfe5ce88ae..9bc86643a96f41e7551e1b8d03764153
                              case let .fileCdnRedirect(fileCdnRedirectData):
                                  let (dcId, fileToken, encryptionKey, encryptionIv, fileHashes) = (fileCdnRedirectData.dcId, fileCdnRedirectData.fileToken, fileCdnRedirectData.encryptionKey.makeData(), fileCdnRedirectData.encryptionIv.makeData(), fileCdnRedirectData.fileHashes)
 diff --git a/submodules/TelegramCore/Sources/Network/MultipartUpload.swift b/submodules/TelegramCore/Sources/Network/MultipartUpload.swift
-index f00804ff824df2ac07f7dd9657f9faed53ed3987..b3842f11a31c242504d831b6876e16c349982f57 100644
+index c9ae018ca466f62b276489b1a25317dc1d77ed71..ac941b044e404515260846a485e5517b034a5e14 100644
 --- a/submodules/TelegramCore/Sources/Network/MultipartUpload.swift
 +++ b/submodules/TelegramCore/Sources/Network/MultipartUpload.swift
 @@ -1,4 +1,7 @@
@@ -2093,7 +2173,7 @@ index f00804ff824df2ac07f7dd9657f9faed53ed3987..b3842f11a31c242504d831b6876e16c3
  import Postbox
  internal import TelegramApi
  import SwiftSignalKit
-@@ -482,7 +485,11 @@ func multipartUpload(network: Network, postbox: Postbox, source: MultipartUpload
+@@ -499,7 +502,11 @@ func multipartUpload(network: Network, postbox: Postbox, source: MultipartUpload
                  }
              }
              
@@ -2107,7 +2187,7 @@ index f00804ff824df2ac07f7dd9657f9faed53ed3987..b3842f11a31c242504d831b6876e16c3
                  case let .download(download):
                      return download.uploadPart(fileId: part.fileId, index: part.index, data: part.data, asBigPart: part.bigPart, bigTotalParts: part.bigTotalParts, useCompression: useCompression, onFloodWaitError: onFloodWaitError)
 diff --git a/submodules/TelegramCore/Sources/Network/Network.swift b/submodules/TelegramCore/Sources/Network/Network.swift
-index 7a8db1d8722fe803f8166be1643ecd48afd5f3d7..0579990cdf18752a156964039bfa66660b76f863 100644
+index d0a36f610d35fbb06435168a83d04ac4ccb9455b..a3adb86704777e7eccda4a2705eb45e036a76761 100644
 --- a/submodules/TelegramCore/Sources/Network/Network.swift
 +++ b/submodules/TelegramCore/Sources/Network/Network.swift
 @@ -1,3 +1,6 @@
@@ -2372,99 +2452,6 @@ index 5d933383fcc00786e733ad88cf6af28c58b4bb24..b406ed3174108cb3064363663d680579
                                              })
                                          }
                                      default:
-diff --git a/submodules/TelegramCore/Sources/State/AccountStateManagementUtils.swift b/submodules/TelegramCore/Sources/State/AccountStateManagementUtils.swift
-index 3d99e59d34c32b44e03410836815207bab277747..ed753510d81d126e5bec6ed9932e519c6012ed39 100644
---- a/submodules/TelegramCore/Sources/State/AccountStateManagementUtils.swift
-+++ b/submodules/TelegramCore/Sources/State/AccountStateManagementUtils.swift
-@@ -4621,7 +4621,22 @@ func replayFinalState(
-                 upsertEphemeralReplacement(transaction: transaction, anchorMessageId: anchorMessageId, message: message)
-             case let .DeleteEphemeralMessages(peerId, ids):
-                 deleteEphemeralMessages(transaction: transaction, peerId: peerId, ids: ids)
--            case let .DeleteMessagesWithGlobalIds(ids):
-+            case let .DeleteMessagesWithGlobalIds(allIds):
-+                var ids = allIds
-+                #if os(macOS)
-+                ids = allIds.filter { globalId in
-+                    let messageIds = transaction.messageIdsForGlobalIds([globalId])
-+                    let retainedIds = messageIds.filter { rgShouldRetainRevokedMessage(accountId: accountPeerId.toInt64(), transaction: transaction, id: $0) }
-+                    guard !retainedIds.isEmpty else { return true }
-+                    for id in retainedIds {
-+                        rgMarkMessageRevoked(transaction: transaction, id: id)
-+                    }
-+                    let deletedIds = messageIds.filter { !retainedIds.contains($0) }
-+                    _internal_deleteMessages(transaction: transaction, mediaBox: mediaBox, ids: deletedIds)
-+                    deletedMessageIds.append(contentsOf: deletedIds.map { .messageId($0) })
-+                    return false
-+                }
-+                #endif
-                 var resourceIds: [MediaResourceId] = []
-                 transaction.deleteMessagesWithGlobalIds(ids, forEachMedia: { media in
-                     addMessageMediaResourceIdsToRemove(media: media, resourceIds: &resourceIds)
-@@ -4630,7 +4645,15 @@ func replayFinalState(
-                     let _ = mediaBox.removeCachedResources(Array(Set(resourceIds)), force: true).start()
-                 }
-                 deletedMessageIds.append(contentsOf: ids.map { .global($0) })
--            case let .DeleteMessages(ids):
-+            case let .DeleteMessages(allIds):
-+                var ids = allIds
-+                #if os(macOS)
-+                ids = allIds.filter { id in
-+                    guard rgShouldRetainRevokedMessage(accountId: accountPeerId.toInt64(), transaction: transaction, id: id) else { return true }
-+                    rgMarkMessageRevoked(transaction: transaction, id: id)
-+                    return false
-+                }
-+                #endif
-                 _internal_deleteMessages(transaction: transaction, mediaBox: mediaBox, ids: ids, manualAddMessageThreadStatsDifference: { id, add, remove in
-                     addMessageThreadStatsDifference(threadKey: id, remove: remove, addedMessagePeer: nil, addedMessageId: nil, isOutgoing: false)
-                 })
-@@ -4680,7 +4703,7 @@ func replayFinalState(
-                         generatedEvent = reactionGeneratedEvent(previousMessage.reactionsAttribute, message.reactionsAttribute, message: message, transaction: transaction)
-                     }
-                     
--                    return .update(mergedServerMessageUpdate(previous: previousMessage, updated: message))
-+                    return .update(mergedServerMessageUpdate(previous: previousMessage, updated: message, regramAccountId: accountPeerId.toInt64(), mediaBox: mediaBox, cachedPeerData: transaction.getPeerCachedData(peerId: previousMessage.id.peerId)))
-                 })
-                 if let generatedEvent = generatedEvent {
-                     addedReactionEvents.append(generatedEvent)
-@@ -5162,6 +5185,9 @@ func replayFinalState(
-                                 }
-                         }
-                     case let .unpin(itemId):
-+                        #if os(macOS)
-+                        if rgLocalOverflowPinnedItemIds(transaction: transaction, accountPeerId: accountPeerId, groupId: groupId).contains(itemId) { break }
-+                        #endif
-                         switch itemId {
-                             case let .peer(peerId):
-                                 var currentItemIds = transaction.getPinnedItemIds(groupId: groupId)
-@@ -5174,8 +5200,18 @@ func replayFinalState(
-                         }
-                     case let .reorder(itemIds):
-                         let currentItemIds = transaction.getPinnedItemIds(groupId: groupId)
--                        if Set(itemIds) == Set(currentItemIds) {
-+                        #if os(macOS)
-+                        let overflow = rgLocalOverflowPinnedItemIds(transaction: transaction, accountPeerId: accountPeerId, groupId: groupId)
-+                        let currentServerItems = currentItemIds.filter { !overflow.contains($0) }
-+                        #else
-+                        let currentServerItems = currentItemIds
-+                        #endif
-+                        if Set(itemIds) == Set(currentServerItems) {
-+                            #if os(macOS)
-+                            rgSetServerPinnedItemIds(transaction: transaction, accountPeerId: accountPeerId, groupId: groupId, itemIds: itemIds)
-+                            #else
-                             transaction.setPinnedItemIds(groupId: groupId, itemIds: itemIds)
-+                            #endif
-                         } else {
-                             addSynchronizePinnedChatsOperation(transaction: transaction, groupId: groupId)
-                         }
-@@ -6036,7 +6072,7 @@ func replayFinalState(
-         }).map({ $0.1 })
-         for file in stickerFiles {
-             if let entry = CodableEntry(RecentMediaItem(file)) {
--                transaction.addOrMoveToFirstPositionOrderedItemListItem(collectionId: Namespaces.OrderedItemList.CloudRecentStickers, item: OrderedItemListEntry(id: RecentMediaItemId(file.fileId).rawValue, contents: entry), removeTailIfCountExceeds: 20)
-+                transaction.addOrMoveToFirstPositionOrderedItemListItem(collectionId: Namespaces.OrderedItemList.CloudRecentStickers, item: OrderedItemListEntry(id: RecentMediaItemId(file.fileId).rawValue, contents: entry), removeTailIfCountExceeds: rgRecentStickerLimit(transaction: transaction))
-             }
-         }
-     }
 diff --git a/submodules/TelegramCore/Sources/State/ApplyUpdateMessage.swift b/submodules/TelegramCore/Sources/State/ApplyUpdateMessage.swift
 index 60ac9b11d61762bc2b625c709128d55ce051e9c8..da1a259d3e6a0596e8ebfeaac6b4a76eec229414 100644
 --- a/submodules/TelegramCore/Sources/State/ApplyUpdateMessage.swift
@@ -2487,17 +2474,77 @@ index 60ac9b11d61762bc2b625c709128d55ce051e9c8..da1a259d3e6a0596e8ebfeaac6b4a76e
              }
          }
          for file in sentGifs {
+diff --git a/submodules/TelegramCore/Sources/State/FetchChatList.swift b/submodules/TelegramCore/Sources/State/FetchChatList.swift
+index 9ffb055104435aaa01a947bb2a7f6c6ea0d235de..27bfddf70559d3284c34231b6e66fb2b2c391d5a 100644
+--- a/submodules/TelegramCore/Sources/State/FetchChatList.swift
++++ b/submodules/TelegramCore/Sources/State/FetchChatList.swift
+@@ -238,6 +238,7 @@ struct FetchedChatList {
+     var peerGroupIds: [PeerId: PeerGroupId]
+     var threadInfos: [PeerAndBoundThreadId: StoreMessageHistoryThreadData]
+     var inputStates: [(PeerId, Api.DraftMessage)]
++    var placementRevision: Int64 = 0
+ }
+ 
+ func fetchChatList(accountPeerId: PeerId, postbox: Postbox, network: Network, location: FetchChatListLocation, upperBound: MessageIndex, hash: Int64, limit: Int32) -> Signal<FetchedChatList?, NoError> {
+@@ -262,8 +263,9 @@ func fetchChatList(accountPeerId: PeerId, postbox: Postbox, network: Network, lo
+             }
+         }
+         
+-        return offset
+-        |> mapToSignal { (timestamp, id, peer) -> Signal<FetchedChatList?, NoError> in
++        return combineLatest(offset, postbox.transaction { RegramChatListPlacement.read($0).revision })
++        |> mapToSignal { offset, placementRevision -> Signal<FetchedChatList?, NoError> in
++            let (timestamp, id, peer) = offset
+             let additionalPinnedChats: Signal<Api.messages.PeerDialogs?, NoError>
+             if case .inputPeerEmpty = peer, timestamp == 0 {
+                 let folderId: Int32
+@@ -439,7 +441,8 @@ func fetchChatList(accountPeerId: PeerId, postbox: Postbox, network: Network, lo
+                         // can be listed twice here. That is intentionally not deduped: `_internal_applyFetchedChatInputStates`
+                         // is idempotent — after the first apply, the second pass reads the just-written (equal) local
+                         // timestamp and its strict newer-wins guard skips it. Don't drop the guard without deduping here.
+-                        inputStates: parsedRemoteChats.inputStates + (parsedPinnedChats?.inputStates ?? [])
++                        inputStates: parsedRemoteChats.inputStates + (parsedPinnedChats?.inputStates ?? []),
++                        placementRevision: placementRevision
+                     )
+                     return resolveUnknownEmojiFiles(postbox: postbox, source: .network(network), messages: storeMessages, reactions: [], result: result)
+                     |> mapToSignal { result in
 diff --git a/submodules/TelegramCore/Sources/State/Holes.swift b/submodules/TelegramCore/Sources/State/Holes.swift
-index 5137a035d3f6d75ab468d1d3279cd448b5360b7b..a3f8a12845045752b5944f2904c6742d013eb56f 100644
+index 0c03828fbe3031dccb58cb8405e1891cc883f34b..7d532d3f386a072fa4b125386e85dd01bec45a3a 100644
 --- a/submodules/TelegramCore/Sources/State/Holes.swift
 +++ b/submodules/TelegramCore/Sources/State/Holes.swift
-@@ -1377,7 +1377,11 @@ func fetchChatListHole(postbox: Postbox, network: Network, accountPeerId: PeerId
+@@ -1634,8 +1634,13 @@ func fetchChatListHole(postbox: Postbox, network: Network, accountPeerId: PeerId
+             
+             transaction.replaceChatListHole(groupId: groupId, index: hole.index, hole: fetchedChats.lowerNonPinnedIndex.flatMap(ChatListHole.init))
+             
++            let placement = RegramChatListPlacement.read(transaction)
+             for peerId in fetchedChats.chatPeerIds {
+                 if let peer = transaction.getPeer(peerId) {
++                    let inclusion = transaction.getPeerChatListInclusion(peerId)
++                    if let protectedGroup = placement.protectedGroup(peerId: peerId, currentGroup: inclusion.groupId, since: fetchedChats.placementRevision), protectedGroup != groupId {
++                        continue
++                    }
+                     transaction.updatePeerChatListInclusion(peerId, inclusion: .ifHasMessagesOrOneOf(groupId: groupId, pinningIndex: transaction.getPeerChatListIndex(peerId)?.1.pinningIndex, minTimestamp: minTimestampForPeerInclusion(peer)))
+                 } else {
+                     assertionFailure()
+@@ -1644,6 +1649,10 @@ func fetchChatListHole(postbox: Postbox, network: Network, accountPeerId: PeerId
+             
+             for (peerId, peerGroupId) in fetchedChats.peerGroupIds {
+                 if let peer = transaction.getPeer(peerId) {
++                    let inclusion = transaction.getPeerChatListInclusion(peerId)
++                    if let protectedGroup = placement.protectedGroup(peerId: peerId, currentGroup: inclusion.groupId, since: fetchedChats.placementRevision), protectedGroup != peerGroupId {
++                        continue
++                    }
+                     transaction.updatePeerChatListInclusion(peerId, inclusion: .ifHasMessagesOrOneOf(groupId: peerGroupId, pinningIndex: nil, minTimestamp: minTimestampForPeerInclusion(peer)))
+                 } else {
+                     assertionFailure()
+@@ -1665,7 +1674,12 @@ func fetchChatListHole(postbox: Postbox, network: Network, accountPeerId: PeerId
              }
              
              if let replacePinnedItemIds = fetchedChats.pinnedItemIds {
 -                transaction.setPinnedItemIds(groupId: groupId, itemIds: replacePinnedItemIds.map(PinnedItemId.peer))
 +                #if os(macOS)
-+                    rgSetServerPinnedItemIds(transaction: transaction, accountPeerId: accountPeerId, groupId: groupId, itemIds: replacePinnedItemIds.map(PinnedItemId.peer))
++                    let itemIds = rgFilterPinnedChatPlacements(transaction: transaction, placement: placement, groupId: groupId, itemIds: replacePinnedItemIds.map(PinnedItemId.peer), since: fetchedChats.placementRevision)
++                    rgSetServerPinnedItemIds(transaction: transaction, accountPeerId: accountPeerId, groupId: groupId, itemIds: itemIds)
 +                    #else
 +                    transaction.setPinnedItemIds(groupId: groupId, itemIds: replacePinnedItemIds.map(PinnedItemId.peer))
 +                    #endif
@@ -2565,7 +2612,7 @@ index 7256668bf953823b2c324642f04290174fbf3825..34cf846dc4a736aefa80d0123f4b81f9
          if isOnline {
              let timer = SignalKitTimer(timeout: 30.0, repeat: false, completion: { [weak self] in
 diff --git a/submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift b/submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift
-index 713bf6f417..d6ddee2f4b 100644
+index 713bf6f417f5126de698975d6577fdcac694f019..d6ddee2f4b0d4096c22e9cf08647cddbfeb9d147 100644
 --- a/submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift
 +++ b/submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift
 @@ -1,4 +1,7 @@
@@ -2643,15 +2690,120 @@ index 4d94548f42fb7e08eb5ed43594202fa84d5c6bdd..250e38a1dd9f17951cf6191a1455ac8f
                          transaction.replaceOrderedItemListItems(collectionId: collectionId, items: items)
                      }
                  } else {
+diff --git a/submodules/TelegramCore/Sources/State/ManagedSynchronizeGroupedPeersOperations.swift b/submodules/TelegramCore/Sources/State/ManagedSynchronizeGroupedPeersOperations.swift
+index 9dba93663e38e0f62c0ddc70af7c4ee6b6834e28..af7ab0706f036e64cf30dc3a53890fa9092948af 100644
+--- a/submodules/TelegramCore/Sources/State/ManagedSynchronizeGroupedPeersOperations.swift
++++ b/submodules/TelegramCore/Sources/State/ManagedSynchronizeGroupedPeersOperations.swift
+@@ -10,31 +10,19 @@ private final class ManagedSynchronizeGroupedPeersOperationsHelper {
+     
+     func update(_ entries: [PeerMergedOperationLogEntry]) -> (disposeOperations: [Disposable], beginOperations: [(PeerMergedOperationLogEntry, MetaDisposable)]) {
+         var disposeOperations: [Disposable] = []
+-        var beginOperations: [(PeerMergedOperationLogEntry, MetaDisposable)] = []
+-        
+-        var validMergedIndices = Set<Int32>()
+-        for entry in entries {
+-            validMergedIndices.insert(entry.mergedIndex)
+-            
+-            if self.operationDisposables[entry.mergedIndex] == nil {
+-                let disposable = MetaDisposable()
+-                beginOperations.append((entry, disposable))
+-                self.operationDisposables[entry.mergedIndex] = disposable
+-            }
+-        }
+-        
+-        var removeMergedIndices: [Int32] = []
+-        for (mergedIndex, disposable) in self.operationDisposables {
+-            if !validMergedIndices.contains(mergedIndex) {
+-                removeMergedIndices.append(mergedIndex)
++        let validMergedIndices = Set(entries.map(\.mergedIndex))
++        for mergedIndex in self.operationDisposables.keys.filter({ !validMergedIndices.contains($0) }) {
++            if let disposable = self.operationDisposables.removeValue(forKey: mergedIndex) {
+                 disposeOperations.append(disposable)
+             }
+         }
+-        
+-        for mergedIndex in removeMergedIndices {
+-            self.operationDisposables.removeValue(forKey: mergedIndex)
++
++        guard self.operationDisposables.isEmpty else { return (disposeOperations, []) }
++        let beginOperations = entries.map { entry in
++            let disposable = MetaDisposable()
++            self.operationDisposables[entry.mergedIndex] = disposable
++            return (entry, disposable)
+         }
+-        
+         return (disposeOperations, beginOperations)
+     }
+     
+@@ -128,29 +116,42 @@ func managedSynchronizeGroupedPeersOperations(postbox: Postbox, network: Network
+ }
+ 
+ private func synchronizeGroupedPeers(transaction: Transaction, postbox: Postbox, network: Network, stateManager: AccountStateManager, operations: [SynchronizeGroupedPeersOperation]) -> Signal<Void, NoError> {
+-    if operations.isEmpty {
+-        return .complete()
+-    }
+-    var folderPeers: [Api.InputFolderPeer] = []
+-    for operation in operations {
+-        if let inputPeer = transaction.getPeer(operation.peerId).flatMap(apiInputPeer) {
+-            folderPeers.append(.inputFolderPeer(.init(peer: inputPeer, folderId: operation.groupId.rawValue)))
++    let placement = RegramChatListPlacement.read(transaction)
++    var selectedPeers = Set<PeerId>()
++    let latestOperations = operations.reversed().filter { operation in
++        placement.shouldSend(peerId: operation.peerId, groupId: operation.groupId, revision: operation.revision)
++            && selectedPeers.insert(operation.peerId).inserted
++    }.reversed()
++    let folderPeers: [Api.InputFolderPeer] = latestOperations.compactMap { operation in
++        transaction.getPeer(operation.peerId).flatMap(apiInputPeer).map { inputPeer in
++            .inputFolderPeer(.init(peer: inputPeer, folderId: operation.groupId.rawValue))
+         }
+     }
++    let request: Signal<Api.Updates?, NoError>
+     if folderPeers.isEmpty {
+-        return .complete()
+-    }
+-    
+-    return network.request(Api.functions.folders.editPeerFolders(folderPeers: folderPeers))
+-    |> map(Optional.init)
+-    |> `catch` { _ -> Signal<Api.Updates?, NoError> in
+-        return .single(nil)
++        request = .single(nil)
++    } else {
++        request = network.request(Api.functions.folders.editPeerFolders(folderPeers: folderPeers))
++        |> retry(retryOnError: { $0.errorCode < 0 || $0.errorCode >= 500 || $0.errorCode == 420 }, delayIncrement: 0.2, maxDelay: 5.0, maxRetries: nil, onQueue: .concurrentDefaultQueue())
++        |> map(Optional.init)
++        |> `catch` { _ in .single(nil) }
+     }
++
++    return request
+     |> mapToSignal { updates -> Signal<Void, NoError> in
+-        if let updates = updates {
++        if let updates {
+             stateManager.addUpdates(updates)
+         }
+-        return .complete()
++        return postbox.transaction { transaction -> Void in
++            var placement = RegramChatListPlacement.read(transaction)
++            var changed = false
++            for operation in latestOperations {
++                if let revision = operation.revision, placement.finish(peerId: operation.peerId, groupId: operation.groupId, revision: revision) {
++                    changed = true
++                }
++            }
++            if changed { placement.store(transaction) }
++        }
+     }
+ }
+ 
 diff --git a/submodules/TelegramCore/Sources/State/ManagedSynchronizePinnedChatsOperations.swift b/submodules/TelegramCore/Sources/State/ManagedSynchronizePinnedChatsOperations.swift
-index 90b23e6167a750e1388a65054563d5ca3964f9db..70ea3a6c4e49283c2b04af0b660d0c6b328d2fa5 100644
+index 90b23e6167a750e1388a65054563d5ca3964f9db..da25f4c3ce111b50910de6557d1afb63e493a7ae 100644
 --- a/submodules/TelegramCore/Sources/State/ManagedSynchronizePinnedChatsOperations.swift
 +++ b/submodules/TelegramCore/Sources/State/ManagedSynchronizePinnedChatsOperations.swift
-@@ -113,14 +113,23 @@ func managedSynchronizePinnedChatsOperations(postbox: Postbox, network: Network,
+@@ -113,14 +113,24 @@ func managedSynchronizePinnedChatsOperations(postbox: Postbox, network: Network,
  }
  
  private func synchronizePinnedChats(transaction: Transaction, postbox: Postbox, network: Network, accountPeerId: PeerId, stateManager: AccountStateManager, groupId: PeerGroupId, operation: SynchronizePinnedChatsOperation) -> Signal<Void, NoError> {
 +    #if os(macOS)
++    let placementRevision = RegramChatListPlacement.read(transaction).revision
 +    let serverPinnedLimit = rgServerPinnedChatLimit(transaction: transaction, accountPeerId: accountPeerId, groupId: groupId)
 +    let initialRemoteItemIds = rgSplitPinnedItemIds(operation.previousItemIds, limit: serverPinnedLimit).server
 +    #else
@@ -2671,11 +2823,13 @@ index 90b23e6167a750e1388a65054563d5ca3964f9db..70ea3a6c4e49283c2b04af0b660d0c6b
      let localItemIdsWithoutSecretChats = localItemIds.filter { item in
          switch item {
              case let .peer(peerId):
-@@ -225,7 +234,17 @@ private func synchronizePinnedChats(transaction: Transaction, postbox: Postbox,
+@@ -225,7 +235,19 @@ private func synchronizePinnedChats(transaction: Transaction, postbox: Postbox,
              return postbox.transaction { transaction -> Signal<Void, NoError> in
                  updatePeers(transaction: transaction, accountPeerId: accountPeerId, peers: parsedPeers)
                  
 +                #if os(macOS)
++                let placement = RegramChatListPlacement.read(transaction)
++                resultingItemIds = rgFilterPinnedChatPlacements(transaction: transaction, placement: placement, groupId: groupId, itemIds: resultingItemIds, since: placementRevision)
 +                let latestLocalOrder = transaction.getPinnedItemIds(groupId: groupId)
 +                let localOverflow = rgLocalOverflowPinnedItemIds(transaction: transaction, accountPeerId: accountPeerId, groupId: groupId).intersection(latestLocalOrder).subtracting(resultingItemIds)
 +                let mergedItemIds = rgMergeLocalPinnedItemIds(resultingItemIds, previousOrder: latestLocalOrder, keep: localOverflow)
@@ -2713,9 +2867,116 @@ index e38c0f96c77041c97293f8cc2c0386ebf62274ed..b875edf9b7def7decb627ee601fc3e1c
      guard let inputPeer = apiInputPeer(peer) else {
          return .complete()
      }
+diff --git a/submodules/TelegramCore/Sources/State/RegramChatListPlacement.swift b/submodules/TelegramCore/Sources/State/RegramChatListPlacement.swift
+new file mode 100644
+index 0000000000000000000000000000000000000000..af07edbe11d8875c6bbd155bc17185240980c054
+--- /dev/null
++++ b/submodules/TelegramCore/Sources/State/RegramChatListPlacement.swift
+@@ -0,0 +1,101 @@
++import Postbox
++
++private let regramChatListPlacementKey = ValueBoxKey("regram.chatListPlacement")
++
++struct RegramChatListPlacement: Codable {
++    private struct Entry: Codable {
++        let peerId: Int64
++        var groupId: Int32
++        var revision: Int64
++        var pending: Bool
++        var hiddenGroupId: Int32?
++    }
++
++    private var entries: [Entry] = []
++    private(set) var revision: Int64 = 0
++
++    static func read(_ transaction: Transaction) -> Self {
++        transaction.getPreferencesEntry(key: regramChatListPlacementKey)?.get(Self.self) ?? Self()
++    }
++
++    func store(_ transaction: Transaction) {
++        transaction.updatePreferencesEntry(key: regramChatListPlacementKey, { _ in PreferencesEntry(self) })
++    }
++
++    mutating func record(peerId: PeerId, groupId: PeerGroupId) -> Int64 {
++        revision += 1
++        let key = peerId.toInt64()
++        let entry = Entry(peerId: key, groupId: groupId.rawValue, revision: revision, pending: true)
++        if let index = entries.firstIndex(where: { $0.peerId == key }) {
++            entries[index] = entry
++        } else {
++            entries.append(entry)
++        }
++        return revision
++    }
++
++    func shouldSend(peerId: PeerId, groupId: PeerGroupId, revision: Int64?) -> Bool {
++        let entry = entries.first { $0.peerId == peerId.toInt64() }
++        guard let revision else { return entry?.pending != true }
++        return entry?.pending == true && entry?.revision == revision && entry?.groupId == groupId.rawValue
++    }
++
++    mutating func finish(peerId: PeerId, groupId: PeerGroupId, revision: Int64) -> Bool {
++        guard let index = entries.firstIndex(where: {
++            $0.peerId == peerId.toInt64() && $0.pending && $0.revision == revision && $0.groupId == groupId.rawValue
++        }) else { return false }
++        self.revision += 1
++        entries[index].revision = self.revision
++        entries[index].pending = false
++        return true
++    }
++
++    func protectedGroup(peerId: PeerId, currentGroup: PeerGroupId?, since revision: Int64? = nil) -> PeerGroupId? {
++        guard let entry = entries.first(where: { $0.peerId == peerId.toInt64() }) else { return nil }
++        if entry.pending {
++            return PeerGroupId(rawValue: entry.groupId)
++        }
++        guard let revision, entry.revision > revision else { return nil }
++        return currentGroup ?? PeerGroupId(rawValue: entry.hiddenGroupId ?? entry.groupId)
++    }
++
++    mutating func rememberHidden(peerId: PeerId, groupId: PeerGroupId) -> Bool {
++        let key = peerId.toInt64()
++        if let index = entries.firstIndex(where: { $0.peerId == key }) {
++            guard entries[index].hiddenGroupId != groupId.rawValue else { return false }
++            entries[index].hiddenGroupId = groupId.rawValue
++        } else {
++            guard groupId != .root else { return false }
++            entries.append(Entry(peerId: key, groupId: groupId.rawValue, revision: 0, pending: false, hiddenGroupId: groupId.rawValue))
++        }
++        return true
++    }
++
++    func restoredGroup(peerId: PeerId) -> PeerGroupId {
++        if let entry = entries.first(where: { $0.peerId == peerId.toInt64() }),
++           let groupId = entry.pending ? entry.groupId : entry.hiddenGroupId {
++            return PeerGroupId(rawValue: groupId)
++        }
++        return .root
++    }
++}
++
++func rgRememberHiddenChatListGroup(transaction: Transaction, peerId: PeerId, groupId: PeerGroupId? = nil) {
++    guard let groupId = groupId ?? transaction.getPeerChatListInclusion(peerId).groupId else { return }
++    var placement = RegramChatListPlacement.read(transaction)
++    if placement.rememberHidden(peerId: peerId, groupId: groupId) {
++        placement.store(transaction)
++    }
++}
++
++func rgRestoreChatListGroup(transaction: Transaction, peerId: PeerId) -> PeerGroupId {
++    RegramChatListPlacement.read(transaction).restoredGroup(peerId: peerId)
++}
++
++func rgFilterPinnedChatPlacements(transaction: Transaction, placement: RegramChatListPlacement, groupId: PeerGroupId, itemIds: [PinnedItemId], since revision: Int64? = nil) -> [PinnedItemId] {
++    itemIds.filter { item in
++        guard case let .peer(peerId) = item,
++              let protectedGroup = placement.protectedGroup(peerId: peerId, currentGroup: transaction.getPeerChatListInclusion(peerId).groupId, since: revision) else { return true }
++        return protectedGroup == groupId
++    }
++}
 diff --git a/submodules/TelegramCore/Sources/State/RegramMessageRetention.swift b/submodules/TelegramCore/Sources/State/RegramMessageRetention.swift
 new file mode 100644
-index 0000000000..a4ea48c4f5
+index 0000000000000000000000000000000000000000..a4ea48c4f58d781219fdb8f660adb426583df6d0
 --- /dev/null
 +++ b/submodules/TelegramCore/Sources/State/RegramMessageRetention.swift
 @@ -0,0 +1,51 @@
@@ -2790,36 +3051,84 @@ index 0000000000000000000000000000000000000000..023453d92a7b3caefc05d1090febe6e6
 +    #endif
 +}
 diff --git a/submodules/TelegramCore/Sources/State/ResetState.swift b/submodules/TelegramCore/Sources/State/ResetState.swift
-index e7f2209780e2ef0c694ca7edee6027cc683329d9..b5d2a256335f20919c5feed1b7c89843885b7947 100644
+index deda3e04c7162b8fa4780604fa70219b8f2f9733..c1c2c3b4b66e7c5d8a58f1aa9834eac6b10763d8 100644
 --- a/submodules/TelegramCore/Sources/State/ResetState.swift
 +++ b/submodules/TelegramCore/Sources/State/ResetState.swift
-@@ -15,6 +15,9 @@ func _internal_resetAccountState(postbox: Postbox, network: Network, accountPeer
-                 return .never()
+@@ -52,8 +52,17 @@ func _internal_resetAccountState(postbox: Postbox, network: Network, accountPeer
+                 Logger.shared.log("State", "account reset: the answers are \(Int(FetchedAnswerAge.now() - fetched.fetchStartedAt)) s old, older than the record of recent deletions keeps one; writing nothing, fetching the chat list again")
+                 return false
              }
-             return withResolvedAssociatedMessages(postbox: postbox, source: .network(network), accountPeerId: accountPeerId, parsedPeers: fetchedChats.peers, storeMessages: fetchedChats.storeMessages, resolveThreads: false, { transaction, additionalPeers, additionalMessages -> Void in
-+                #if os(macOS)
-+                rgPrepareLocalPinnedChatsForStateReset(transaction: transaction, accountPeerId: accountPeerId)
-+                #endif
-                 for peerId in transaction.chatListGetAllPeerIds() {
-                     if peerId.namespace != Namespaces.Peer.SecretChat {
-                         transaction.updatePeerChatListInclusion(peerId, inclusion: .notIncluded)
-@@ -123,9 +126,16 @@ func _internal_resetAccountState(postbox: Postbox, network: Network, accountPeer
++            #if os(macOS)
++            rgPrepareLocalPinnedChatsForStateReset(transaction: transaction, accountPeerId: accountPeerId)
++            #endif
++            let placement = RegramChatListPlacement.read(transaction)
++            var protectedInclusions: [PeerId: PeerChatListInclusion] = [:]
+             for peerId in transaction.chatListGetAllPeerIds() {
+                 if peerId.namespace != Namespaces.Peer.SecretChat {
++                    let inclusion = transaction.getPeerChatListInclusion(peerId)
++                    if placement.protectedGroup(peerId: peerId, currentGroup: inclusion.groupId, since: fetchedChats.placementRevision) != nil {
++                        protectedInclusions[peerId] = inclusion
++                    }
+                     transaction.updatePeerChatListInclusion(peerId, inclusion: .notIncluded)
                  }
                  
-                 if let replacePinnedItemIds = fetchedChats.pinnedItemIds {
-+                    #if os(macOS)
-+                    rgSetServerPinnedItemIds(transaction: transaction, accountPeerId: accountPeerId, groupId: .root, itemIds: replacePinnedItemIds.map(PinnedItemId.peer), restoringState: true)
-+                    #else
-                     transaction.setPinnedItemIds(groupId: .root, itemIds: replacePinnedItemIds.map(PinnedItemId.peer))
-+                    #endif
+@@ -110,7 +119,12 @@ func _internal_resetAccountState(postbox: Postbox, network: Network, accountPeer
+             // this reset was in flight) has a pts above `pts`, so the follow-up getDifference delivers it again.
+             // After both stores; before the read states are reset, so the server's read counts win over what the
+             // deletions adjust.
+-            let ghostTail = storedCloudMessagesAboveTopMessages(transaction: transaction, fetchedChats: fetchedChats)
++            var ghostTail = storedCloudMessagesAboveTopMessages(transaction: transaction, fetchedChats: fetchedChats)
++            #if os(macOS)
++            ghostTail.removeAll { id in
++                transaction.getMessage(id)?.rgIsRevoked == true
++            }
++            #endif
+             if !ghostTail.isEmpty {
+                 let deletedIds = deleteStoredMessagesAsReceivedDeletion(transaction: transaction, mediaBox: postbox.mediaBox, ids: ghostTail)
+                 Logger.shared.log("State", "account reset: deleted \(deletedIds.count) stored message(s) above the fetched top messages")
+@@ -158,7 +172,7 @@ func _internal_resetAccountState(postbox: Postbox, network: Network, accountPeer
+             }
+             transaction.addChatListHole(groupId: .group(1), hole: ChatListHole(index: MessageIndex(id: MessageId(peerId: PeerId(namespace: Namespaces.Peer.Empty, id: PeerId.Id._internalFromInt64Value(0)), namespace: Namespaces.Message.Cloud, id: 1), timestamp: Int32.max - 1)))
+             
+-            for peerId in fetchedChats.chatPeerIds {
++            for peerId in fetchedChats.chatPeerIds where protectedInclusions[peerId] == nil {
+                 if let peer = transaction.getPeer(peerId) {
+                     transaction.updatePeerChatListInclusion(peerId, inclusion: .ifHasMessagesOrOneOf(groupId: .root, pinningIndex: transaction.getPeerChatListIndex(peerId)?.1.pinningIndex, minTimestamp: minTimestampForPeerInclusion(peer)))
+                 } else {
+@@ -166,7 +180,7 @@ func _internal_resetAccountState(postbox: Postbox, network: Network, accountPeer
                  }
-                 
+             }
+             
+-            for (peerId, peerGroupId) in fetchedChats.peerGroupIds {
++            for (peerId, peerGroupId) in fetchedChats.peerGroupIds where protectedInclusions[peerId] == nil {
+                 if let peer = transaction.getPeer(peerId) {
+                     transaction.updatePeerChatListInclusion(peerId, inclusion: .ifHasMessagesOrOneOf(groupId: peerGroupId, pinningIndex: nil, minTimestamp: minTimestampForPeerInclusion(peer)))
+                 } else {
+@@ -189,10 +203,24 @@ func _internal_resetAccountState(postbox: Postbox, network: Network, accountPeer
+                 }
+             }
+             
++            for (peerId, inclusion) in protectedInclusions {
++                if !shouldExcludePeerFromChatList(transaction: transaction, peerId: peerId) {
++                    transaction.updatePeerChatListInclusion(peerId, inclusion: inclusion)
++                }
++            }
+             if let replacePinnedItemIds = fetchedChats.pinnedItemIds {
 +                #if os(macOS)
-+                rgSetServerPinnedItemIds(transaction: transaction, accountPeerId: accountPeerId, groupId: .group(1), itemIds: transaction.getPinnedItemIds(groupId: .group(1)), restoringState: true)
++                let itemIds = rgFilterPinnedChatPlacements(transaction: transaction, placement: placement, groupId: .root, itemIds: replacePinnedItemIds.map(PinnedItemId.peer), since: fetchedChats.placementRevision)
++                rgSetServerPinnedItemIds(transaction: transaction, accountPeerId: accountPeerId, groupId: .root, itemIds: itemIds, restoringState: true)
++                #else
+                 transaction.setPinnedItemIds(groupId: .root, itemIds: replacePinnedItemIds.map(PinnedItemId.peer))
 +                #endif
-                 for (peerId, summary) in fetchedChats.mentionTagSummaries {
-                     transaction.replaceMessageTagSummary(peerId: peerId, threadId: nil, tagMask: .unseenPersonalMessage, namespace: Namespaces.Message.Cloud, customTag: nil, count: summary.count, maxId: summary.range.maxId)
-                 }
+             }
+             
++            #if os(macOS)
++            rgSetServerPinnedItemIds(transaction: transaction, accountPeerId: accountPeerId, groupId: .group(1), itemIds: transaction.getPinnedItemIds(groupId: .group(1)), restoringState: true)
++            #endif
++
+             for (peerId, summary) in fetchedChats.mentionTagSummaries {
+                 transaction.replaceMessageTagSummary(peerId: peerId, threadId: nil, tagMask: .unseenPersonalMessage, namespace: Namespaces.Message.Cloud, customTag: nil, count: summary.count, maxId: summary.range.maxId)
+             }
 diff --git a/submodules/TelegramCore/Sources/State/ServerMessageMerge.swift b/submodules/TelegramCore/Sources/State/ServerMessageMerge.swift
 index 7c455601685b98e8d12877146acbc0309a29b014..74f25def89fc208ea3b26012a4cf1e1458440d38 100644
 --- a/submodules/TelegramCore/Sources/State/ServerMessageMerge.swift
@@ -2852,6 +3161,159 @@ index 7c455601685b98e8d12877146acbc0309a29b014..74f25def89fc208ea3b26012a4cf1e14
 +    #endif
 +
      return message.withUpdatedLocalTags(updatedLocalTags).withUpdatedFlags(updatedFlags).withUpdatedAttributes(updatedAttributes).withUpdatedMedia(updatedMedia)
+ }
+diff --git a/submodules/TelegramCore/Sources/State/Sync/StateReplay+ChatList.swift b/submodules/TelegramCore/Sources/State/Sync/StateReplay+ChatList.swift
+index ec282062ed488a1b5b015b0dfad31fe965dde595..9b8720bffba9941ca2e68cfd7e798ebaf74bf2af 100644
+--- a/submodules/TelegramCore/Sources/State/Sync/StateReplay+ChatList.swift
++++ b/submodules/TelegramCore/Sources/State/Sync/StateReplay+ChatList.swift
+@@ -7,8 +7,13 @@ import EncryptionProvider
+ 
+ /// The chat list: chat inclusion, pinned chats and pinned saved chats, chat folders.
+ extension ReplayContext {
+-    func applyUpdatePeerChatInclusion(_ peerId: PeerId, _ groupId: PeerGroupId, _ changedGroup: Bool) {
++    func applyUpdatePeerChatInclusion(_ peerId: PeerId, _ serverGroupId: PeerGroupId, _ changedGroup: Bool) {
++        let placement = RegramChatListPlacement.read(transaction)
++        let groupId = placement.protectedGroup(peerId: peerId, currentGroup: nil) ?? serverGroupId
+         if shouldExcludePeerFromChatList(transaction: transaction, peerId: peerId) {
++            if isPeerHiddenByCollapsedCommunity(transaction: transaction, peerId: peerId) {
++                rgRememberHiddenChatListGroup(transaction: transaction, peerId: peerId, groupId: groupId)
++            }
+             transaction.updatePeerChatListInclusion(peerId, inclusion: .notIncluded)
+         } else {
+             let currentInclusion = transaction.getPeerChatListInclusion(peerId)
+@@ -35,6 +40,10 @@ extension ReplayContext {
+             case let .pin(itemId):
+                 switch itemId {
+                     case let .peer(peerId):
++                        let placement = RegramChatListPlacement.read(transaction)
++                        if let protectedGroup = placement.protectedGroup(peerId: peerId, currentGroup: nil), protectedGroup != groupId {
++                            break
++                        }
+                         if transaction.getPeer(peerId) == nil || transaction.getPeerChatListInclusion(peerId) == .notIncluded {
+                             addSynchronizePinnedChatsOperation(transaction: transaction, groupId: groupId)
+                         } else {
+@@ -46,6 +55,9 @@ extension ReplayContext {
+                         }
+                 }
+             case let .unpin(itemId):
++                #if os(macOS)
++                if rgLocalOverflowPinnedItemIds(transaction: transaction, accountPeerId: accountPeerId, groupId: groupId).contains(itemId) { break }
++                #endif
+                 switch itemId {
+                     case let .peer(peerId):
+                         var currentItemIds = transaction.getPinnedItemIds(groupId: groupId)
+@@ -58,8 +70,18 @@ extension ReplayContext {
+                 }
+             case let .reorder(itemIds):
+                 let currentItemIds = transaction.getPinnedItemIds(groupId: groupId)
+-                if Set(itemIds) == Set(currentItemIds) {
++                #if os(macOS)
++                let overflow = rgLocalOverflowPinnedItemIds(transaction: transaction, accountPeerId: accountPeerId, groupId: groupId)
++                let currentServerItems = currentItemIds.filter { !overflow.contains($0) }
++                #else
++                let currentServerItems = currentItemIds
++                #endif
++                if Set(itemIds) == Set(currentServerItems) {
++                    #if os(macOS)
++                    rgSetServerPinnedItemIds(transaction: transaction, accountPeerId: accountPeerId, groupId: groupId, itemIds: itemIds)
++                    #else
+                     transaction.setPinnedItemIds(groupId: groupId, itemIds: itemIds)
++                    #endif
+                 } else {
+                     addSynchronizePinnedChatsOperation(transaction: transaction, groupId: groupId)
+                 }
+diff --git a/submodules/TelegramCore/Sources/State/Sync/StateReplay+Finalize.swift b/submodules/TelegramCore/Sources/State/Sync/StateReplay+Finalize.swift
+index e8b2bf9d06020b401b38a9bca11a5b02d4e8b432..0e1a5a106538301da8a688b0db03d421a392441c 100644
+--- a/submodules/TelegramCore/Sources/State/Sync/StateReplay+Finalize.swift
++++ b/submodules/TelegramCore/Sources/State/Sync/StateReplay+Finalize.swift
+@@ -261,7 +261,7 @@ extension ReplayContext {
+             }).map({ $0.1 })
+             for file in stickerFiles {
+                 if let entry = CodableEntry(RecentMediaItem(file)) {
+-                    transaction.addOrMoveToFirstPositionOrderedItemListItem(collectionId: Namespaces.OrderedItemList.CloudRecentStickers, item: OrderedItemListEntry(id: RecentMediaItemId(file.fileId).rawValue, contents: entry), removeTailIfCountExceeds: 20)
++                    transaction.addOrMoveToFirstPositionOrderedItemListItem(collectionId: Namespaces.OrderedItemList.CloudRecentStickers, item: OrderedItemListEntry(id: RecentMediaItemId(file.fileId).rawValue, contents: entry), removeTailIfCountExceeds: rgRecentStickerLimit(transaction: transaction))
+                 }
+             }
+         }
+diff --git a/submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift b/submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift
+index cf1ab15d9cfae956abcb53bf5060db525b32448d..703e56d419e0c31c9dfd8695f832750e335099bd 100644
+--- a/submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift
++++ b/submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift
+@@ -273,7 +273,23 @@ extension ReplayContext {
+         deleteEphemeralMessages(transaction: transaction, peerId: peerId, ids: ids)
+     }
+     
+-    func applyDeleteMessagesWithGlobalIds(_ ids: [Int32]) {
++    func applyDeleteMessagesWithGlobalIds(_ allIds: [Int32]) {
++        var ids = allIds
++        #if os(macOS)
++        ids = allIds.filter { globalId in
++            let messageIds = transaction.messageIdsForGlobalIds([globalId])
++            let retainedIds = messageIds.filter { rgShouldRetainRevokedMessage(accountId: accountPeerId.toInt64(), transaction: transaction, id: $0) }
++            guard !retainedIds.isEmpty else { return true }
++            for id in retainedIds {
++                rgMarkMessageRevoked(transaction: transaction, id: id)
++            }
++            let retainedSet = Set(retainedIds)
++            let deletedIds = messageIds.filter { !retainedSet.contains($0) }
++            _internal_deleteMessages(transaction: transaction, mediaBox: mediaBox, ids: deletedIds)
++            deletedMessageIds.append(contentsOf: deletedIds.map { .messageId($0) })
++            return false
++        }
++        #endif
+         var resourceIds: [MediaResourceId] = []
+         transaction.deleteMessagesWithGlobalIds(ids, forEachMedia: { media in
+             addMessageMediaResourceIdsToRemove(media: media, resourceIds: &resourceIds)
+@@ -284,7 +300,15 @@ extension ReplayContext {
+         deletedMessageIds.append(contentsOf: ids.map { .global($0) })
+     }
+     
+-    func applyDeleteMessages(_ ids: [MessageId]) {
++    func applyDeleteMessages(_ allIds: [MessageId]) {
++        var ids = allIds
++        #if os(macOS)
++        ids = allIds.filter { id in
++            guard rgShouldRetainRevokedMessage(accountId: accountPeerId.toInt64(), transaction: transaction, id: id) else { return true }
++            rgMarkMessageRevoked(transaction: transaction, id: id)
++            return false
++        }
++        #endif
+         _internal_deleteMessages(transaction: transaction, mediaBox: mediaBox, ids: ids, manualAddMessageThreadStatsDifference: { id, add, remove in
+             self.addMessageThreadStatsDifference(threadKey: id, remove: remove, addedMessagePeer: nil, addedMessageId: nil, isOutgoing: false)
+         })
+@@ -317,7 +341,7 @@ extension ReplayContext {
+                 generatedEvent = reactionGeneratedEvent(previousMessage.reactionsAttribute, message.reactionsAttribute, message: message, transaction: transaction)
+             }
+ 
+-            return .update(mergedServerMessageUpdate(previous: previousMessage, updated: message))
++            return .update(mergedServerMessageUpdate(previous: previousMessage, updated: message, regramAccountId: self.accountPeerId.toInt64(), mediaBox: self.mediaBox, cachedPeerData: self.transaction.getPeerCachedData(peerId: previousMessage.id.peerId)))
+         })
+         // A fetch in flight may be bringing the message with its old content, over the edited one or, with none stored
+         // here, instead of it; it stores this edit in its place (Postbox's record of recent edits,
+diff --git a/submodules/TelegramCore/Sources/State/SynchronizeGroupedPeersOperation.swift b/submodules/TelegramCore/Sources/State/SynchronizeGroupedPeersOperation.swift
+index e9c7ec2531a534db1d1650732ccb18afd9c6b41a..9602ada539de155a8a59de1136cbe04ed0e5e6ff 100644
+--- a/submodules/TelegramCore/Sources/State/SynchronizeGroupedPeersOperation.swift
++++ b/submodules/TelegramCore/Sources/State/SynchronizeGroupedPeersOperation.swift
+@@ -21,14 +21,17 @@ func _internal_updatePeerGroupIdInteractively(transaction: Transaction, peerId:
+     if initialInclusion != updatedInclusion {
+         transaction.updatePeerChatListInclusion(peerId, inclusion: updatedInclusion)
+         if peerId.namespace != Namespaces.Peer.SecretChat {
+-            addSynchronizeGroupedPeersOperation(transaction: transaction, peerId: peerId, groupId: groupId)
++            var placement = RegramChatListPlacement.read(transaction)
++            let revision = placement.record(peerId: peerId, groupId: groupId)
++            placement.store(transaction)
++            addSynchronizeGroupedPeersOperation(transaction: transaction, operation: SynchronizeGroupedPeersOperation(peerId: peerId, groupId: groupId, revision: revision))
+         }
+     }
+ }
+ 
+-private func addSynchronizeGroupedPeersOperation(transaction: Transaction, peerId: PeerId, groupId: PeerGroupId) {
++private func addSynchronizeGroupedPeersOperation(transaction: Transaction, operation: SynchronizeGroupedPeersOperation) {
+     let tag: PeerOperationLogTag = OperationLogTags.SynchronizeGroupedPeers
+     let logPeerId = PeerId(0)
+     
+-    transaction.operationLogAddEntry(peerId: logPeerId, tag: tag, tagLocalIndex: .automatic, tagMergedIndex: .automatic, contents: SynchronizeGroupedPeersOperation(peerId: peerId, groupId: groupId))
++    transaction.operationLogAddEntry(peerId: logPeerId, tag: tag, tagLocalIndex: .automatic, tagMergedIndex: .automatic, contents: operation)
  }
 diff --git a/submodules/TelegramCore/Sources/State/SynchronizeRecentlyUsedMediaOperations.swift b/submodules/TelegramCore/Sources/State/SynchronizeRecentlyUsedMediaOperations.swift
 index fe1b5734c2d43097ab3c8bc98effba71540bdc85..30582440527e719a34536a870cf62fe2d6649b6c 100644
@@ -2960,7 +3422,7 @@ index beaf799980ba9c20251f597b5187388091365635..ac0f5638e64af05118fc74df1e54b170
      }
  }
 diff --git a/submodules/TelegramCore/Sources/SyncCore/SyncCore_AutoremoveTimeoutMessageAttribute.swift b/submodules/TelegramCore/Sources/SyncCore/SyncCore_AutoremoveTimeoutMessageAttribute.swift
-index e8cc0f30ef..2b621b5ec6 100644
+index e8cc0f30ef101bc89202e9f43dfed413dfae753b..2b621b5ec690e5247baa5f38dd650e9f38d652c5 100644
 --- a/submodules/TelegramCore/Sources/SyncCore/SyncCore_AutoremoveTimeoutMessageAttribute.swift
 +++ b/submodules/TelegramCore/Sources/SyncCore/SyncCore_AutoremoveTimeoutMessageAttribute.swift
 @@ -11,16 +11,18 @@ public func autoremoveExpiryTimestamp(countdownBeginTime: Int32, timeout: Int32)
@@ -3260,11 +3722,47 @@ index 91c5c772f3abbc45895387981e3f960ac2628938..6b6494579bd7f8745e21fe26cb43d788
              if previous.isEmpty {
                  return
              }
+diff --git a/submodules/TelegramCore/Sources/SyncCore/SyncCore_SynchronizeGroupedPeersOperation.swift b/submodules/TelegramCore/Sources/SyncCore/SyncCore_SynchronizeGroupedPeersOperation.swift
+index fc4383cc1d74650152d340964400182df65ab961..6dde8add457adce9fdf5450986915c54d09ad570 100644
+--- a/submodules/TelegramCore/Sources/SyncCore/SyncCore_SynchronizeGroupedPeersOperation.swift
++++ b/submodules/TelegramCore/Sources/SyncCore/SyncCore_SynchronizeGroupedPeersOperation.swift
+@@ -3,19 +3,31 @@ import Postbox
+ public final class SynchronizeGroupedPeersOperation: PostboxCoding {
+     public let peerId: PeerId
+     public let groupId: PeerGroupId
++    let revision: Int64?
+     
+     public init(peerId: PeerId, groupId: PeerGroupId) {
+         self.peerId = peerId
+         self.groupId = groupId
++        self.revision = nil
++    }
++
++    init(peerId: PeerId, groupId: PeerGroupId, revision: Int64) {
++        self.peerId = peerId
++        self.groupId = groupId
++        self.revision = revision
+     }
+     
+     public init(decoder: PostboxDecoder) {
+         self.peerId = PeerId(decoder.decodeInt64ForKey("peerId", orElse: 0))
+         self.groupId = PeerGroupId.init(rawValue: decoder.decodeInt32ForKey("groupId", orElse: 0))
++        self.revision = decoder.decodeOptionalInt64ForKey("revision")
+     }
+     
+     public func encode(_ encoder: PostboxEncoder) {
+         encoder.encodeInt64(self.peerId.toInt64(), forKey: "peerId")
+         encoder.encodeInt32(self.groupId.rawValue, forKey: "groupId")
++        if let revision {
++            encoder.encodeInt64(revision, forKey: "revision")
++        }
+     }
+ }
 diff --git a/submodules/TelegramCore/Sources/SyncCore/SyncCore_TelegramUser.swift b/submodules/TelegramCore/Sources/SyncCore/SyncCore_TelegramUser.swift
-index 1ddaf1482079927b001310fc1a88f701e4d23d52..f698efd7e058beea13d9954eb372f2e856717c79 100644
+index 5ffcebdeff6951bbf1ddfa22375969c3a2059780..1af5e8f0f09b3f76e2df2bb1977991e081fd374a 100644
 --- a/submodules/TelegramCore/Sources/SyncCore/SyncCore_TelegramUser.swift
 +++ b/submodules/TelegramCore/Sources/SyncCore/SyncCore_TelegramUser.swift
-@@ -168,7 +168,13 @@ public final class TelegramUser: Peer, Equatable {
+@@ -169,7 +169,13 @@ public final class TelegramUser: Peer, Equatable {
      public let botInfo: BotUserInfo?
      public let restrictionInfo: PeerAccessRestrictionInfo?
      public let flags: UserInfoFlags
@@ -3279,7 +3777,7 @@ index 1ddaf1482079927b001310fc1a88f701e4d23d52..f698efd7e058beea13d9954eb372f2e8
      public let usernames: [TelegramPeerUsername]
      public let storiesHidden: Bool?
      public let nameColor: PeerColor?
-@@ -289,7 +295,7 @@ public final class TelegramUser: Peer, Equatable {
+@@ -290,7 +296,7 @@ public final class TelegramUser: Peer, Equatable {
          self.botInfo = botInfo
          self.restrictionInfo = restrictionInfo
          self.flags = flags
@@ -3288,7 +3786,7 @@ index 1ddaf1482079927b001310fc1a88f701e4d23d52..f698efd7e058beea13d9954eb372f2e8
          self.usernames = usernames
          self.storiesHidden = storiesHidden
          self.nameColor = nameColor
-@@ -334,7 +340,7 @@ public final class TelegramUser: Peer, Equatable {
+@@ -335,7 +341,7 @@ public final class TelegramUser: Peer, Equatable {
          
          self.flags = UserInfoFlags(rawValue: decoder.decodeInt32ForKey("fl", orElse: 0))
          
@@ -3297,7 +3795,7 @@ index 1ddaf1482079927b001310fc1a88f701e4d23d52..f698efd7e058beea13d9954eb372f2e8
          
          self.usernames = decoder.decodeObjectArrayForKey("uns")
          self.storiesHidden = decoder.decodeOptionalBoolForKey("sth")
-@@ -409,7 +415,7 @@ public final class TelegramUser: Peer, Equatable {
+@@ -410,7 +416,7 @@ public final class TelegramUser: Peer, Equatable {
          
          encoder.encodeInt32(self.flags.rawValue, forKey: "fl")
          
@@ -3306,7 +3804,7 @@ index 1ddaf1482079927b001310fc1a88f701e4d23d52..f698efd7e058beea13d9954eb372f2e8
              encoder.encode(emojiStatus, forKey: "emjs")
          } else {
              encoder.encodeNil(forKey: "emjs")
-@@ -518,7 +524,7 @@ public final class TelegramUser: Peer, Equatable {
+@@ -519,7 +525,7 @@ public final class TelegramUser: Peer, Equatable {
          if lhs.flags != rhs.flags {
              return false
          }
@@ -3315,7 +3813,7 @@ index 1ddaf1482079927b001310fc1a88f701e4d23d52..f698efd7e058beea13d9954eb372f2e8
              return false
          }
          if lhs.usernames != rhs.usernames {
-@@ -552,23 +558,23 @@ public final class TelegramUser: Peer, Equatable {
+@@ -553,23 +559,23 @@ public final class TelegramUser: Peer, Equatable {
      }
      
      public func withUpdatedUsername(_ username: String?) -> TelegramUser {
@@ -3344,7 +3842,7 @@ index 1ddaf1482079927b001310fc1a88f701e4d23d52..f698efd7e058beea13d9954eb372f2e8
      }
      
      public func withUpdatedEmojiStatus(_ emojiStatus: PeerEmojiStatus?) -> TelegramUser {
-@@ -576,27 +582,27 @@ public final class TelegramUser: Peer, Equatable {
+@@ -577,27 +583,27 @@ public final class TelegramUser: Peer, Equatable {
      }
      
      public func withUpdatedFlags(_ flags: UserInfoFlags) -> TelegramUser {
@@ -3378,7 +3876,7 @@ index 1ddaf1482079927b001310fc1a88f701e4d23d52..f698efd7e058beea13d9954eb372f2e8
      }
      
      public init(flatBuffersObject: TelegramCore_TelegramUser) throws {
-@@ -610,7 +616,7 @@ public final class TelegramUser: Peer, Equatable {
+@@ -611,7 +617,7 @@ public final class TelegramUser: Peer, Equatable {
          self.botInfo = try flatBuffersObject.botInfo.flatMap { try BotUserInfo(flatBuffersObject: $0) }
          self.restrictionInfo = try flatBuffersObject.restrictionInfo.flatMap { try PeerAccessRestrictionInfo(flatBuffersObject: $0) }
          self.flags = UserInfoFlags(rawValue: flatBuffersObject.flags)
@@ -3387,7 +3885,7 @@ index 1ddaf1482079927b001310fc1a88f701e4d23d52..f698efd7e058beea13d9954eb372f2e8
          self.usernames = try (0 ..< flatBuffersObject.usernamesCount).map { try TelegramPeerUsername(flatBuffersObject: flatBuffersObject.usernames(at: $0)!) }
          self.storiesHidden = flatBuffersObject.storiesHidden?.value
          if let collectibleColor = try flatBuffersObject.collectibleColor.flatMap(PeerCollectibleColor.init) {
-@@ -658,7 +664,7 @@ public final class TelegramUser: Peer, Equatable {
+@@ -659,7 +665,7 @@ public final class TelegramUser: Peer, Equatable {
              collectibleColorOffset = nil
          }        
          let profileColorOffset = self.profileColor.flatMap { $0.encodeToFlatBuffers(builder: &builder) }
@@ -3397,69 +3895,40 @@ index 1ddaf1482079927b001310fc1a88f701e4d23d52..f698efd7e058beea13d9954eb372f2e8
          let start = TelegramCore_TelegramUser.startTelegramUser(&builder)
          
 diff --git a/submodules/TelegramCore/Sources/TelegramEngine/AccountData/TelegramEngineAccountData.swift b/submodules/TelegramCore/Sources/TelegramEngine/AccountData/TelegramEngineAccountData.swift
-index c236035276d53ee235efccf1e324846206d68f55..e4a1348e6a32399c117ad42675a686b250075834 100644
+index fa8e111734d29d0d407e972172df532de1c71ac0..174342f303b5ef5023b09b7284e3319fcdf2fa82 100644
 --- a/submodules/TelegramCore/Sources/TelegramEngine/AccountData/TelegramEngineAccountData.swift
 +++ b/submodules/TelegramCore/Sources/TelegramEngine/AccountData/TelegramEngineAccountData.swift
-@@ -132,7 +132,24 @@ public extension TelegramEngine {
-             }
-             |> ignoreValues
-             
-+            let localStatus = Atomic(value: false)
-+            #if os(macOS)
-+            let localModeRequested = rgIsLocalPremiumPeerId(peerId)
-+            #endif
-             return self.account.postbox.transaction { transaction -> Void in
-+                #if os(macOS)
-+                if localModeRequested, !rgIsLocalPremiumPeerId(peerId) {
-+                    _ = localStatus.swap(true)
-+                    return
-+                }
-+                if localModeRequested, (transaction.getPeer(peerId) as? TelegramUser)?.flags.contains(.isPremium) != true {
-+                    _ = localStatus.swap(true)
-+                    if let file { transaction.storeMediaIfNotPresent(media: file) }
-+                    if let patternFile { transaction.storeMediaIfNotPresent(media: patternFile) }
-+                    rgStoreLocalPremiumEmojiStatus(peerId: peerId, status: emojiStatus)
-+                    return
-+                }
-+                #endif
-                 if let file, let patternFile {
-                     transaction.storeMediaIfNotPresent(media: file)
-                     transaction.storeMediaIfNotPresent(media: patternFile)
-@@ -146,12 +163,32 @@ public extension TelegramEngine {
-                 }
-             }
-             |> ignoreValues
--            |> then(remoteApply)
-+            |> then(deferred { localStatus.with({ $0 }) ? .complete() : remoteApply })
-         }
-         
-         public func setEmojiStatus(file: TelegramMediaFile?, expirationDate: Int32?) -> Signal<Never, NoError> {
-             let peerId = self.account.peerId
--            
-+            #if os(macOS)
-+            if rgIsLocalPremiumPeerId(peerId) {
-+                return self.account.postbox.transaction { transaction in
-+                    guard rgIsLocalPremiumPeerId(peerId), let peer = transaction.getPeer(peerId) as? TelegramUser else { return true }
-+                    guard !peer.flags.contains(.isPremium) else { return false }
-+                    if let file { transaction.storeMediaIfNotPresent(media: file) }
-+                    rgStoreLocalPremiumEmojiStatus(peerId: peerId, status: file.map { PeerEmojiStatus(content: .emoji(fileId: $0.fileId.id), expirationDate: expirationDate) })
-+                    return true
-+                }
-+                |> mapToSignal { stored in
-+                    if stored { return .complete() }
-+                    guard rgIsLocalPremiumPeerId(peerId) else { return .complete() }
-+                    return self.setServerEmojiStatus(file: file, expirationDate: expirationDate)
-+                }
+@@ -14,6 +14,30 @@ private final class AccountEmojiStatusRequestDependencyTag: NetworkRequestDepend
+ }
+ 
+ private func _internal_setAccountEmojiStatus(account: Account, apiEmojiStatus: Api.EmojiStatus, emojiStatus: PeerEmojiStatus?, files: [TelegramMediaFile], recentFile: TelegramMediaFile?) -> Signal<Never, SetEmojiStatusError> {
++    #if os(macOS)
++    let peerId = account.peerId
++    let postbox = account.postbox
++    if rgIsLocalPremiumPeerId(peerId) {
++        return postbox.transaction { transaction -> Bool in
++            guard rgIsLocalPremiumPeerId(peerId), let peer = transaction.getPeer(peerId) as? TelegramUser else { return true }
++            guard !peer.flags.contains(.isPremium) else { return false }
++            for file in files {
++                transaction.storeMediaIfNotPresent(media: file)
 +            }
-+            #endif
-+            return self.setServerEmojiStatus(file: file, expirationDate: expirationDate)
++            rgStoreLocalPremiumEmojiStatus(peerId: peerId, status: emojiStatus)
++            return true
 +        }
++        |> castError(SetEmojiStatusError.self)
++        |> mapToSignal { stored -> Signal<Never, SetEmojiStatusError> in
++            guard !stored, rgIsLocalPremiumPeerId(peerId) else { return .complete() }
++            return setServerEmojiStatus(account: account, apiEmojiStatus: apiEmojiStatus, emojiStatus: emojiStatus, files: files, recentFile: recentFile)
++        }
++    }
++    #endif
++    return setServerEmojiStatus(account: account, apiEmojiStatus: apiEmojiStatus, emojiStatus: emojiStatus, files: files, recentFile: recentFile)
++}
 +
-+        private func setServerEmojiStatus(file: TelegramMediaFile?, expirationDate: Int32?) -> Signal<Never, NoError> {
-+            let peerId = self.account.peerId
-             let remoteApply = self.account.network.request(Api.functions.account.updateEmojiStatus(emojiStatus: file.flatMap({ file in
-                 var flags: Int32 = 0
-                 if let _ = expirationDate {
++private func setServerEmojiStatus(account: Account, apiEmojiStatus: Api.EmojiStatus, emojiStatus: PeerEmojiStatus?, files: [TelegramMediaFile], recentFile: TelegramMediaFile?) -> Signal<Never, SetEmojiStatusError> {
+     let peerId = account.peerId
+     let postbox = account.postbox
+     return account.network.request(Api.functions.account.updateEmojiStatus(emojiStatus: apiEmojiStatus), tag: AccountEmojiStatusRequestDependencyTag())
 diff --git a/submodules/TelegramCore/Sources/TelegramEngine/Feed/FeedPageStorage.swift b/submodules/TelegramCore/Sources/TelegramEngine/Feed/FeedPageStorage.swift
 index 1257d6ab3399d585aab337b420f2121d56c117d2..9c6009b9dc51c84200d3dac4a5114ae0411ccdcb 100644
 --- a/submodules/TelegramCore/Sources/TelegramEngine/Feed/FeedPageStorage.swift
@@ -3473,6 +3942,36 @@ index 1257d6ab3399d585aab337b420f2121d56c117d2..9c6009b9dc51c84200d3dac4a5114ae0
              })
          } else {
              addedMessages.append(storeMessage)
+diff --git a/submodules/TelegramCore/Sources/TelegramEngine/Messages/EarliestUnseenPersonalMentionMessage.swift b/submodules/TelegramCore/Sources/TelegramEngine/Messages/EarliestUnseenPersonalMentionMessage.swift
+index da4635e46fd49f65e14cd99dc2d2e840bba2aa19..16459a5badad73a1913840860a8714199e5459e2 100644
+--- a/submodules/TelegramCore/Sources/TelegramEngine/Messages/EarliestUnseenPersonalMentionMessage.swift
++++ b/submodules/TelegramCore/Sources/TelegramEngine/Messages/EarliestUnseenPersonalMentionMessage.swift
+@@ -9,14 +9,14 @@ public enum EarliestUnseenPersonalMentionMessageResult: Equatable {
+     case result(MessageId?)
+ }
+ 
+-func _internal_earliestUnseenPersonalMentionMessage(account: Account, peerId: PeerId, threadId: Int64?) -> Signal<EarliestUnseenPersonalMentionMessageResult, NoError> {
+-    return account.viewTracker.aroundMessageHistoryViewForLocation(.peer(peerId: peerId, threadId: threadId), index: .lowerBound, anchorIndex: .lowerBound, count: 4, fixedCombinedReadStates: nil, tag: .tag(.unseenPersonalMessage), additionalData: [.peerChatState(peerId)])
++func _internal_earliestUnseenPersonalMentionMessage(account: Account, peerId: PeerId, threadId: Int64?, ignoreMessageIds: Set<MessageId> = []) -> Signal<EarliestUnseenPersonalMentionMessageResult, NoError> {
++    return account.viewTracker.aroundMessageHistoryViewForLocation(.peer(peerId: peerId, threadId: threadId), ignoreMessageIds: ignoreMessageIds, index: .lowerBound, anchorIndex: .lowerBound, count: 4, fixedCombinedReadStates: nil, tag: .tag(.unseenPersonalMessage), additionalData: [.peerChatState(peerId)])
+     |> mapToSignal { view -> Signal<EarliestUnseenPersonalMentionMessageResult, NoError> in
+         if view.0.isLoading {
+             return .single(.loading)
+         }
+         if case .FillHole = view.1 {
+-            return _internal_earliestUnseenPersonalMentionMessage(account: account, peerId: peerId, threadId: threadId)
++            return _internal_earliestUnseenPersonalMentionMessage(account: account, peerId: peerId, threadId: threadId, ignoreMessageIds: ignoreMessageIds)
+         }
+         if let message = view.0.entries.first?.message {
+             if peerId.namespace == Namespaces.Peer.CloudChannel {
+@@ -51,6 +51,7 @@ func _internal_earliestUnseenPersonalMentionMessage(account: Account, peerId: Pe
+                 return .single(.result(message.id))
+             }
+         } else {
++            if !ignoreMessageIds.isEmpty { return .single(.result(nil)) }
+             return account.postbox.transaction { transaction -> EarliestUnseenPersonalMentionMessageResult in
+                 if let topId = transaction.getTopPeerMessageId(peerId: peerId, namespace: Namespaces.Message.Cloud) {
+                     transaction.replaceMessageTagSummary(peerId: peerId, threadId: threadId, tagMask: .unseenPersonalMessage, namespace: Namespaces.Message.Cloud, customTag: nil, count: 0, maxId: topId.id)
 diff --git a/submodules/TelegramCore/Sources/TelegramEngine/Messages/SearchMessages.swift b/submodules/TelegramCore/Sources/TelegramEngine/Messages/SearchMessages.swift
 index d16a100108bfaf2deb09ce4f631cbee036d4fd9e..3a30e1983d280c106ccf1924a5e0ab93a0d48f32 100644
 --- a/submodules/TelegramCore/Sources/TelegramEngine/Messages/SearchMessages.swift
@@ -3535,7 +4034,7 @@ index d16a100108bfaf2deb09ce4f631cbee036d4fd9e..3a30e1983d280c106ccf1924a5e0ab93
      }
  }
 diff --git a/submodules/TelegramCore/Sources/TelegramEngine/Messages/Stories.swift b/submodules/TelegramCore/Sources/TelegramEngine/Messages/Stories.swift
-index 9878c79e3413fc01f84b97625d2f79e74ab12d10..62c03976e0ea294cf72d50fe83dda1a6dea80f77 100644
+index e74f20743396547ad82771f9c53b97651b29e17f..61a76fbc62635f1cf1cc9fc75990fb711219314d 100644
 --- a/submodules/TelegramCore/Sources/TelegramEngine/Messages/Stories.swift
 +++ b/submodules/TelegramCore/Sources/TelegramEngine/Messages/Stories.swift
 @@ -1,4 +1,7 @@
@@ -3546,7 +4045,7 @@ index 9878c79e3413fc01f84b97625d2f79e74ab12d10..62c03976e0ea294cf72d50fe83dda1a6
  import SwiftSignalKit
  import Postbox
  internal import TelegramApi
-@@ -2072,6 +2075,11 @@ func _internal_deleteStories(account: Account, peerId: PeerId, ids: [Int32]) ->
+@@ -2109,6 +2112,11 @@ func _internal_deleteStories(account: Account, peerId: PeerId, ids: [Int32]) ->
  
  func _internal_markStoryAsSeen(account: Account, peerId: PeerId, id: Int32, asPinned: Bool) -> Signal<Never, NoError> {
      if asPinned {
@@ -3559,7 +4058,7 @@ index 9878c79e3413fc01f84b97625d2f79e74ab12d10..62c03976e0ea294cf72d50fe83dda1a6
              return transaction.getPeer(peerId).flatMap(apiInputPeer)
          }
 diff --git a/submodules/TelegramCore/Sources/TelegramEngine/Messages/TelegramEngineMessages.swift b/submodules/TelegramCore/Sources/TelegramEngine/Messages/TelegramEngineMessages.swift
-index fe15eed4b3..e2340fd212 100644
+index 52723ff4eae10a7a801bb8b2789e53e1e8c2b082..229016d50db5fb535750fa57e4e42ab09743030c 100644
 --- a/submodules/TelegramCore/Sources/TelegramEngine/Messages/TelegramEngineMessages.swift
 +++ b/submodules/TelegramCore/Sources/TelegramEngine/Messages/TelegramEngineMessages.swift
 @@ -1,6 +1,9 @@
@@ -3572,7 +4071,10 @@ index fe15eed4b3..e2340fd212 100644
  internal import TelegramApi
  
  public enum EngineOutgoingMessageContent {
-@@ -325,12 +328,12 @@ public extension TelegramEngine {
+@@ -397,15 +400,15 @@ public extension TelegramEngine {
+             return _internal_appendTodoMessageItems(account: self.account, messageId: messageId, items: items)
+         }
+         
 -        public func earliestUnseenPersonalMentionMessage(peerId: PeerId, threadId: Int64?) -> Signal<EarliestUnseenPersonalMentionMessageResult, NoError> {
 +        public func earliestUnseenPersonalMentionMessage(peerId: PeerId, threadId: Int64?, ignoreMessageIds: Set<MessageId> = []) -> Signal<EarliestUnseenPersonalMentionMessageResult, NoError> {
              let account = self.account
@@ -3588,7 +4090,7 @@ index fe15eed4b3..e2340fd212 100644
                          let _ = clearPeerUnseenPersonalMessagesInteractively(account: account, peerId: peerId, threadId: threadId).start()
                      }
                      return .single(result)
-@@ -1684,6 +1687,9 @@ public extension TelegramEngine {
+@@ -1805,6 +1808,9 @@ public extension TelegramEngine {
          }
          
          public func markStoryAsSeen(peerId: EnginePeer.Id, id: Int32, asPinned: Bool) -> Signal<Never, NoError> {
@@ -3598,6 +4100,83 @@ index fe15eed4b3..e2340fd212 100644
              return _internal_markStoryAsSeen(account: self.account, peerId: peerId, id: id, asPinned: asPinned)
          }
          
+diff --git a/submodules/TelegramCore/Sources/TelegramEngine/Peers/ChatListFiltering.swift b/submodules/TelegramCore/Sources/TelegramEngine/Peers/ChatListFiltering.swift
+index f8aacb5a3ca05f1dad8d2876a66e0e87075af7eb..a963462638bed111b74b738203f24231dcc9b9c6 100644
+--- a/submodules/TelegramCore/Sources/TelegramEngine/Peers/ChatListFiltering.swift
++++ b/submodules/TelegramCore/Sources/TelegramEngine/Peers/ChatListFiltering.swift
+@@ -871,8 +871,8 @@ private func requestChatListFilters(accountPeerId: PeerId, postbox: Postbox, net
+ }
+ 
+ private func loadAndStorePeerChatInfos(accountPeerId: PeerId, postbox: Postbox, network: Network, peers: [Api.InputPeer]) -> Signal<Never, NoError> {
+-    return postbox.transaction { transaction -> [Api.InputDialogPeer] in
+-        return peers.map { peer -> Api.InputDialogPeer in
++    return postbox.transaction { transaction -> ([Api.InputDialogPeer], Int64) in
++        let inputDialogPeers = peers.map { peer -> Api.InputDialogPeer in
+             if case let .inputPeerChannel(inputPeerChannelData) = peer {
+                 let peerId = peerIdFromApiCommunityId(inputPeerChannelData.channelId)
+                 if let peer = transaction.getPeer(peerId) as? TelegramCommunity, let inputChannel = apiInputChannel(peer) {
+@@ -881,20 +881,23 @@ private func loadAndStorePeerChatInfos(accountPeerId: PeerId, postbox: Postbox,
+             }
+             return .inputDialogPeer(.init(peer: peer))
+         }
++        return (inputDialogPeers, RegramChatListPlacement.read(transaction).revision)
+     }
+-    |> mapToSignal { inputDialogPeers -> Signal<Api.messages.PeerDialogs?, NoError> in
++    |> mapToSignal { inputDialogPeers, placementRevision -> Signal<(Api.messages.PeerDialogs?, Int64), NoError> in
+         return network.request(Api.functions.messages.getPeerDialogs(peers: inputDialogPeers))
+         |> map(Optional.init)
+         |> `catch` { _ -> Signal<Api.messages.PeerDialogs?, NoError> in
+             return .single(nil)
+         }
++        |> map { ($0, placementRevision) }
+     }
+-    |> mapToSignal { result -> Signal<Never, NoError> in
++    |> mapToSignal { result, placementRevision -> Signal<Never, NoError> in
+         guard let result = result else {
+             return .complete()
+         }
+         
+         return postbox.transaction { transaction -> Void in
++            let placement = RegramChatListPlacement.read(transaction)
+             var notificationSettings: [PeerId: PeerNotificationSettings] = [:]
+             var ttlPeriods: [PeerId: CachedPeerAutoremoveTimeout] = [:]
+             var channelStates: [PeerId: Int32] = [:]
+@@ -947,8 +950,8 @@ private func loadAndStorePeerChatInfos(accountPeerId: PeerId, postbox: Postbox,
+                         }
+                         
+                         if !isExcludedFromChatList {
+-                            let groupId = PeerGroupId(rawValue: folderId ?? 0)
+                             let currentInclusion = transaction.getPeerChatListInclusion(peerId)
++                            let groupId = placement.protectedGroup(peerId: peerId, currentGroup: currentInclusion.groupId, since: placementRevision) ?? PeerGroupId(rawValue: folderId ?? 0)
+                             var currentPinningIndex: UInt16?
+                             var currentMinTimestamp: Int32?
+                             switch currentInclusion {
+diff --git a/submodules/TelegramCore/Sources/TelegramEngine/Peers/Communities.swift b/submodules/TelegramCore/Sources/TelegramEngine/Peers/Communities.swift
+index 60e3147ddd0c84cdcb4b69c9ef3d076347e6e853..9d1b448046f0507ca386f4466c95d26b22d1e833 100644
+--- a/submodules/TelegramCore/Sources/TelegramEngine/Peers/Communities.swift
++++ b/submodules/TelegramCore/Sources/TelegramEngine/Peers/Communities.swift
+@@ -469,14 +469,15 @@ func _internal_toggleCommunityCollapsedInDialogs(account: Account, communityId:
+                         linkedPeerIds.insert(linkedPeer.peerId)
+                     }
+                     for peerId in linkedPeerIds {
+-                        if collapsed {
++                        if collapsed || isPeerHiddenByCollapsedCommunity(transaction: transaction, peerId: peerId) {
++                            rgRememberHiddenChatListGroup(transaction: transaction, peerId: peerId)
+                             transaction.updatePeerChatListInclusion(peerId, inclusion: .notIncluded)
+-                        } else if isPeerHiddenByCollapsedCommunity(transaction: transaction, peerId: peerId) {
+-                            transaction.updatePeerChatListInclusion(peerId, inclusion: .notIncluded)
+-                        } else if let peer = transaction.getPeer(peerId) {
++                        } else if transaction.getPeerChatListInclusion(peerId) == .notIncluded,
++                                  let peer = transaction.getPeer(peerId),
++                                  !shouldExcludePeerFromChatList(transaction: transaction, peerId: peerId) {
+                             transaction.updatePeerChatListInclusion(peerId, inclusion: .ifHasMessagesOrOneOf(
+-                                groupId: .root,
+-                                pinningIndex: transaction.getPeerChatListIndex(peerId)?.1.pinningIndex,
++                                groupId: rgRestoreChatListGroup(transaction: transaction, peerId: peerId),
++                                pinningIndex: nil,
+                                 minTimestamp: minTimestampForPeerInclusion(peer)
+                             ))
+                         }
 diff --git a/submodules/TelegramCore/Sources/TelegramEngine/Peers/GroupsInCommon.swift b/submodules/TelegramCore/Sources/TelegramEngine/Peers/GroupsInCommon.swift
 index 155b71aa8cf49c9c0fb1ba1723946f20c429ce65..101782e4b825ff5214601023c2ec42a31da92bd5 100644
 --- a/submodules/TelegramCore/Sources/TelegramEngine/Peers/GroupsInCommon.swift
@@ -3742,7 +4321,7 @@ index 155b71aa8cf49c9c0fb1ba1723946f20c429ce65..101782e4b825ff5214601023c2ec42a3
  }
  
 diff --git a/submodules/TelegramCore/Sources/TelegramEngine/Peers/TelegramEnginePeers.swift b/submodules/TelegramCore/Sources/TelegramEngine/Peers/TelegramEnginePeers.swift
-index a5f736c0a1edc22106a2c06d94dec186afe81a6d..9e96a44e3c014c171a09a1222336ebdd77b0a3a4 100644
+index 37441e5cfb64ab149a644e69f70814751cf4f47d..d24a2e455dd638f5cc1a28302e605d1aff9309e2 100644
 --- a/submodules/TelegramCore/Sources/TelegramEngine/Peers/TelegramEnginePeers.swift
 +++ b/submodules/TelegramCore/Sources/TelegramEngine/Peers/TelegramEnginePeers.swift
 @@ -893,7 +893,7 @@ public extension TelegramEngine {
@@ -3807,11 +4386,51 @@ index aa11e5220c1df03c60f72bf74d9bb43c0df72480..b3e884d7c33f3833007d12cec6206bed
              addSynchronizePinnedChatsOperation(transaction: transaction, groupId: groupId)
              return true
          } else {
+diff --git a/submodules/TelegramCore/Sources/UpdatePeers.swift b/submodules/TelegramCore/Sources/UpdatePeers.swift
+index d90af5f2cb9ba8c2ca6e5c4ea26b0a3fb6372e54..80a6d2bf8f1266819602969afb9f1e4bd6b94f66 100644
+--- a/submodules/TelegramCore/Sources/UpdatePeers.swift
++++ b/submodules/TelegramCore/Sources/UpdatePeers.swift
+@@ -52,6 +52,9 @@ func shouldExcludePeerFromChatList(transaction: Transaction, peerId: PeerId, pee
+ 
+ func updatePeerChatInclusionWithMinTimestamp(transaction: Transaction, id: PeerId, minTimestamp: Int32, forceRootGroupIfNotExists: Bool, peer: Peer? = nil) {
+     if shouldExcludePeerFromChatList(transaction: transaction, peerId: id, peer: peer) {
++        if isPeerHiddenByCollapsedCommunity(transaction: transaction, peerId: id, peer: peer) {
++            rgRememberHiddenChatListGroup(transaction: transaction, peerId: id)
++        }
+         transaction.updatePeerChatListInclusion(id, inclusion: .notIncluded)
+         return
+     }
+@@ -73,7 +76,7 @@ func updatePeerChatInclusionWithMinTimestamp(transaction: Transaction, id: PeerI
+             updatedInclusion = .ifHasMessagesOrOneOf(groupId: groupId, pinningIndex: pinningIndex, minTimestamp: updatedMinTimestamp)
+         default:
+             if forceRootGroupIfNotExists {
+-                updatedInclusion = .ifHasMessagesOrOneOf(groupId: .root, pinningIndex: nil, minTimestamp: minTimestamp)
++                updatedInclusion = .ifHasMessagesOrOneOf(groupId: rgRestoreChatListGroup(transaction: transaction, peerId: id), pinningIndex: nil, minTimestamp: minTimestamp)
+             }
+     }
+     if let updatedInclusion = updatedInclusion {
+@@ -96,6 +99,7 @@ func minTimestampForPeerInclusion(_ peer: Peer) -> Int32? {
+ func updateCommunityChatListInclusion(transaction: Transaction, communityId: EnginePeer.Id, collapsedInDialogs: Bool, minTimestamp: Int32?) {
+     if !collapsedInDialogs {
+         if transaction.getPeerChatListInclusion(communityId) != .notIncluded {
++            rgRememberHiddenChatListGroup(transaction: transaction, peerId: communityId)
+             transaction.updatePeerChatListInclusion(communityId, inclusion: .notIncluded)
+         }
+         return
+@@ -125,7 +129,7 @@ func updateCommunityChatListInclusion(transaction: Transaction, communityId: Eng
+         transaction.updatePeerChatListInclusion(communityId, inclusion: .ifHasMessagesOrOneOf(groupId: groupId, pinningIndex: pinningIndex, minTimestamp: updatedMinTimestamp))
+     default:
+         transaction.updatePeerChatListInclusion(communityId, inclusion: .ifHasMessagesOrOneOf(
+-            groupId: .root,
++            groupId: rgRestoreChatListGroup(transaction: transaction, peerId: communityId),
+             pinningIndex: transaction.getPeerChatListIndex(communityId)?.1.pinningIndex,
+             minTimestamp: effectiveMinTimestamp
+         ))
 diff --git a/submodules/TelegramCore/Sources/Utils/PeerUtils.swift b/submodules/TelegramCore/Sources/Utils/PeerUtils.swift
-index 26cebdb4c4848c85f61ee0cacdb622f8a259ce30..d4bad19c675919945d0ad1f82b70a631498b25e8 100644
+index ef64c4b825107a1b7c551665683457bb653799b1..24c1ce30f374fed61ee25ea291859e6dfb01723b 100644
 --- a/submodules/TelegramCore/Sources/Utils/PeerUtils.swift
 +++ b/submodules/TelegramCore/Sources/Utils/PeerUtils.swift
-@@ -225,6 +225,9 @@ public extension Peer {
+@@ -243,6 +243,9 @@ public extension Peer {
      }
      
      var isPremium: Bool {
@@ -4228,740 +4847,3 @@ index d9cc47c895ea1e79bcb78f21195be34fd0861feb..e9d3ba319d5f294c4e2d0598c9525409
      // A purchased paid post must not fall back to its locked preview.
      func testUnlockedPaidMediaSurvives() {
          let image = TelegramMediaImage(imageId: MediaId(namespace: Namespaces.Media.CloudImage, id: 1), representations: [], immediateThumbnailData: nil, reference: nil, partialReference: nil, flags: [])
-diff --git a/submodules/TelegramCore/Sources/MacOS/RegramMessageHistory.swift b/submodules/TelegramCore/Sources/MacOS/RegramMessageHistory.swift
-new file mode 100644
-index 00000000..1f8a5bf8
---- /dev/null
-+++ b/submodules/TelegramCore/Sources/MacOS/RegramMessageHistory.swift
-@@ -0,0 +1,53 @@
-+import Postbox
-+import SwiftSignalKit
-+internal import TelegramApi
-+
-+public enum RegramMessageHistoryError {
-+    case unavailable
-+}
-+
-+public struct RegramMessageHistoryPage {
-+    public let messages: [Message]
-+    public let nextOffsetId: Int32?
-+}
-+
-+public func regramMessageHistoryPage(account: Account, peerId: PeerId, threadId: Int64?, offsetId: Int32, offsetDate: Int32, limit: Int32 = 100) -> Signal<RegramMessageHistoryPage, RegramMessageHistoryError> {
-+    account.postbox.transaction { transaction -> (Peer, Api.InputPeer, Api.InputPeer?)? in
-+        guard peerId.namespace != Namespaces.Peer.SecretChat, let peer = transaction.getPeer(peerId), let inputPeer = apiInputPeer(peer) else { return nil }
-+        let savedPeer = threadId.flatMap { transaction.getPeer(PeerId($0)) }.flatMap(apiInputPeer)
-+        return (peer, inputPeer, savedPeer)
-+    }
-+    |> castError(RegramMessageHistoryError.self)
-+    |> mapToSignal { value -> Signal<RegramMessageHistoryPage, RegramMessageHistoryError> in
-+        guard let (peer, inputPeer, savedPeer) = value else { return .fail(.unavailable) }
-+        let request: Signal<Api.messages.Messages, RegramMessageHistoryError>
-+        if threadId != nil, peerId == account.peerId || peer.isMonoForum {
-+            guard let savedPeer else { return .fail(.unavailable) }
-+            request = account.network.request(Api.functions.messages.getSavedHistory(flags: peerId == account.peerId ? 0 : 1, parentPeer: peerId == account.peerId ? nil : inputPeer, peer: savedPeer, offsetId: offsetId, offsetDate: offsetDate, addOffset: 0, limit: limit, maxId: 0, minId: 0, hash: 0), automaticFloodWait: false) |> mapError { _ in .unavailable }
-+        } else if let threadId {
-+            guard let messageId = Int32(exactly: threadId) else { return .fail(.unavailable) }
-+            request = account.network.request(Api.functions.messages.getReplies(peer: inputPeer, msgId: messageId, offsetId: offsetId, offsetDate: offsetDate, addOffset: 0, limit: limit, maxId: 0, minId: 0, hash: 0), automaticFloodWait: false) |> mapError { _ in .unavailable }
-+        } else {
-+            request = account.network.request(Api.functions.messages.getHistory(peer: inputPeer, offsetId: offsetId, offsetDate: offsetDate, addOffset: 0, limit: limit, maxId: 0, minId: 0, hash: 0), automaticFloodWait: false) |> mapError { _ in .unavailable }
-+        }
-+        return request |> mapToSignal { result in
-+            account.postbox.transaction { transaction -> RegramMessageHistoryPage in
-+                let messages: [Api.Message]
-+                let chats: [Api.Chat]
-+                let users: [Api.User]
-+                switch result {
-+                case let .messages(data): (messages, chats, users) = (data.messages, data.chats, data.users)
-+                case let .messagesSlice(data): (messages, chats, users) = (data.messages, data.chats, data.users)
-+                case let .channelMessages(data): (messages, chats, users) = (data.messages, data.chats, data.users)
-+                case .messagesNotModified: (messages, chats, users) = ([], [], [])
-+                }
-+                let peers = AccumulatedPeers(transaction: transaction, chats: chats, users: users)
-+                updatePeers(transaction: transaction, accountPeerId: account.peerId, peers: peers)
-+                let stored = messages.compactMap { StoreMessage(apiMessage: $0, accountPeerId: account.peerId, peerIsForum: peer.isForumOrMonoForum) }
-+                _ = transaction.addMessages(stored, location: .Random)
-+                let ids: [MessageId] = stored.compactMap { if case let .Id(id) = $0.id { return id }; return nil }
-+                return RegramMessageHistoryPage(messages: ids.compactMap(transaction.getMessage), nextOffsetId: ids.map(\.id).min())
-+            } |> castError(RegramMessageHistoryError.self)
-+        }
-+    }
-+}
-diff --git a/submodules/TelegramCore/Sources/TelegramEngine/Messages/EarliestUnseenPersonalMentionMessage.swift b/submodules/TelegramCore/Sources/TelegramEngine/Messages/EarliestUnseenPersonalMentionMessage.swift
-index da4635e46f..16459a5bad 100644
---- a/submodules/TelegramCore/Sources/TelegramEngine/Messages/EarliestUnseenPersonalMentionMessage.swift
-+++ b/submodules/TelegramCore/Sources/TelegramEngine/Messages/EarliestUnseenPersonalMentionMessage.swift
-@@ -12,11 +12,11 @@ public enum EarliestUnseenPersonalMentionMessageResult: Equatable {
--func _internal_earliestUnseenPersonalMentionMessage(account: Account, peerId: PeerId, threadId: Int64?) -> Signal<EarliestUnseenPersonalMentionMessageResult, NoError> {
--    return account.viewTracker.aroundMessageHistoryViewForLocation(.peer(peerId: peerId, threadId: threadId), index: .lowerBound, anchorIndex: .lowerBound, count: 4, fixedCombinedReadStates: nil, tag: .tag(.unseenPersonalMessage), additionalData: [.peerChatState(peerId)])
-+func _internal_earliestUnseenPersonalMentionMessage(account: Account, peerId: PeerId, threadId: Int64?, ignoreMessageIds: Set<MessageId> = []) -> Signal<EarliestUnseenPersonalMentionMessageResult, NoError> {
-+    return account.viewTracker.aroundMessageHistoryViewForLocation(.peer(peerId: peerId, threadId: threadId), ignoreMessageIds: ignoreMessageIds, index: .lowerBound, anchorIndex: .lowerBound, count: 4, fixedCombinedReadStates: nil, tag: .tag(.unseenPersonalMessage), additionalData: [.peerChatState(peerId)])
-     |> mapToSignal { view -> Signal<EarliestUnseenPersonalMentionMessageResult, NoError> in
-         if view.0.isLoading {
-             return .single(.loading)
-         }
-         if case .FillHole = view.1 {
--            return _internal_earliestUnseenPersonalMentionMessage(account: account, peerId: peerId, threadId: threadId)
-+            return _internal_earliestUnseenPersonalMentionMessage(account: account, peerId: peerId, threadId: threadId, ignoreMessageIds: ignoreMessageIds)
-         }
-         if let message = view.0.entries.first?.message {
-             if peerId.namespace == Namespaces.Peer.CloudChannel {
-@@ -51,6 +51,7 @@ func _internal_earliestUnseenPersonalMentionMessage(account: Account, peerId: Pe
-                 return .single(.result(message.id))
-             }
-         } else {
-+            if !ignoreMessageIds.isEmpty { return .single(.result(nil)) }
-             return account.postbox.transaction { transaction -> EarliestUnseenPersonalMentionMessageResult in
-                 if let topId = transaction.getTopPeerMessageId(peerId: peerId, namespace: Namespaces.Message.Cloud) {
-                     transaction.replaceMessageTagSummary(peerId: peerId, threadId: threadId, tagMask: .unseenPersonalMessage, namespace: Namespaces.Message.Cloud, customTag: nil, count: 0, maxId: topId.id)
-diff --git a/submodules/TelegramCore/Sources/MacOS/RegramConditionalRead.swift b/submodules/TelegramCore/Sources/MacOS/RegramConditionalRead.swift
-new file mode 100644
-index 0000000000..0c2f3c4a15
---- /dev/null
-+++ b/submodules/TelegramCore/Sources/MacOS/RegramConditionalRead.swift
-@@ -0,0 +1,15 @@
-+import Postbox
-+import SwiftSignalKit
-+
-+public func regramApplyMaxReadIndexInteractively(account: Account, index: MessageIndex, when validate: @escaping (Transaction, () -> Void) -> Void) -> Signal<Bool, NoError> {
-+    account.postbox.transaction { transaction -> Bool in
-+        guard index.id.peerId.namespace != Namespaces.Peer.SecretChat, peerKeepsReadState(transaction.getPeer(index.id.peerId)) else { return false }
-+        var applied = false
-+        validate(transaction, {
-+            guard !applied else { return }
-+            applied = true
-+            _internal_applyMaxReadIndexInteractively(transaction: transaction, stateManager: account.stateManager, index: index)
-+        })
-+        return applied
-+    }
-+}
-diff --git a/submodules/TelegramCore/Sources/TelegramEngine/Peers/SavedMusic.swift b/submodules/TelegramCore/Sources/TelegramEngine/Peers/SavedMusic.swift
-index 44bddb37ddb55c43eef1e2e5f4dc7c987eea9628..e59596680fc41740bab906ee950c08677947c05a 100644
---- a/submodules/TelegramCore/Sources/TelegramEngine/Peers/SavedMusic.swift
-+++ b/submodules/TelegramCore/Sources/TelegramEngine/Peers/SavedMusic.swift
-@@ -124,126 +124,125 @@ func managedSavedMusicIdsUpdates(postbox: Postbox, network: Network, accountPeer
-     return (poll |> then(.complete() |> suspendAwareDelay(0.5 * 60.0 * 60.0, queue: Queue.concurrentDefaultQueue()))) |> restart
- }
- 
-+private func updatedSavedMusicFiles(_ files: [TelegramMediaFile], file: TelegramMediaFile, afterFile: FileMediaReference?) -> [TelegramMediaFile] {
-+    if afterFile?.media.fileId == file.fileId {
-+        return files
-+    }
-+    var updated = mergedSavedMusicFiles([], files).filter { $0.fileId != file.fileId }
-+    if let afterFile {
-+        if let index = updated.firstIndex(where: { $0.fileId == afterFile.media.fileId }) {
-+            updated.insert(file, at: index + 1)
-+        } else {
-+            updated.append(file)
-+        }
-+    } else {
-+        updated.insert(file, at: 0)
-+    }
-+    return updated
-+}
-+
-+private func mergedSavedMusicFiles(_ files: [TelegramMediaFile], _ incoming: [TelegramMediaFile]) -> [TelegramMediaFile] {
-+    var result: [TelegramMediaFile] = []
-+    var indices: [MediaId: Int] = [:]
-+    for file in files + incoming {
-+        if let index = indices[file.fileId] {
-+            result[index] = file
-+        } else {
-+            indices[file.fileId] = result.count
-+            result.append(file)
-+        }
-+    }
-+    return result
-+}
-+
- func _internal_addSavedMusic(account: Account, file: FileMediaReference, afterFile: FileMediaReference?) -> Signal<Never, AddSavedMusicError> {
--    return account.postbox.transaction { transaction in
--        if let cachedSavedMusic = transaction.retrieveItemCacheEntry(id: entryId(peerId: account.peerId))?.get(CachedProfileSavedMusic.self) {
--            var updatedFiles = cachedSavedMusic.files
--            var updatedCount = cachedSavedMusic.count
--            
--            if let fromIndex = updatedFiles.firstIndex(where: { $0.fileId == file.media.fileId }) {
--                let anchorIdxOpt: Int? = afterFile.flatMap { af in
--                    updatedFiles.firstIndex(where: { $0.fileId == af.media.fileId })
--                }
--                updatedFiles.remove(at: fromIndex)
--                let insertIndex: Int
--                if let anchorIndex = anchorIdxOpt {
--                    if anchorIndex == fromIndex {
--                        insertIndex = min(fromIndex + 1, updatedFiles.count)
--                    } else {
--                        let adjustedAnchor = anchorIndex > fromIndex ? (anchorIndex - 1) : anchorIndex
--                        insertIndex = updatedFiles.index(after: adjustedAnchor)
--                    }
--                } else if afterFile != nil {
--                    insertIndex = 0
--                } else {
--                    insertIndex = 0
--                }
--                
--                updatedFiles.insert(file.media, at: insertIndex)
--            } else {
--                if let afterFile, let anchor = updatedFiles.firstIndex(where: { $0.fileId == afterFile.media.fileId }) {
--                    updatedFiles.insert(file.media, at: updatedFiles.index(after: anchor))
--                } else if afterFile != nil {
--                    updatedFiles.append(file.media)
--                } else {
--                    updatedFiles.insert(file.media, at: 0)
-+    if afterFile?.media.fileId == file.media.fileId {
-+        return .complete()
-+    }
-+    return revalidatedMusic(account: account, file: file, signal: { resource in
-+        var flags: Int32 = 0
-+        var afterId: Api.InputDocument?
-+        if let afterFile, let resource = afterFile.media.resource as? CloudDocumentMediaResource {
-+            flags = 1 << 1
-+            afterId = .inputDocument(.init(id: resource.fileId, accessHash: resource.accessHash, fileReference: Buffer(data: resource.fileReference)))
-+        }
-+        return account.network.request(Api.functions.account.saveMusic(flags: flags, id: .inputDocument(.init(id: resource.fileId, accessHash: resource.accessHash, fileReference: Buffer(data: resource.fileReference))), afterId: afterId))
-+    })
-+    |> mapError { _ -> AddSavedMusicError in
-+        return .generic
-+    }
-+    |> mapToSignal { result -> Signal<Never, AddSavedMusicError> in
-+        guard case .boolTrue = result else {
-+            return .fail(.generic)
-+        }
-+        return account.postbox.transaction { transaction in
-+            var firstFile: TelegramMediaFile?
-+            if let cached = transaction.retrieveItemCacheEntry(id: entryId(peerId: account.peerId))?.get(CachedProfileSavedMusic.self) {
-+                let existed = cached.files.contains(where: { $0.fileId == file.media.fileId })
-+                let files = updatedSavedMusicFiles(cached.files, file: file.media, afterFile: afterFile)
-+                let count = max(Int32(clamping: files.count), Int32(clamping: Int64(cached.count) + (existed ? 0 : 1)))
-+                if let entry = CodableEntry(CachedProfileSavedMusic(files: files, count: count)) {
-+                    transaction.putItemCacheEntry(id: entryId(peerId: account.peerId), entry: entry)
-                 }
--                updatedCount = updatedCount + 1
--            }
--            
--            if let entry = CodableEntry(CachedProfileSavedMusic(files: updatedFiles, count: updatedCount)) {
--                transaction.putItemCacheEntry(id: entryId(peerId: account.peerId), entry: entry)
-+                firstFile = files.first
-+            } else if afterFile == nil {
-+                firstFile = file.media
-             }
--            
-             if let entry = transaction.getPreferencesEntry(key: PreferencesKeys.savedMusicIds())?.get(SavedMusicIdsList.self) {
-                 var ids = Set(entry.items)
-                 ids.insert(file.media.fileId.id)
--                let savedMusicIdsList = SavedMusicIdsList(items: Array(ids))
--                transaction.setPreferencesEntry(key: PreferencesKeys.savedMusicIds(), value: PreferencesEntry(savedMusicIdsList))
-+                transaction.setPreferencesEntry(key: PreferencesKeys.savedMusicIds(), value: PreferencesEntry(SavedMusicIdsList(items: Array(ids))))
-             }
--            
--            if afterFile == nil {
--                transaction.updatePeerCachedData(peerIds: Set([account.peerId]), update: { _, cachedData -> CachedPeerData? in
--                    if let cachedData = cachedData as? CachedUserData {
--                        var updatedData = cachedData
--                        updatedData = updatedData.withUpdatedSavedMusic(file.media)
--                        return updatedData
--                    } else {
--                        return cachedData
-+            if let firstFile {
-+                transaction.updatePeerCachedData(peerIds: Set([account.peerId]), update: { _, data in
-+                    guard let data = data as? CachedUserData else {
-+                        return data
-                     }
-+                    return data.withUpdatedSavedMusic(firstFile)
-                 })
-             }
-         }
--        return revalidatedMusic(account: account, file: file, signal: { resource in
--            var flags: Int32 = 0
--            var afterId: Api.InputDocument?
--            if let afterFile, let resource = afterFile.media.resource as? CloudDocumentMediaResource {
--                flags = 1 << 1
--                afterId = .inputDocument(.init(id: resource.fileId, accessHash: resource.accessHash, fileReference: Buffer(data: resource.fileReference)))
--            }
--            return account.network.request(Api.functions.account.saveMusic(flags: flags, id: .inputDocument(.init(id: resource.fileId, accessHash: resource.accessHash, fileReference: Buffer(data: resource.fileReference))), afterId: afterId))
--        })
--        |> mapError { _ -> AddSavedMusicError in
--            return .generic
--        }
--        |> mapToSignal { _ in
--            return .complete()
--        }
-+        |> castError(AddSavedMusicError.self)
-+        |> ignoreValues
-     }
--    |> castError(AddSavedMusicError.self)
--    |> switchToLatest
- }
- 
- func _internal_removeSavedMusic(account: Account, file: FileMediaReference) -> Signal<Never, NoError> {
--    return account.postbox.transaction { transaction in
--        if let cachedSavedMusic = transaction.retrieveItemCacheEntry(id: entryId(peerId: account.peerId))?.get(CachedProfileSavedMusic.self) {
--            let updatedFiles = cachedSavedMusic.files.filter { $0.fileId != file.media.id }
--            let updatedCount = max(0, cachedSavedMusic.count - 1)
--            if let entry = CodableEntry(CachedProfileSavedMusic(files: updatedFiles, count: updatedCount)) {
--                transaction.putItemCacheEntry(id: entryId(peerId: account.peerId), entry: entry)
--            }
--            
--            if let entry = transaction.getPreferencesEntry(key: PreferencesKeys.savedMusicIds())?.get(SavedMusicIdsList.self) {
--                var ids = Set(entry.items)
--                ids.remove(file.media.fileId.id)
--                let savedMusicIdsList = SavedMusicIdsList(items: Array(ids))
--                transaction.setPreferencesEntry(key: PreferencesKeys.savedMusicIds(), value: PreferencesEntry(savedMusicIdsList))
--            }
--            
--            if updatedCount == 0 {
--                transaction.updatePeerCachedData(peerIds: Set([account.peerId]), update: { _, cachedData -> CachedPeerData? in
--                    if let cachedData = cachedData as? CachedUserData {
--                        var updatedData = cachedData
--                        updatedData = updatedData.withUpdatedSavedMusic(nil)
--                        return updatedData
--                    } else {
--                        return cachedData
--                    }
--                })
--            }
--        }
--        let flags: Int32 = 1 << 0
--        return revalidatedMusic(account: account, file: file, signal: { resource in
--            return account.network.request(Api.functions.account.saveMusic(flags: flags, id: .inputDocument(.init(id: resource.fileId, accessHash: resource.accessHash, fileReference: Buffer(data: resource.fileReference))), afterId: nil))
--        })
--        |> `catch` { _ -> Signal<Api.Bool, NoError> in
-+    return revalidatedMusic(account: account, file: file, signal: { resource in
-+        return account.network.request(Api.functions.account.saveMusic(flags: 1 << 0, id: .inputDocument(.init(id: resource.fileId, accessHash: resource.accessHash, fileReference: Buffer(data: resource.fileReference))), afterId: nil))
-+    })
-+    |> `catch` { _ -> Signal<Api.Bool, NoError> in
-+        return .complete()
-+    }
-+    |> mapToSignal { result -> Signal<Never, NoError> in
-+        guard case .boolTrue = result else {
-             return .complete()
-         }
--        |> mapToSignal { _ in
--            return .complete()
-+        return account.postbox.transaction { transaction in
-+            let knownIds = transaction.getPreferencesEntry(key: PreferencesKeys.savedMusicIds())?.get(SavedMusicIdsList.self)
-+            var firstFile: TelegramMediaFile?
-+            if let cached = transaction.retrieveItemCacheEntry(id: entryId(peerId: account.peerId))?.get(CachedProfileSavedMusic.self) {
-+                let existed = cached.files.contains(where: { $0.fileId == file.media.fileId }) || knownIds?.items.contains(file.media.fileId.id) == true
-+                let files = mergedSavedMusicFiles([], cached.files.filter { $0.fileId != file.media.fileId })
-+                let count = max(Int32(clamping: files.count), max(0, Int32(clamping: Int64(cached.count) - (existed ? 1 : 0))))
-+                if let entry = CodableEntry(CachedProfileSavedMusic(files: files, count: count)) {
-+                    transaction.putItemCacheEntry(id: entryId(peerId: account.peerId), entry: entry)
-+                }
-+                firstFile = files.first
-+            }
-+            if let knownIds {
-+                let ids = knownIds.items.filter { $0 != file.media.fileId.id }
-+                transaction.setPreferencesEntry(key: PreferencesKeys.savedMusicIds(), value: PreferencesEntry(SavedMusicIdsList(items: ids)))
-+            }
-+            transaction.updatePeerCachedData(peerIds: Set([account.peerId]), update: { _, data in
-+                guard let data = data as? CachedUserData, data.savedMusic?.fileId == file.media.fileId else {
-+                    return data
-+                }
-+                return data.withUpdatedSavedMusic(firstFile)
-+            })
-         }
-+        |> ignoreValues
-     }
--    |> switchToLatest
- }
- 
- private final class CachedProfileSavedMusic: Codable {
-@@ -287,179 +286,291 @@ public final class ProfileSavedMusicContext {
-             case loading
-             case ready(canLoadMore: Bool)
-         }
--        
-+
-         public var files: [TelegramMediaFile]
-         public var count: Int32?
-         public var dataState: DataState
-     }
--    
-+
-     private let queue: Queue = .mainQueue()
-     private let account: Account
-     public let peerId: EnginePeer.Id
--    
-+
-     private let disposable = MetaDisposable()
--    private let cacheDisposable = MetaDisposable()
--    
-+    private let cacheReadDisposable = MetaDisposable()
-+    private let cacheWriteDisposable = MetaDisposable()
-+    private let cacheGeneration = Atomic(value: 0)
-+    private var requestGeneration = 0
-+    private var nextOffset: Int32 = 0
-+    private var nextMutationId = 0
-+    private var pendingMutations = Set<Int>()
-+    private var mutationStarts: [() -> Void] = []
-+    private var applyingMutation = false
-+
-     private var files: [TelegramMediaFile] = []
-     private var count: Int32?
--    private var dataState: ProfileSavedMusicContext.State.DataState = .ready(canLoadMore: true)
--    
-+    private var dataState: State.DataState = .ready(canLoadMore: true)
-+
-     private let stateValue = Promise<State>()
-     public var state: Signal<State, NoError> {
-         return self.stateValue.get()
-     }
--    
-+
-     public init(account: Account, peerId: EnginePeer.Id) {
-         self.account = account
-         self.peerId = peerId
--                
-         self.loadMore()
-     }
--    
-+
-     deinit {
-+        _ = self.cacheGeneration.modify { $0 &+ 1 }
-         self.disposable.dispose()
--        self.cacheDisposable.dispose()
-+        self.cacheReadDisposable.dispose()
-+        self.cacheWriteDisposable.dispose()
-     }
--    
-+
-     public func reload() {
--        self.files = []
--        self.dataState = .ready(canLoadMore: true)
-         self.loadMore(reload: true)
-     }
--    
-+
-+    private func invalidateRequests() {
-+        self.requestGeneration &+= 1
-+        _ = self.cacheGeneration.modify { $0 &+ 1 }
-+        self.disposable.set(nil)
-+        self.cacheReadDisposable.set(nil)
-+        self.cacheWriteDisposable.set(nil)
-+    }
-+
-+    private func finishLoading(generation: Int) {
-+        guard self.requestGeneration == generation, case .loading = self.dataState else {
-+            return
-+        }
-+        self.dataState = .ready(canLoadMore: true)
-+        self.pushState()
-+    }
-+
-     public func loadMore(reload: Bool = false) {
-+        guard self.pendingMutations.isEmpty else {
-+            return
-+        }
-+        if reload {
-+            self.invalidateRequests()
-+            self.nextOffset = 0
-+            self.dataState = .ready(canLoadMore: true)
-+        }
-+        guard case .ready(true) = self.dataState else {
-+            return
-+        }
-+        self.requestGeneration &+= 1
-+        let generation = self.requestGeneration
-+        let offset = self.nextOffset
-         let peerId = self.peerId
--        let network = self.account.network
--        let postbox = self.account.postbox
--        let dataState = self.dataState
--        let offset = Int32(self.files.count)
--        
--        guard case .ready(true) = dataState else {
-+        let request = MetaDisposable()
-+        self.disposable.set(request)
-+        self.cacheReadDisposable.set(nil)
-+        self.dataState = .loading
-+        self.pushState()
-+        guard self.requestGeneration == generation else {
-             return
-         }
--        if self.files.isEmpty, !reload {
--            self.cacheDisposable.set((postbox.transaction { transaction -> CachedProfileSavedMusic? in
-+
-+        if offset == 0, !reload {
-+            let cacheRead = MetaDisposable()
-+            self.cacheReadDisposable.set(cacheRead)
-+            cacheRead.set((self.account.postbox.transaction { transaction -> CachedProfileSavedMusic? in
-                 return transaction.retrieveItemCacheEntry(id: entryId(peerId: peerId))?.get(CachedProfileSavedMusic.self)
--            } |> deliverOn(self.queue)).start(next: { [weak self] cachedSavedMusic in
--                guard let self, let cachedSavedMusic else {
-+            } |> deliverOn(self.queue)).start(next: { [weak self] cached in
-+                guard let self, self.requestGeneration == generation, let cached else {
-                     return
-                 }
--                self.files = cachedSavedMusic.files
--                self.count = cachedSavedMusic.count
--                if case .loading = self.dataState {
--                    self.pushState()
--                }
-+                self.files = mergedSavedMusicFiles([], cached.files)
-+                self.count = cached.count
-+                self.pushState()
-             }))
-         }
--        
--        self.dataState = .loading
--        if !reload {
--            self.pushState()
-+        guard self.requestGeneration == generation else {
-+            return
-         }
--        
--        let signal = postbox.loadedPeerWithId(peerId)
-+
-+        let network = self.account.network
-+        let signal = self.account.postbox.loadedPeerWithId(peerId)
-         |> castError(MTRpcError.self)
--        |> mapToSignal { peer -> Signal<([TelegramMediaFile], Int32), MTRpcError> in
-+        |> mapToSignal { peer -> Signal<([TelegramMediaFile], Int32, Int)?, MTRpcError> in
-             guard let inputUser = apiInputUser(peer) else {
-                 return .complete()
-             }
-             return network.request(Api.functions.users.getSavedMusic(id: inputUser, offset: offset, limit: 32, hash: 0))
--            |> map { result -> ([TelegramMediaFile], Int32) in
-+            |> map { result -> ([TelegramMediaFile], Int32, Int)? in
-                 switch result {
--                case let .savedMusic(savedMusicData):
--                    return (savedMusicData.documents.compactMap { telegramMediaFileFromApiDocument($0, altDocuments: nil) }, savedMusicData.count)
--                case let .savedMusicNotModified(savedMusicNotModifiedData):
--                    return ([], savedMusicNotModifiedData.count)
-+                case let .savedMusic(data):
-+                    return (data.documents.compactMap { telegramMediaFileFromApiDocument($0, altDocuments: nil) }, data.count, data.documents.count)
-+                case .savedMusicNotModified:
-+                    return nil
-                 }
-             }
-         }
--        
--        self.disposable.set((signal
--        |> deliverOn(self.queue)).start(next: { [weak self] files, count in
--            guard let self else {
-+        request.set((signal |> deliverOn(self.queue)).start(next: { [weak self] page in
-+            guard let self, self.requestGeneration == generation else {
-+                return
-+            }
-+            guard let (files, count, rawCount) = page else {
-+                self.finishLoading(generation: generation)
-                 return
-             }
--            if offset == 0 || reload {
--                self.files = files
--                self.cacheDisposable.set(self.account.postbox.transaction { transaction in
-+            self.cacheReadDisposable.set(nil)
-+            self.files = mergedSavedMusicFiles(offset == 0 ? [] : self.files, files)
-+            self.nextOffset = Int32(clamping: Int64(offset) + Int64(rawCount))
-+            self.count = max(Int32(clamping: self.files.count), count)
-+            self.dataState = .ready(canLoadMore: rawCount != 0 && self.nextOffset < count)
-+            if offset == 0 {
-+                let files = self.files
-+                let count = self.count ?? 0
-+                let cacheGeneration = self.cacheGeneration
-+                let cacheVersion = cacheGeneration.with { $0 }
-+                let cacheWrite = MetaDisposable()
-+                self.cacheWriteDisposable.set(cacheWrite)
-+                cacheWrite.set(self.account.postbox.transaction { transaction in
-+                    guard cacheGeneration.with({ $0 }) == cacheVersion else {
-+                        return
-+                    }
-                     if let entry = CodableEntry(CachedProfileSavedMusic(files: files, count: count)) {
-                         transaction.putItemCacheEntry(id: entryId(peerId: peerId), entry: entry)
-                     }
-                 }.start())
--            } else {
--                self.files.append(contentsOf: files)
-             }
--            
--            let updatedCount = max(Int32(self.files.count), count)
--            self.count = updatedCount
--            self.dataState = .ready(canLoadMore: count != 0 && updatedCount > self.files.count)
-+            guard self.requestGeneration == generation else {
-+                return
-+            }
-             self.pushState()
-+        }, error: { [weak self] _ in
-+            self?.finishLoading(generation: generation)
-+        }, completed: { [weak self] in
-+            self?.finishLoading(generation: generation)
-         }))
-     }
--        
--    public func addMusic(file: FileMediaReference, afterFile: FileMediaReference? = nil, apply: Bool = true) -> Signal<Never, AddSavedMusicError> {
--        var updatedFiles = self.files
--    
--        let fromIdx = updatedFiles.firstIndex { $0.fileId == file.media.fileId }
--        let anchorIdxOpt = afterFile.flatMap { af in
--            updatedFiles.firstIndex { $0.fileId == af.media.fileId }
--        }
--        
--        if let fromIdx = fromIdx {
--            updatedFiles.remove(at: fromIdx)
--            
--            let insertIdx: Int
--            if let anchorIdx = anchorIdxOpt {
--                if anchorIdx == fromIdx {
--                    insertIdx = min(fromIdx + 1, updatedFiles.count)
--                } else {
--                    let adjustedAnchor = anchorIdx > fromIdx ? (anchorIdx - 1) : anchorIdx
--                    insertIdx = updatedFiles.index(after: adjustedAnchor)
-+
-+    private func applyAddedMusic(file: FileMediaReference, afterFile: FileMediaReference?) {
-+        let existed = self.files.contains(where: { $0.fileId == file.media.fileId })
-+        self.files = updatedSavedMusicFiles(self.files, file: file.media, afterFile: afterFile)
-+        if let count = self.count {
-+            self.count = max(Int32(clamping: self.files.count), Int32(clamping: Int64(count) + (existed ? 0 : 1)))
-+        }
-+    }
-+
-+    private func applyRemovedMusic(file: FileMediaReference) {
-+        let existed = self.files.contains(where: { $0.fileId == file.media.fileId })
-+        self.files.removeAll(where: { $0.fileId == file.media.fileId })
-+        if let count = self.count {
-+            self.count = max(Int32(clamping: self.files.count), max(0, Int32(clamping: Int64(count) - (existed ? 1 : 0))))
-+        }
-+    }
-+
-+    private func beginMutation() -> Int {
-+        let identifier = self.nextMutationId
-+        self.nextMutationId &+= 1
-+        self.pendingMutations.insert(identifier)
-+        return identifier
-+    }
-+
-+    private func finishMutation(_ identifier: Int) {
-+        guard self.pendingMutations.remove(identifier) != nil else {
-+            return
-+        }
-+        if self.pendingMutations.isEmpty {
-+            self.reload()
-+        }
-+    }
-+
-+    private func mutationSignal<E>(_ signal: Signal<Never, E>, update: @escaping (ProfileSavedMusicContext) -> Void) -> Signal<Never, E> {
-+        let queue = self.queue
-+        return Signal { [weak self] subscriber in
-+            let request = MetaDisposable()
-+            let active = Atomic(value: true)
-+            let identifier = self?.beginMutation()
-+            let finish: () -> Bool = { [weak self] in
-+                guard active.swap(false) else {
-+                    return false
-                 }
--            } else if afterFile != nil {
--                insertIdx = updatedFiles.count
--            } else {
--                insertIdx = 0
-+                request.dispose()
-+                if let identifier {
-+                    queue.async { [weak self] in
-+                        self?.finishMutation(identifier)
-+                    }
-+                }
-+                return true
-             }
--            updatedFiles.insert(file.media, at: insertIdx)
--        } else {
--            if let anchorIdx = anchorIdxOpt {
--                updatedFiles.insert(file.media, at: updatedFiles.index(after: anchorIdx))
--            } else if afterFile != nil {
--                updatedFiles.append(file.media)
-+            let start = {
-+                guard active.with({ $0 }) else {
-+                    return
-+                }
-+                request.set((signal |> deliverOn(queue)).start(error: { error in
-+                    if finish() {
-+                        subscriber.putError(error)
-+                    }
-+                }, completed: {
-+                    if finish() {
-+                        subscriber.putCompletion()
-+                    }
-+                }))
-+            }
-+            if let self {
-+                let drain = !self.applyingMutation
-+                if drain {
-+                    self.applyingMutation = true
-+                }
-+                self.mutationStarts.append(start)
-+                self.invalidateRequests()
-+                self.nextOffset = 0
-+                self.dataState = .ready(canLoadMore: true)
-+                update(self)
-+                self.pushState()
-+                if drain {
-+                    while !self.mutationStarts.isEmpty {
-+                        let next = self.mutationStarts.removeFirst()
-+                        next()
-+                    }
-+                    self.applyingMutation = false
-+                }
-             } else {
--                updatedFiles.insert(file.media, at: 0)
-+                start()
-             }
--            if let count = self.count {
--                self.count = count + 1
-+            return ActionDisposable {
-+                _ = finish()
-             }
-+        } |> runOn(queue)
-+    }
-+
-+    public func addMusic(file: FileMediaReference, afterFile: FileMediaReference? = nil, apply: Bool = true) -> Signal<Never, AddSavedMusicError> {
-+        if afterFile?.media.fileId == file.media.fileId {
-+            return .complete()
-         }
--        self.files = updatedFiles        
--        self.pushState()
--        
--        if apply {
--            return _internal_addSavedMusic(account: self.account, file: file, afterFile: afterFile)
--        } else {
-+        if !apply {
-+            if self.peerId == self.account.peerId {
-+                self.applyAddedMusic(file: file, afterFile: afterFile)
-+                self.pushState()
-+            }
-             return .complete()
-         }
-+        let signal = _internal_addSavedMusic(account: self.account, file: file, afterFile: afterFile)
-+        guard self.peerId == self.account.peerId else {
-+            return signal
-+        }
-+        return self.mutationSignal(signal, update: { context in
-+            context.applyAddedMusic(file: file, afterFile: afterFile)
-+        })
-     }
--    
-+
-     public func removeMusic(file: FileMediaReference) -> Signal<Never, NoError> {
--        self.files.removeAll(where: { $0.fileId == file.media.id })
--        if let count = self.count {
--            self.count = max(0, count - 1)
-+        let signal = _internal_removeSavedMusic(account: self.account, file: file)
-+        guard self.peerId == self.account.peerId else {
-+            return signal
-         }
--        self.pushState()
--        
--        return _internal_removeSavedMusic(account: self.account, file: file)
-+        return self.mutationSignal(signal, update: { context in
-+            context.applyRemovedMusic(file: file)
-+        })
-     }
--    
-+
-     private func pushState() {
--        let state = State(
--            files: self.files,
--            count: self.count,
--            dataState: self.dataState
--        )
--        self.stateValue.set(.single(state))
-+        self.stateValue.set(.single(State(files: self.files, count: self.count, dataState: self.dataState)))
-     }
- }

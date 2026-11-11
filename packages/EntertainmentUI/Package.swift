@@ -4,6 +4,7 @@ import PackageDescription
 
 let deps: [(String, String)] = [
     ("RegramCore", "../RegramCore"),
+    ("AppAnalytics", "../AppAnalytics"),
     ("TGUIKit", "../TGUIKit"),
     ("ColorPalette", "../ColorPalette"),
     ("InAppSettings", "../InAppSettings"),
