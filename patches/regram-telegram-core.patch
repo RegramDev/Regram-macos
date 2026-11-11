@@ -3236,7 +3236,7 @@ index e8b2bf9d06020b401b38a9bca11a5b02d4e8b432..0e1a5a106538301da8a688b0db03d421
              }
          }
 diff --git a/submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift b/submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift
-index cf1ab15d9cfae956abcb53bf5060db525b32448d..703e56d419e0c31c9dfd8695f832750e335099bd 100644
+index cf1ab15d9cfae956abcb53bf5060db525b32448d..ecde665d2cb6b1253ad1a2f828a0759c7ec6e0d0 100644
 --- a/submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift
 +++ b/submodules/TelegramCore/Sources/State/Sync/StateReplay+Messages.swift
 @@ -273,7 +273,23 @@ extension ReplayContext {
@@ -3281,15 +3281,30 @@ index cf1ab15d9cfae956abcb53bf5060db525b32448d..703e56d419e0c31c9dfd8695f832750e
          _internal_deleteMessages(transaction: transaction, mediaBox: mediaBox, ids: ids, manualAddMessageThreadStatsDifference: { id, add, remove in
              self.addMessageThreadStatsDifference(threadKey: id, remove: remove, addedMessagePeer: nil, addedMessageId: nil, isOutgoing: false)
          })
-@@ -317,7 +341,7 @@ extension ReplayContext {
+@@ -306,6 +330,7 @@ extension ReplayContext {
+     
+     func applyEditMessage(_ id: MessageId, _ message: StoreMessage) {
+         var generatedEvent: (reactionAuthor: Peer, reaction: MessageReaction.Reaction, message: Message, timestamp: Int32)?
++        var storedEdit = message
+         transaction.updateMessage(id, update: { previousMessage in
+             let peers: [PeerId:Peer] = previousMessage.peers.reduce([:], { current, value in
+                 var current = current
+@@ -317,12 +342,13 @@ extension ReplayContext {
                  generatedEvent = reactionGeneratedEvent(previousMessage.reactionsAttribute, message.reactionsAttribute, message: message, transaction: transaction)
              }
  
 -            return .update(mergedServerMessageUpdate(previous: previousMessage, updated: message))
-+            return .update(mergedServerMessageUpdate(previous: previousMessage, updated: message, regramAccountId: self.accountPeerId.toInt64(), mediaBox: self.mediaBox, cachedPeerData: self.transaction.getPeerCachedData(peerId: previousMessage.id.peerId)))
++            storedEdit = mergedServerMessageUpdate(previous: previousMessage, updated: message, regramAccountId: self.accountPeerId.toInt64(), mediaBox: self.mediaBox, cachedPeerData: self.transaction.getPeerCachedData(peerId: previousMessage.id.peerId))
++            return .update(storedEdit)
          })
          // A fetch in flight may be bringing the message with its old content, over the edited one or, with none stored
          // here, instead of it; it stores this edit in its place (Postbox's record of recent edits,
+         // `fetchedMessagesWithRecentEdits`; owner decision 2026-10-25).
+-        transaction.recordMessageEdit(message)
++        transaction.recordMessageEdit(storedEdit)
+         if let generatedEvent = generatedEvent {
+             addedReactionEvents.append(generatedEvent)
+         }
 diff --git a/submodules/TelegramCore/Sources/State/SynchronizeGroupedPeersOperation.swift b/submodules/TelegramCore/Sources/State/SynchronizeGroupedPeersOperation.swift
 index e9c7ec2531a534db1d1650732ccb18afd9c6b41a..9602ada539de155a8a59de1136cbe04ed0e5e6ff 100644
 --- a/submodules/TelegramCore/Sources/State/SynchronizeGroupedPeersOperation.swift
@@ -4320,6 +4335,71 @@ index 155b71aa8cf49c9c0fb1ba1723946f20c429ce65..101782e4b825ff5214601023c2ec42a3
      }
  }
  
+diff --git a/submodules/TelegramCore/Sources/TelegramEngine/Peers/SavedMusic.swift b/submodules/TelegramCore/Sources/TelegramEngine/Peers/SavedMusic.swift
+index 6dd9b9faa62bcc9809358fef70cd836304ce9213..562083b14926e163b29c24a58c72c096696f5145 100644
+--- a/submodules/TelegramCore/Sources/TelegramEngine/Peers/SavedMusic.swift
++++ b/submodules/TelegramCore/Sources/TelegramEngine/Peers/SavedMusic.swift
+@@ -271,6 +271,7 @@ public final class ProfileSavedMusicContext {
+     private let disposable = MetaDisposable()
+     private let cacheDisposable = MetaDisposable()
+     private let cacheReadDisposable = MetaDisposable()
++    private let cacheGeneration = Atomic(value: 0)
+     
+     private var files: [TelegramMediaFile] = []
+     private var count: Int32?
+@@ -296,24 +297,28 @@ public final class ProfileSavedMusicContext {
+     }
+     
+     deinit {
++        _ = self.cacheGeneration.modify { $0 &+ 1 }
+         self.disposable.dispose()
+         self.cacheDisposable.dispose()
+         self.cacheReadDisposable.dispose()
+     }
+     
+     public func reload() {
+-        self.dataState = .ready(canLoadMore: true)
+         self.loadMore(reload: true)
+     }
+     
+     public func loadMore(reload: Bool = false) {
++        guard self.pendingMutations.isEmpty else { return }
++        if reload {
++            self.invalidatePage()
++        }
+         let peerId = self.peerId
+         let network = self.account.network
+         let postbox = self.account.postbox
+         let dataState = self.dataState
+         let offset = reload || self.needsFirstPageRetry ? 0 : self.nextOffset
+         
+-        guard case .ready(true) = dataState, self.pendingMutations.isEmpty else {
++        guard case .ready(true) = dataState else {
+             return
+         }
+         self.requestGeneration &+= 1
+@@ -392,7 +397,12 @@ public final class ProfileSavedMusicContext {
+             }
+             self.files = mergedFiles
+             if offset == 0 || reload {
+-                self.cacheDisposable.set(self.account.postbox.transaction { transaction in
++                let cacheGeneration = self.cacheGeneration
++                let generation = cacheGeneration.with { $0 }
++                let cacheWrite = MetaDisposable()
++                self.cacheDisposable.set(cacheWrite)
++                cacheWrite.set(self.account.postbox.transaction { transaction in
++                    guard cacheGeneration.with({ $0 }) == generation else { return }
+                     if let entry = CodableEntry(CachedProfileSavedMusic(files: mergedFiles, count: count)) {
+                         transaction.putItemCacheEntry(id: entryId(peerId: peerId), entry: entry)
+                     }
+@@ -443,6 +453,7 @@ public final class ProfileSavedMusicContext {
+ 
+     private func invalidatePage() {
+         self.requestGeneration &+= 1
++        _ = self.cacheGeneration.modify { $0 &+ 1 }
+         self.disposable.set(nil)
+         self.cacheReadDisposable.set(nil)
+         self.cacheDisposable.set(nil)
 diff --git a/submodules/TelegramCore/Sources/TelegramEngine/Peers/TelegramEnginePeers.swift b/submodules/TelegramCore/Sources/TelegramEngine/Peers/TelegramEnginePeers.swift
 index 37441e5cfb64ab149a644e69f70814751cf4f47d..d24a2e455dd638f5cc1a28302e605d1aff9309e2 100644
 --- a/submodules/TelegramCore/Sources/TelegramEngine/Peers/TelegramEnginePeers.swift
