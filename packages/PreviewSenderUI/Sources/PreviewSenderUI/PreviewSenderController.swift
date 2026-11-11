@@ -3356,7 +3356,7 @@ public class PreviewSenderController: ModalViewController, Notifable {
             self.receivePasteURLs(.single(photos.urls), completion: { [weak self] urls in
                 guard let self, !urls.isEmpty else { return }
                 self.genericView.state = self.genericView.state.withUpdatedState(.media)
-                self.insertAdditionUrls?(urls)
+                self.insertAdditionUrls?(urls, .addPaste)
             })
             return true
         }
