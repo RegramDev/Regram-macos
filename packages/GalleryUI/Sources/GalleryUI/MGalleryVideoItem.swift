@@ -38,7 +38,7 @@ public class MGalleryVideoItem: MGalleryItem {
         let preference = RGVideoQualityPreference(rawValue: RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["defaultVideoQuality"].string) ?? .automatic
         guard preference != .automatic else { appliedRegramQuality = true; regramQualityDisposable.set(nil); return }
         guard let state = controller.mediaPlayer.videoQualityState() else {
-            if !(controller.mediaPlayer is HLSVideoJSNativeContentView) { appliedRegramQuality = true; regramQualityDisposable.set(nil) }
+            if !(controller.mediaPlayer is HLSVideoNativeContentView) { appliedRegramQuality = true; regramQualityDisposable.set(nil) }
             return
         }
         guard case .auto = state.preferred else { appliedRegramQuality = true; regramQualityDisposable.set(nil); return }
