@@ -57,4 +57,4 @@ let package = Package(name: "ChatDateContext", targets: [.testTarget(name: "Chat
     (directory / 'Tests/DeferredSendTests.swift').write_text(deferred)
     (directory / 'Tests/RichDraftStoreTests.swift').write_text(Path(__file__).with_name('RichDraftStoreTests.swift').read_text())
     (directory / 'Tests/PaymentConfirmationTests.swift').write_text(payment)
-    raise SystemExit(subprocess.run(['swift', 'test', '--package-path', str(directory), '--disable-sandbox', '--jobs', '4']).returncode)
+    raise SystemExit(subprocess.run(['swift', 'test', '--package-path', str(directory), '--disable-sandbox', '--jobs', '4', '--configuration', 'release', '-Xswiftc', '-DSTABLE']).returncode)

@@ -66,7 +66,7 @@ final class RichDraftStoreTests: XCTestCase {
             ChatRichTextDraftKey(accountId: 1, peerId: 2, threadId: nil, isWelcome: true, isCustomEditor: true),
             ChatRichTextDraftKey(accountId: 1, peerId: 2, threadId: nil, isWelcome: false, isCustomEditor: true)
         ]
-        let store = ChatRichTextDraftStore<Int>()
+        let store = ChatRichTextDraftStore<Int, NSObject>()
         for (index, key) in keys.enumerated() {
             store.set(index, for: key)
         }
