@@ -42,6 +42,7 @@
 "AppIcon.Name.mint" = "Mint";
 "AppIcon.Name.nebula" = "Nebula";
 "AppIcon.Name.silver" = "Silver";
+"AppIcon.Name.telegram" = "Telegram Original";
 "AppUpdate.ActivityDownloaded" = "Downloaded. Open Regram to finish preparing the update.";
 "AppUpdate.ActivityOpen" = "Open update page";
 "AppUpdate.ActivityStale" = "Progress will refresh when Regram can run";

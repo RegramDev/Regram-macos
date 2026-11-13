@@ -4,8 +4,9 @@ import AppKit
 
 final class RegramBrandingAssetsTests: XCTestCase {
     func testBundledSourceArtworkAndAdditionalFontCatalogHaveExactChoices() {
-        XCTAssertEqual(RegramBranding.icons.count, 10)
-        for name in RegramBranding.icons {
+        XCTAssertEqual(RegramBranding.icons.count, 11)
+        XCTAssertEqual(RegramBranding.titleKey(RegramBranding.telegramIconName), "AppIcon.Name.telegram")
+        for name in RegramBranding.icons where name != RegramBranding.telegramIconName {
             XCTAssertNotNil(RegramBranding.image(name, dark: false), name)
             XCTAssertNotNil(RegramBranding.image(name, dark: true), name)
         }
@@ -16,10 +17,10 @@ final class RegramBrandingAssetsTests: XCTestCase {
     }
 
     func testNativeApplicationIconsHavePaddingMaskAndAllDockRepresentations() throws {
-        XCTAssertEqual(RegramBranding.icons, ["RGConversation", "RGAzure", "RGIris", "RGMint", "RGGathering", "RGAmber", "RGNebula", "RGJade", "RGSilver", "RGClassic"])
+        XCTAssertEqual(RegramBranding.icons, ["RGConversation", "RGAzure", "RGIris", "RGMint", "RGGathering", "RGAmber", "RGNebula", "RGJade", "RGSilver", "RGClassic", "AppIcon"])
         for dark in [false, true] {
             var renderedChoices = Set<Data>()
-            for name in RegramBranding.icons {
+            for name in RegramBranding.icons where name != RegramBranding.telegramIconName {
                 let icon = try XCTUnwrap(RegramBranding.applicationIcon(name, dark: dark))
                 XCTAssertEqual(Set(icon.representations.map(\.pixelsWide)), [16, 32, 64, 128, 256, 512, 1024])
                 let rendered = try XCTUnwrap(RegramBranding.renderedIcon(name, dark: dark, pixelSize: 128))

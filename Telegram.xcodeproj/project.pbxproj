@@ -224,6 +224,7 @@
 		275DDC3B267B8702009CF884 /* bot_close_menu.tgs in Resources */ = {isa = PBXBuildFile; fileRef = 275DDC39267B8702009CF884 /* bot_close_menu.tgs */; };
 		275E4B402EEC24C400BC1A68 /* Sparkle.framework in Copy Files */ = {isa = PBXBuildFile; fileRef = 9F0BCD9E2087BABC001D8D8A /* Sparkle.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		275E4B432EEC31DF00BC1A68 /* Regram.icon in Resources */ = {isa = PBXBuildFile; fileRef = 275E4B422EEC31DF00BC1A68 /* Regram.icon */; };
+		A14B3C5D6E7F890123456702 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = A14B3C5D6E7F890123456701 /* AppIcon.icon */; };
 		275E4B492EF0287E00BC1A68 /* dice_roll.tgs in Resources */ = {isa = PBXBuildFile; fileRef = 275E4B482EF0287E00BC1A68 /* dice_roll.tgs */; };
 		275E4B4B2EFA778C00BC1A68 /* menu_cocoon.tgs in Resources */ = {isa = PBXBuildFile; fileRef = 275E4B4A2EFA778C00BC1A68 /* menu_cocoon.tgs */; };
 		275E851C2B20C4EC007A72CA /* ShelfPack in Frameworks */ = {isa = PBXBuildFile; productRef = 275E851B2B20C4EC007A72CA /* ShelfPack */; };
@@ -1266,6 +1267,7 @@
 		275DDC38267B8701009CF884 /* bot_menu_close.tgs */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = bot_menu_close.tgs; sourceTree = "<group>"; };
 		275DDC39267B8702009CF884 /* bot_close_menu.tgs */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = bot_close_menu.tgs; sourceTree = "<group>"; };
 		275E4B422EEC31DF00BC1A68 /* Regram.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = Regram.icon; sourceTree = "<group>"; };
+		A14B3C5D6E7F890123456701 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		275E4B482EF0287E00BC1A68 /* dice_roll.tgs */ = {isa = PBXFileReference; lastKnownFileType = file; path = dice_roll.tgs; sourceTree = "<group>"; };
 		275E4B4A2EFA778C00BC1A68 /* menu_cocoon.tgs */ = {isa = PBXFileReference; lastKnownFileType = file; path = menu_cocoon.tgs; sourceTree = "<group>"; };
 		275E851A2B20C452007A72CA /* ShelfPack */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = ShelfPack; path = "submodules/telegram-ios/submodules/Utils/ShelfPack"; sourceTree = "<group>"; };
@@ -3541,6 +3543,7 @@
 				C253A9721D92F9F100CDC850 /* Localizable.strings */,
 				D098C71A1D7E175A007784E4 /* Assets.xcassets */,
 				275E4B422EEC31DF00BC1A68 /* Regram.icon */,
+				A14B3C5D6E7F890123456701 /* AppIcon.icon */,
 			);
 			name = "supporting-files";
 			sourceTree = "<group>";
@@ -4466,6 +4469,7 @@
 				27CCE8332B839B7100F7C687 /* coin_anim.png in Resources */,
 				2729341C2779A35C00F10D3C /* menu_select_multiple.tgs in Resources */,
 				275E4B432EEC31DF00BC1A68 /* Regram.icon in Resources */,
+				A14B3C5D6E7F890123456702 /* AppIcon.icon in Resources */,
 				2773A56825FA4E4B00AB45E9 /* voice_chat_raise_hand_7.tgs in Resources */,
 				270FD5942C500B8A000070E6 /* duck_webapp_error.tgs in Resources */,
 				D07450F32340E89100769D7F /* sad_man.tgs in Resources */,
@@ -4948,6 +4952,7 @@
 			baseConfigurationReference = 278926CF2755222700923087 /* Release.xcconfig */;
 			buildSettings = {
 				ARCHS = "$(ARCHS_STANDARD)";
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = AppIcon;
 				ASSETCATALOG_COMPILER_APPICON_NAME = Regram;
 				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
 				CLANG_ENABLE_MODULES = YES;
@@ -5173,6 +5178,7 @@
 			baseConfigurationReference = 278926CE27551B5600923087 /* Debug.xcconfig */;
 			buildSettings = {
 				ARCHS = "$(ARCHS_STANDARD)";
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = AppIcon;
 				ASSETCATALOG_COMPILER_APPICON_NAME = Regram;
 				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
 				CLANG_ENABLE_MODULES = YES;

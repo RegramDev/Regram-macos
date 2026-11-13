@@ -42,6 +42,7 @@
 "AppIcon.Name.mint" = "薄荷";
 "AppIcon.Name.nebula" = "星河";
 "AppIcon.Name.silver" = "銀色氣泡";
+"AppIcon.Name.telegram" = "Telegram 原版";
 "AppUpdate.ActivityDownloaded" = "已下載，開啟 Regram 完成更新準備";
 "AppUpdate.ActivityOpen" = "開啟更新頁面";
 "AppUpdate.ActivityStale" = "等待 Regram 恢復執行後更新進度";

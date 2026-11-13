@@ -4,7 +4,8 @@ import SwiftSignalKit
 
 public enum RegramBranding {
     public static let didChange = Notification.Name("Regram.NativeAppIcon.DidChange")
-    public static let icons = ["RGConversation", "RGAzure", "RGIris", "RGMint", "RGGathering", "RGAmber", "RGNebula", "RGJade", "RGSilver", "RGClassic"]
+    static let telegramIconName = "AppIcon"
+    public static let icons = ["RGConversation", "RGAzure", "RGIris", "RGMint", "RGGathering", "RGAmber", "RGNebula", "RGJade", "RGSilver", "RGClassic", telegramIconName]
     private static let iconKey = "RegramNativeApplicationIcon"
     private static let iconCache: NSCache<NSString, NSImage> = {
         let cache = NSCache<NSString, NSImage>()
@@ -27,12 +28,15 @@ public enum RegramBranding {
     }
 
     public static func titleKey(_ name: String) -> String {
-        let names = ["RGConversation": "conversation", "RGAzure": "azure", "RGIris": "iris", "RGMint": "mint", "RGGathering": "gathering", "RGAmber": "amber", "RGNebula": "nebula", "RGJade": "jade", "RGClassic": "classic", "RGSilver": "silver"]
+        let names = ["RGConversation": "conversation", "RGAzure": "azure", "RGIris": "iris", "RGMint": "mint", "RGGathering": "gathering", "RGAmber": "amber", "RGNebula": "nebula", "RGJade": "jade", "RGClassic": "classic", "RGSilver": "silver", telegramIconName: "telegram"]
         return "AppIcon.Name." + (names[name] ?? "conversation")
     }
 
     public static func image(_ name: String, dark: Bool) -> NSImage? {
         guard icons.contains(name) else { return nil }
+        if name == telegramIconName {
+            return Bundle.main.image(forResource: name)
+        }
         let filename = name == "RGSilver" ? name : name + (dark ? "-dark" : "-light")
         let suffix = name == "RGSilver" ? "jpg" : "png"
         guard let url = Bundle.module.url(forResource: filename, withExtension: suffix, subdirectory: "Branding") ?? Bundle.module.url(forResource: filename, withExtension: suffix) else { return nil }
@@ -40,11 +44,18 @@ public enum RegramBranding {
     }
 
     public static func renderedIcon(_ name: String, dark: Bool, pixelSize: Int) -> CGImage? {
+        if name == telegramIconName {
+            var rect = CGRect(x: 0, y: 0, width: pixelSize, height: pixelSize)
+            return image(name, dark: dark)?.cgImage(forProposedRect: &rect, context: nil, hints: nil)
+        }
         guard let image = image(name, dark: dark), let source = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
         return RegramApplicationIconRenderer.render(source, pixelSize: pixelSize)
     }
 
     public static func applicationIcon(_ name: String, dark: Bool) -> NSImage? {
+        if name == telegramIconName {
+            return image(name, dark: dark)
+        }
         let key = (name + (dark ? ":dark" : ":light")) as NSString
         if let cached = iconCache.object(forKey: key) { return cached }
         guard let image = image(name, dark: dark), let source = image.cgImage(forProposedRect: nil, context: nil, hints: nil), let rendered = RegramApplicationIconRenderer.image(source) else { return nil }
