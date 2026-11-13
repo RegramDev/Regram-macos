@@ -280,6 +280,7 @@ protocol ChatHistoryForwardMessagesObject: AnyObject {
 
 final class ForwardMessagesObject: ShareObject, ChatHistoryForwardMessagesObject {
     fileprivate let messages: [Message]
+    private let hideNames: Bool
     let forwardingAnalyticsContext: AnalyticsContext
     __OBJECT_IDS__
     private let album: Bool

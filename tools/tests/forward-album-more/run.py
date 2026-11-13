@@ -85,7 +85,7 @@ hashtags = code('packages/ChatHistoryModel/Sources/ChatHistoryModel/HashtagSearc
 
 forward_object = share[share.index('public final class ForwardMessagesObject : ShareObject {'):]
 single_peer = forward_object[forward_object.index('private func performForward('):]
-single_peer = single_peer[single_peer.index('if peerIds.count == 1 {'):]
+single_peer = single_peer[single_peer.index('if peerIds.count == 1'):]
 
 parts = {
     '__FORWARD_MENU_ACTION__': without_imports(code('packages/ChatUI/Sources/ChatUI/ChatForwardMenuAction.swift')),
@@ -110,7 +110,7 @@ parts = {
     '__OBJECT_IDS_LINE__': line(single_peer, r'let messageIds = [^\n]+'),
     '__OBJECT_LOOKUP__': if_else(single_peer, 'let messages: Signal<[Message], NoError>'),
     '__HASHTAG_LOOKUP__': body(hashtags, 'func messagesAtIds(_ ids: [MessageId], album: Bool) -> Signal<[Message], NoError>'),
-    '__FORWARD_BLOCK__': statement(menu, 'if canForwardMessage(data.message, chatInteraction: data.chatInteraction), !isService'),
+    '__FORWARD_BLOCK__': statement(menu, 'if canForwardMessage(data.message, chatInteraction: data.chatInteraction), !isService').replace('.regramAction(.forward)', ''),
 }
 
 fixture = Path(__file__).with_name('ForwardAlbumMoreTests.swift.in').read_text()
