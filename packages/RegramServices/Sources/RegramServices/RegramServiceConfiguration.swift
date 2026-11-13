@@ -17,10 +17,22 @@ public func regramLLMConfiguration(accountId: Int64, settings: RegramAccountSett
 
 public func regramExternalTranslate(text: String, to: String, accountId: Int64, settings: RegramAccountSettings, context: [String] = [], permitsNetworkFallback: @escaping () -> Signal<Bool, NoError> = { .single(true) }, telegramTranslate: ((String, String) -> Signal<String, TranslateFetchError>)? = nil) -> Signal<String, TranslateFetchError> {
     guard let provider = RegramChatTranslationPolicy.provider(settings: settings) else { return .fail(.network) }
-    return permitsNetworkFallback() |> take(1) |> castError(TranslateFetchError.self) |> mapToSignal { allowed in
-        guard allowed else { return .fail(.outdated) }
+    func authorized(_ request: @escaping () -> Signal<String, TranslateFetchError>) -> Signal<String, TranslateFetchError> {
+        deferred {
+            permitsNetworkFallback() |> take(1) |> castError(TranslateFetchError.self) |> mapToSignal { allowed in
+                allowed ? request() : .fail(.outdated)
+            }
+        }
+    }
+    if provider == .telegram {
+        guard let telegramTranslate else { return .fail(.network) }
+        return rgTranslateInChunks(text, to, maxLength: 1024) { chunk, target in
+            authorized { telegramTranslate(chunk, target) }
+        }
+    }
+    return authorized {
         switch provider {
-        case .telegram: return telegramTranslate?(text, to) ?? .fail(.network)
+        case .telegram: return .fail(.network)
         case .system: return regramSystemTranslate(text: text, to: to)
         case .google: return googleTranslate(text, to)
         case .googleCN: return googleCNTranslate(text, to)

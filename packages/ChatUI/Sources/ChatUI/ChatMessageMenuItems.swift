@@ -440,6 +440,9 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
         let translateConfig = AppConfigTranslateState(rawValue: context.appConfiguration.getStringValue("translations_manual_enabled", orElse: "enabled")) ?? .disabled
         let regramUsesExternalTranslation = !["default", "system"].contains(RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["translationBackend"].string)
         let canShowTranslation = translateConfig.canTranslate || regramUsesExternalTranslation
+        let appearance = appAppearance
+        let translationTarget = RegramChatLanguagePolicy.interfaceCode(primary: appearance.language.primaryLanguage.languageCode, base: appearance.languageCode)
+        let ignoredTranslationLanguages = context.sharedContext.baseSettings.doNotTranslate
         var isService = data.message.extendedMedia is TelegramMediaAction || mode.isSavedMode || mode == .preview || chatInteraction.isLogInteraction
         
 
@@ -920,16 +923,15 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
         if let richAttribute = message.attributes.compactMap({ $0 as? RichTextMessageAttribute }).first, mode.customChatContents == nil {
             let (text, entities) = richTextPlainPreview(from: richAttribute.instantPage)
             let language = Translate.detectLanguage(for: text)
-            let toLang = context.sharedContext.baseSettings.doNotTranslate.union([appAppearance.languageCode])
-            if !text.isEmpty, language == nil || !toLang.contains(language!), !muteTranslate, !isService, canShowTranslation {
+            if !text.isEmpty, RegramChatLanguagePolicy.canTranslateMessage(source: language, interfaceLanguage: translationTarget, configured: ignoredTranslationLanguages), !muteTranslate, !isService, canShowTranslation {
                 thirdBlock.append(ContextMenuItem(strings().chatContextTranslate, handler: {
                     let translationContext = messageTranslationAnalyticsContext(data.message, chatInteraction: data.chatInteraction, inherited: translationOrigin)
                     let presentation = translationContext.beginPresentation()
                     defer { presentation.end() }
-                    showModal(with: ChatHistoryUIHooks.shared.makeTranslateModalObserved(context, language, appAppearance.languageCode, text, entities, source: .richMessage(message.id, richAttribute.instantPage), analyticsContext: translationContext, onToneChanged: { tone in
+                    showModal(with: ChatHistoryUIHooks.shared.makeTranslateModalObserved(context, language, translationTarget, text, entities, source: .richMessage(message.id, richAttribute.instantPage), analyticsContext: translationContext, onToneChanged: { tone in
                         data.chatInteraction.setTranslateTone(tone)
                     }, translateEntireChat: {
-                        data.chatInteraction.translateTo(appAppearance.languageCode)
+                        data.chatInteraction.translateTo(translationTarget)
                     }), for: context.window)
                     if !regramUsesExternalTranslation { data.chatInteraction.enableTranslatePaywall() }
                 }, itemImage: MenuAnimation.menu_translate.value).regramAction(.translate))
@@ -952,17 +954,16 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
             }
             let language = Translate.detectLanguage(for: text)
                         
-            let toLang = context.sharedContext.baseSettings.doNotTranslate.union([appAppearance.languageCode])
-            if language == nil || !toLang.contains(language!), !muteTranslate, !isService, canShowTranslation {
+            if RegramChatLanguagePolicy.canTranslateMessage(source: language, interfaceLanguage: translationTarget, configured: ignoredTranslationLanguages), !muteTranslate, !isService, canShowTranslation {
                 _ = peer?.canSendMessage(data.chatMode.isThreadMode) == true
                 thirdBlock.append(ContextMenuItem(strings().chatContextTranslate, handler: {
                     let translationContext = messageTranslationAnalyticsContext(data.message, chatInteraction: data.chatInteraction, inherited: translationOrigin)
                     let presentation = translationContext.beginPresentation()
                     defer { presentation.end() }
-                    showModal(with: ChatHistoryUIHooks.shared.makeTranslateModalObserved(context, language, appAppearance.languageCode, text, entities, source: .poll(message.id), analyticsContext: translationContext, onToneChanged: { tone in
+                    showModal(with: ChatHistoryUIHooks.shared.makeTranslateModalObserved(context, language, translationTarget, text, entities, source: .poll(message.id), analyticsContext: translationContext, onToneChanged: { tone in
                         data.chatInteraction.setTranslateTone(tone)
                     }, translateEntireChat: {
-                        data.chatInteraction.translateTo(appAppearance.languageCode)
+                        data.chatInteraction.translateTo(translationTarget)
                     }), for: context.window)
                     if !regramUsesExternalTranslation { data.chatInteraction.enableTranslatePaywall() }
                 }, itemImage: MenuAnimation.menu_translate.value).regramAction(.translate))
@@ -977,19 +978,18 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                 let entities = message.textEntities?.entities ?? []
                 let language = Translate.detectLanguage(for: text)
 
-                let toLang = context.sharedContext.baseSettings.doNotTranslate.union([appAppearance.languageCode])
                 // Rich messages get their own Translate item above (flattened preview + translateRichMessage) —
                 // skip the plain-text item so the menu doesn't offer two.
                 let isRichMessage = message.attributes.contains(where: { $0 is RichTextMessageAttribute })
-                if !isRichMessage, !(message.media.first is TelegramMediaPoll), language == nil || !toLang.contains(language!), !muteTranslate, !isService, canShowTranslation {
+                if !isRichMessage, !(message.media.first is TelegramMediaPoll), RegramChatLanguagePolicy.canTranslateMessage(source: language, interfaceLanguage: translationTarget, configured: ignoredTranslationLanguages), !muteTranslate, !isService, canShowTranslation {
                     thirdBlock.append(ContextMenuItem(strings().chatContextTranslate, handler: {
                         let translationContext = messageTranslationAnalyticsContext(data.message, chatInteraction: data.chatInteraction, inherited: translationOrigin)
                         let presentation = translationContext.beginPresentation()
                         defer { presentation.end() }
-                        showModal(with: ChatHistoryUIHooks.shared.makeTranslateModalObserved(context, language, appAppearance.languageCode, text, entities, source: .message(messageId), analyticsContext: translationContext, onToneChanged: { tone in
+                        showModal(with: ChatHistoryUIHooks.shared.makeTranslateModalObserved(context, language, translationTarget, text, entities, source: .message(messageId), analyticsContext: translationContext, onToneChanged: { tone in
                             data.chatInteraction.setTranslateTone(tone)
                         }, translateEntireChat: {
-                            data.chatInteraction.translateTo(appAppearance.languageCode)
+                            data.chatInteraction.translateTo(translationTarget)
                         }), for: context.window)
                         if !regramUsesExternalTranslation { data.chatInteraction.enableTranslatePaywall() }
                     }, itemImage: MenuAnimation.menu_translate.value).regramAction(.translate))
@@ -1085,19 +1085,18 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
 
                         let text = state.inputText
                         let language = Translate.detectLanguage(for: text)
-                        let toLang = context.sharedContext.baseSettings.doNotTranslate.union([appAppearance.languageCode])
                         
                         
-                        if !protected, language == nil || !toLang.contains(language!), !muteTranslate, !isService, canShowTranslation {
+                        if !protected, RegramChatLanguagePolicy.canTranslateMessage(source: language, interfaceLanguage: translationTarget, configured: ignoredTranslationLanguages), !muteTranslate, !isService, canShowTranslation {
                             _ = peer?.canSendMessage(data.chatMode.isThreadMode) == true
                             thirdBlock.append(ContextMenuItem(strings().chatContextTranslate, handler: {
                                 let translationContext = messageTranslationAnalyticsContext(data.message, chatInteraction: data.chatInteraction, inherited: translationOrigin)
                                 let presentation = translationContext.beginPresentation()
                                 defer { presentation.end() }
-                                showModal(with: ChatHistoryUIHooks.shared.makeTranslateModalObserved(context, language, appAppearance.languageCode, text, entities, source: .selectedText, analyticsContext: translationContext, onToneChanged: { tone in
+                                showModal(with: ChatHistoryUIHooks.shared.makeTranslateModalObserved(context, language, translationTarget, text, entities, source: .selectedText, analyticsContext: translationContext, onToneChanged: { tone in
                                     data.chatInteraction.setTranslateTone(tone)
                                 }, translateEntireChat: {
-                                    data.chatInteraction.translateTo(appAppearance.languageCode)
+                                    data.chatInteraction.translateTo(translationTarget)
                                 }), for: context.window)
                                 if !regramUsesExternalTranslation { data.chatInteraction.enableTranslatePaywall() }
                             }, itemImage: MenuAnimation.menu_translate.value).regramAction(.translate))
@@ -1131,17 +1130,16 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
             if !state.text.isEmpty && !state.isPending {
                 let text = state.text
                 let language = Translate.detectLanguage(for: text)
-                let toLang = context.sharedContext.baseSettings.doNotTranslate.union([appAppearance.languageCode])
-                if language == nil || !toLang.contains(language!), !isService, canShowTranslation {
+                if RegramChatLanguagePolicy.canTranslateMessage(source: language, interfaceLanguage: translationTarget, configured: ignoredTranslationLanguages), !isService, canShowTranslation {
                     _ = peer?.canSendMessage(data.chatMode.isThreadMode) == true
                     thirdBlock.append(ContextMenuItem(strings().chatContextTranslate, handler: {
                         let translationContext = messageTranslationAnalyticsContext(data.message, chatInteraction: data.chatInteraction, inherited: translationOrigin)
                         let presentation = translationContext.beginPresentation()
                         defer { presentation.end() }
-                        showModal(with: ChatHistoryUIHooks.shared.makeTranslateModalObserved(context, language, appAppearance.languageCode, text, [], source: .transcription(messageId), analyticsContext: translationContext, onToneChanged: { tone in
+                        showModal(with: ChatHistoryUIHooks.shared.makeTranslateModalObserved(context, language, translationTarget, text, [], source: .transcription(messageId), analyticsContext: translationContext, onToneChanged: { tone in
                             data.chatInteraction.setTranslateTone(tone)
                         }, translateEntireChat: {
-                            data.chatInteraction.translateTo(appAppearance.languageCode)
+                            data.chatInteraction.translateTo(translationTarget)
                         }), for: context.window)
                         if !regramUsesExternalTranslation { data.chatInteraction.enableTranslatePaywall() }
                     }, itemImage: MenuAnimation.menu_translate.value).regramAction(.translate))

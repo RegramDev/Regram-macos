@@ -327,14 +327,19 @@ public struct Translate {
             uri += "ate_a";
             uri += "/singl";
             uri += "e?client=gtx&sl=" + (from ?? "auto") + "&tl=" + to + "&dt=t" + "&ie=UTF-8&oe=UTF-8&otf=1&ssel=0&tsel=0&kc=7&dt=at&dt=bd&dt=ex&dt=ld&dt=md&dt=qca&dt=rw&dt=rm&dt=ss&q=";
-            uri += text.addingPercentEncoding(withAllowedCharacters: CharacterSet.urlQueryAllowed)!
+            var queryAllowed = CharacterSet.urlQueryAllowed
+            queryAllowed.remove(charactersIn: "&=+?#")
+            guard let encoded = text.addingPercentEncoding(withAllowedCharacters: queryAllowed), let url = URL(string: uri + encoded) else {
+                subscriber.putError(.generic)
+                return EmptyDisposable
+            }
             
-            var request = URLRequest(url: URL(string: uri)!)
+            var request = URLRequest(url: url)
             request.httpMethod = "GET"
             request.setValue(userAgents[Int.random(in: 0 ..< userAgents.count)], forHTTPHeaderField: "User-Agent")
             let session = URLSession.shared
             let task = session.dataTask(with: request, completionHandler: { data, response, error in
-                if let _ = error {
+                if error != nil || (response as? HTTPURLResponse).map({ !(200..<300).contains($0.statusCode) }) == true {
                     subscriber.putError(.generic)
                 } else if let data = data {
                     let json = try? JSONSerialization.jsonObject(with: data, options: []) as? NSArray
@@ -350,10 +355,17 @@ public struct Translate {
                                 }
                             }
                         }
-                        subscriber.putNext((detect: json[2] as? String, result: result))
+                        guard !result.isEmpty else {
+                            subscriber.putError(.generic)
+                            return
+                        }
+                        subscriber.putNext((detect: json.count > 2 ? json[2] as? String : nil, result: result))
+                        subscriber.putCompletion()
                     } else {
                         subscriber.putError(.generic)
                     }
+                } else {
+                    subscriber.putError(.generic)
                 }
             })
             task.resume()

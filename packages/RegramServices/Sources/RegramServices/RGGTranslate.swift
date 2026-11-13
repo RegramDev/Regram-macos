@@ -55,49 +55,12 @@ func rgTranslateEncode(_ text: String) -> String {
 }
 
 
-private func rgTranslateSplitIntoChunks(_ text: String, maxLength: Int) -> [String] {
-    if text.count <= maxLength {
-        return [text]
-    }
-
-    var chunks: [String] = []
-    var current: String?
-
-    func flush() {
-        if let value: String = current {
-            chunks.append(value)
-            current = nil
-        }
-    }
-
-    for line in text.components(separatedBy: "\n") {
-        if line.count > maxLength {
-            flush()
-            chunks.append(contentsOf: gtranslateSplitTextBySentences(line, maxChunkLength: maxLength))
-            continue
-        }
-        if let value: String = current {
-            if value.count + 1 + line.count <= maxLength {
-                current = value + "\n" + line
-            } else {
-                flush()
-                current = line
-            }
-        } else {
-            current = line
-        }
-    }
-    flush()
-
-    return chunks.isEmpty ? [text] : chunks
-}
-
 func rgTranslateInChunks(_ text: String, _ toLang: String, maxLength: Int = rgTranslateMaxChunkLength, chunkTimeout: Double = 20.0, _ translateChunk: @escaping (String, String) -> Signal<String, TranslateFetchError>) -> Signal<String, TranslateFetchError> {
     if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
         return .single(text)
     }
 
-    let chunks: [String] = rgTranslateSplitIntoChunks(text, maxLength: maxLength)
+    let chunks = gtranslateSplitTextBySentences(text, maxChunkLength: maxLength)
     if chunks.count == 1 {
         return translateChunk(chunks[0], toLang)
     }
@@ -106,13 +69,25 @@ func rgTranslateInChunks(_ text: String, _ toLang: String, maxLength: Int = rgTr
         if chunk.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return .single(chunk)
         }
-        return translateChunk(chunk, toLang)
+        let leading = chunk.prefix(while: \.isWhitespace)
+        let trailing = chunk.reversed().prefix(while: \.isWhitespace).reversed()
+        return translateChunk(chunk.trimmingCharacters(in: .whitespacesAndNewlines), toLang) |> mapToSignal { value in
+            let translated = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !translated.isEmpty else { return .fail(.network) }
+            return .single(String(leading) + translated + String(trailing))
+        }
     }
 
     return rgTranslateSequentially(signals, chunkTimeout: chunkTimeout)
     |> map { results in
-        return results.joined(separator: "\n")
+        return results.joined()
     }
+}
+
+func rgTranslationSegmentTimeout(utf16Length: Int, maxChunkLength: Int, chunkTimeout: Double) -> Double {
+    let effectiveChunkLength = max(1, maxChunkLength / 2)
+    let estimatedChunks = max(1, Double(utf16Length / effectiveChunkLength) + 1)
+    return (estimatedChunks + 1) * chunkTimeout
 }
 
 
@@ -220,44 +195,63 @@ public func googleTranslate(_ text: String, _ toLang: String) -> Signal<String, 
 
 public func gtranslateSplitTextBySentences(_ text: String, maxChunkLength: Int = 1500) -> [String] {
     let limit = max(1, maxChunkLength)
+    guard text.utf16.count > limit else { return [text] }
     var chunks: [String] = []
     var start = text.startIndex
     while start < text.endIndex {
-        let end = text.index(start, offsetBy: limit, limitedBy: text.endIndex) ?? text.endIndex
-        var boundary = end
-        if end != text.endIndex {
-            let window = text[start ..< end]
-            if let split = window.lastIndex(where: { $0.isWhitespace || ".!?。！？".contains($0) }) {
-                boundary = text.index(after: split)
+        var end = start
+        var length = 0
+        var paragraphBreak: String.Index?
+        var sentenceBreak: String.Index?
+        var wordBreak: String.Index?
+        while end < text.endIndex {
+            let character = text[end]
+            let next = text.index(after: end)
+            let width = text[end ..< next].utf16.count
+            if end != start, length + width > limit { break }
+            end = next
+            length += width
+            guard length >= limit / 2 else { continue }
+            if character.isNewline {
+                paragraphBreak = end
+            } else if ".!?。！？".contains(character) {
+                sentenceBreak = end
+            } else if character.isWhitespace {
+                wordBreak = end
             }
         }
+        let boundary = end == text.endIndex ? end : paragraphBreak ?? sentenceBreak ?? wordBreak ?? end
         chunks.append(String(text[start ..< boundary]))
         start = boundary
     }
-    return chunks.isEmpty ? [text] : chunks
+    return chunks
 }
 
-func rgTranslateSequentially(_ signals: [Signal<String, TranslateFetchError>], chunkTimeout: Double = 20.0) -> Signal<[String], TranslateFetchError> {
+public func regramTranslateSequentially<Value, Failure>(_ signals: [Signal<Value, Failure>], chunkTimeout: Double, failure: Failure) -> Signal<[Value], Failure> {
     return Signal { subscriber in
         let disposable = MetaDisposable()
         let cancelled = Atomic(value: false)
         let queue = Queue(name: "regram.translate-chunks")
-        var values: [String] = []
+        var values: [Value] = []
         func next(_ index: Int) {
             guard !cancelled.with({ $0 }) else { return }
             guard index < signals.count else { subscriber.putNext(values); subscriber.putCompletion(); return }
             let current = MetaDisposable()
             disposable.set(current)
             var receivedValue = false
-            current.set((signals[index] |> take(1) |> timeout(chunkTimeout, queue: queue, alternate: .fail(.network)) |> deliverOn(queue)).start(next: { value in
+            current.set((signals[index] |> take(1) |> timeout(chunkTimeout, queue: queue, alternate: .fail(failure)) |> deliverOn(queue)).start(next: { value in
                 receivedValue = true
                 values.append(value)
                 queue.justDispatch { next(index + 1) }
             }, error: { subscriber.putError($0) }, completed: {
-                if !receivedValue { subscriber.putError(.network) }
+                if !receivedValue { subscriber.putError(failure) }
             }))
         }
         queue.justDispatch { next(0) }
         return ActionDisposable { let _ = cancelled.swap(true); disposable.dispose() }
     }
+}
+
+func rgTranslateSequentially(_ signals: [Signal<String, TranslateFetchError>], chunkTimeout: Double = 20.0) -> Signal<[String], TranslateFetchError> {
+    regramTranslateSequentially(signals, chunkTimeout: chunkTimeout, failure: .network)
 }

@@ -43,13 +43,21 @@ final class RGTranslationSequenceTests: XCTestCase {
         let done = expectation(description: "all text chunks")
         let text = String(repeating: "a", count: 9) + "\n\n" + String(repeating: "b", count: 9)
         let task = rgTranslateInChunks(text, "zh", maxLength: 8, { text, _ in self.asynchronous(text.uppercased()) }).start(next: {
-            XCTAssertTrue($0.contains("AAAAAAAA"))
-            XCTAssertTrue($0.contains("BBBBBBBB"))
-            XCTAssertTrue($0.contains("\n\n"))
+            XCTAssertEqual($0, text.uppercased())
             done.fulfill()
         }, error: { _ in XCTFail("Blank chunk must not block the next chunk") })
         defer { task.dispose() }
         wait(for: [done], timeout: 1)
+    }
+
+    func testChunksMeasureUTF16AndKeepEmojiAndWhitespace() {
+        let emoji = "👨‍👩‍👧‍👦"
+        let text = String(repeating: emoji + " 繁體中文\r\n", count: 170)
+        let chunks = gtranslateSplitTextBySentences(text, maxChunkLength: 1024)
+        XCTAssertGreaterThan(chunks.count, 1)
+        XCTAssertTrue(chunks.allSatisfy { $0.utf16.count <= 1024 })
+        XCTAssertEqual(chunks.joined(), text)
+        XCTAssertTrue(chunks.dropLast().allSatisfy { $0.hasSuffix("\r\n") })
     }
 
     func testTimeoutRemainsActiveAfterSynchronousPrefix() {

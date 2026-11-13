@@ -62,7 +62,7 @@ func regramTranslateOutgoingInput(context: any AccountContextProtocol, peerId: P
         }
     }
     if settings["translationBackend"].string != "default" { return external(settings) }
-    let native = context.engine.messages.translate(text: input.inputText, toLang: target, entities: entities, tone: .neutral) |> `catch` { error -> Signal<(String, [MessageTextEntity])?, TranslationError> in
+    let native = regramTranslateTelegramText(engine: context.engine, text: input.inputText, to: target, entities: entities) |> `catch` { error -> Signal<(String, [MessageTextEntity])?, TranslationError> in
         if case .tryAlternative = error { return .single(nil) }
         return .fail(error)
     }

@@ -2,10 +2,22 @@ import XCTest
 @testable import RegramServices
 
 final class RegramChatLanguagePolicyTests: XCTestCase {
-    func testChineseScriptsCompareAsOneLanguageWithoutLosingRequestTargets() {
-        for source in ["zh", "zh-Hans", "zh-Hant", "zh-CN", "zh-TW", "zh_hk"] {
+    func testChineseScriptsHaveDistinctVisibilityAndRequestTargets() {
+        for source in ["zh", "zh-Hans", "zh-CN"] {
             XCTAssertFalse(RegramChatLanguagePolicy.canDisplay(source: source, target: "zh-CN", interfaceLanguage: "zh-Hans", active: false))
         }
+        for source in ["zh-Hant", "zh-TW", "zh_hk", "zh-MO"] {
+            XCTAssertTrue(RegramChatLanguagePolicy.canDisplay(source: source, target: "zh-CN", interfaceLanguage: "zh-Hans", active: false))
+        }
+        XCTAssertTrue(RegramChatLanguagePolicy.canDisplay(source: "zh-Hans", target: "zh-TW", interfaceLanguage: "zh-Hant", active: false))
+        XCTAssertTrue(RegramChatLanguagePolicy.canTranslateMessage(source: "zh-Hant", interfaceLanguage: "zhcncc-raw", configured: []))
+        XCTAssertTrue(RegramChatLanguagePolicy.canTranslateMessage(source: "zh-Hans", interfaceLanguage: "zh-HK", configured: []))
+        XCTAssertFalse(RegramChatLanguagePolicy.canTranslateMessage(source: "zh-Hans", interfaceLanguage: "regram-zh-hans", configured: []))
+        XCTAssertTrue(RegramChatLanguagePolicy.canTranslateMessage(source: "zh-Hant", interfaceLanguage: "zh-CN", configured: ["zh"]))
+        XCTAssertFalse(RegramChatLanguagePolicy.canTranslateMessage(source: "zh-Hans", interfaceLanguage: "zh-TW", configured: ["zh"]))
+        XCTAssertFalse(RegramChatLanguagePolicy.canTranslateMessage(source: "zh-Hant", interfaceLanguage: "zh-CN", configured: ["zh-TW"]))
+        XCTAssertEqual(RegramChatLanguagePolicy.interfaceCode(primary: "zhcncc-raw", base: "en"), "zh-CN")
+        XCTAssertEqual(RegramChatLanguagePolicy.interfaceCode(primary: "zh_HK", base: "en"), "zh-TW")
         XCTAssertEqual(RegramChatLanguagePolicy.targetCode("zh-Hans-raw"), "zh-CN")
         XCTAssertEqual(RegramChatLanguagePolicy.targetCode("zh-Hant"), "zh-TW")
         XCTAssertEqual(RegramChatLanguagePolicy.targetCode("zh-TW"), "zh-TW")
@@ -16,15 +28,17 @@ final class RegramChatLanguagePolicyTests: XCTestCase {
     func testForeignMonolingualChatAndActiveOriginalControlRemainAvailable() {
         XCTAssertTrue(RegramChatLanguagePolicy.canDisplay(source: "en", target: "zh-CN", interfaceLanguage: "zh-Hans", active: false))
         XCTAssertTrue(RegramChatLanguagePolicy.canDisplay(source: "zh-Hant", target: "en", interfaceLanguage: "zh-Hans", active: true))
-        XCTAssertFalse(RegramChatLanguagePolicy.canDisplay(source: "zh-Hant", target: "en", interfaceLanguage: "zh-Hans", active: false))
+        XCTAssertFalse(RegramChatLanguagePolicy.canDisplay(source: "zh-Hans", target: "en", interfaceLanguage: "zh-Hans", active: false))
         XCTAssertFalse(RegramChatLanguagePolicy.canDisplay(source: "", target: "en", interfaceLanguage: "zh-Hans", active: true))
         XCTAssertFalse(RegramChatLanguagePolicy.canDisplay(source: "en-US", target: "en-GB", interfaceLanguage: "zh-Hans", active: false))
     }
 
     func testIgnoredLanguagesNormalizeInterfaceAndRespectExplicitList() {
-        XCTAssertEqual(RegramChatLanguagePolicy.ignoredLanguages(interfaceLanguage: "zh-Hans-raw", configured: [], systemLanguages: ["en-US", "ja-JP"]), ["zh", "en"])
-        XCTAssertEqual(RegramChatLanguagePolicy.ignoredLanguages(interfaceLanguage: "zh-Hant", configured: [], systemLanguages: ["en-US", "ru-RU"]), ["zh", "en", "ru"])
-        XCTAssertEqual(RegramChatLanguagePolicy.ignoredLanguages(interfaceLanguage: "zh-Hans", configured: ["de-DE", "zh-Hant"], systemLanguages: ["en-US"]), ["de", "zh"])
+        XCTAssertEqual(RegramChatLanguagePolicy.ignoredLanguages(interfaceLanguage: "zh-Hans-raw", configured: [], systemLanguages: ["en-US", "ja-JP"]), ["zh-CN", "en"])
+        XCTAssertEqual(RegramChatLanguagePolicy.ignoredLanguages(interfaceLanguage: "zh-Hant", configured: [], systemLanguages: ["en-US", "ru-RU"]), ["zh-TW", "en", "ru"])
+        XCTAssertEqual(RegramChatLanguagePolicy.ignoredLanguages(interfaceLanguage: "zh-Hans", configured: [], systemLanguages: ["zh-Hant", "en"]), ["zh-CN"])
+        XCTAssertEqual(RegramChatLanguagePolicy.ignoredLanguages(interfaceLanguage: "zh-Hans", configured: ["de-DE", "zh-Hant"], systemLanguages: ["en-US"]), ["de", "zh-TW"])
+        XCTAssertEqual(RegramChatLanguagePolicy.ignoredLanguages(interfaceLanguage: "zh-Hans", configured: ["zh"], systemLanguages: []), ["zh-CN"])
     }
 
     func testRecognitionWeightsIncomingTextRatherThanOutgoingOrMessageCount() {
@@ -34,7 +48,7 @@ final class RegramChatLanguagePolicyTests: XCTestCase {
         let result = RegramChatLanguagePolicy.dominantLanguage(samples: [outgoing] + Array(repeating: english, count: 5) + [chinese], supported: ["en", "zh", "fr"]) { text in
             text.contains("中文") ? "zh-Hans" : text.contains("English") ? "en" : "fr"
         }
-        XCTAssertEqual(result, "zh")
+        XCTAssertEqual(result, "zh-CN")
         let capped = RegramChatLanguagePolicy.dominantLanguage(samples: Array(repeating: english, count: 16) + [chinese], supported: ["en", "zh"]) { $0.contains("中文") ? "zh-Hans" : "en" }
         XCTAssertEqual(capped, "en")
     }
@@ -50,9 +64,14 @@ final class RegramChatLanguagePolicyTests: XCTestCase {
             XCTAssertEqual(value, recognition)
             return "zh-Hans"
         }
-        XCTAssertEqual(result, "zh")
+        XCTAssertEqual(result, "zh-CN")
         let onlyCode = RegramChatLanguagePolicy.Sample(text: "console.log(message)", incoming: true, excludedRanges: [NSRange(location: 0, length: 20)])
         XCTAssertNil(RegramChatLanguagePolicy.dominantLanguage(samples: [onlyCode], supported: ["en"]) { _ in XCTFail("Code-only text must not reach recognition"); return "en" })
+    }
+
+    func testGenericChineseHintStillChecksTheMessageScript() {
+        let sample = RegramChatLanguagePolicy.Sample(text: "這是一條繁體中文訊息，請看看。", incoming: true, languageHint: "zh")
+        XCTAssertEqual(RegramChatLanguagePolicy.dominantLanguage(samples: [sample], supported: ["zh"]) { _ in "zh-Hant" }, "zh-TW")
     }
 
     func testOnlyRecentTimestampedPredictionsCanBeReused() {

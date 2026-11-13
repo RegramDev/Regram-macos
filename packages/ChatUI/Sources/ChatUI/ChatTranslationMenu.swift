@@ -5,6 +5,7 @@ import Localization
 import TelegramTheme
 import LocalAnimations
 import RegramCore
+import RegramServices
 import InputDataUI
 
 func chatTranslationMenuItem(chatInteraction: ChatInteraction) -> ContextMenuItem? {
@@ -57,7 +58,8 @@ func chatTranslationSettingsMenu(chatInteraction: ChatInteraction, translate: Ch
         }
     })
 
-    let languageCode = Translate.normalizeLanguageCode(appAppearance.languageCode)
+    let appearance = appAppearance
+    let languageCode = RegramChatLanguagePolicy.interfaceCode(primary: appearance.language.primaryLanguage.languageCode, base: appearance.languageCode)
     let codeIndex = codes.firstIndex(where: {
         $0.code.contains(languageCode)
     })

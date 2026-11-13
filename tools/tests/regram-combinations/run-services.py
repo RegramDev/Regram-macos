@@ -39,7 +39,7 @@ if args.shared_credential_control:
     if llm.count(boundary) != 1:
         raise RuntimeError("Review the credential negative control boundary")
     llm = llm.replace(boundary, 'request.setValue("Bearer translation-key-0", forHTTPHeaderField: "Authorization")')
-support = [declaration(translation, marker) for marker in ["public enum TranslateFetchError", "private func rgTranslateSplitIntoChunks(", "func rgTranslateInChunks(", "public func getGTranslateLang(", "public func gtranslateSplitTextBySentences(", "func rgTranslateSequentially("]]
+support = [declaration(translation, marker) for marker in ["public enum TranslateFetchError", "func rgTranslateInChunks(", "public func getGTranslateLang(", "public func gtranslateSplitTextBySentences(", "public func regramTranslateSequentially<", "func rgTranslateSequentially("]]
 generated = args.output / "ServiceCombinationChecks.swift"
 generated.write_text((HERE / "ServiceCombinationChecks.swift").read_text() + "\nlet rgTranslateMaxChunkLength = 1200\n" + "\n\n".join(support + [llm, speech, configuration]))
 binary = args.output / "service-combination-checks"

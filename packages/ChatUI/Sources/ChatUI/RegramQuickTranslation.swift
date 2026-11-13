@@ -36,10 +36,10 @@ func regramQuickTranslationIsAvailable(_ item: ChatRowItem) -> Bool {
     let settings = RegramPreferences.shared.settings(accountId: accountId)
     if regramQuickTranslationLanguage(message, settings: settings) != nil || RegramQuickTranslationTasks.shared.task(accountId: accountId, messageId: quickTranslationKey(message)) != nil { return true }
     guard settings["quickTranslateButton"].bool, message.text.unicodeScalars.contains(where: CharacterSet.letters.contains) else { return false }
-    guard let language = Translate.detectLanguage(for: String(message.text.prefix(512))) else { return true }
-    let ignored = item.context.sharedContext.baseSettings.doNotTranslate.union([appAppearance.languageCode])
-    let normalized = language.lowercased().split(separator: "-").first.map(String.init) ?? language
-    return !ignored.contains { $0.lowercased().split(separator: "-").first.map(String.init) == normalized }
+    let appearance = appAppearance
+    let language = Translate.detectLanguage(for: message.text)
+    let interfaceLanguage = RegramChatLanguagePolicy.interfaceCode(primary: appearance.language.primaryLanguage.languageCode, base: appearance.languageCode)
+    return RegramChatLanguagePolicy.canTranslateMessage(source: language, interfaceLanguage: interfaceLanguage, configured: item.context.sharedContext.baseSettings.doNotTranslate)
 }
 
 func regramToggleQuickTranslation(_ item: ChatRowItem) {
@@ -66,7 +66,8 @@ func regramToggleQuickTranslation(_ item: ChatRowItem) {
         return
     }
     guard regramQuickTranslationCanProcess(item) else { return }
-    let target = appAppearance.languageCode
+    let appearance = appAppearance
+    let target = RegramChatLanguagePolicy.interfaceCode(primary: appearance.language.primaryLanguage.languageCode, base: appearance.languageCode)
     guard let token = tasks.begin(accountId: accountId, messageId: key, language: target) else {
         showModalText(for: context.window, text: quickTranslationString("quickTranslate.busy"))
         return
@@ -112,7 +113,7 @@ func regramToggleQuickTranslation(_ item: ChatRowItem) {
     if external {
         translated = externalRequest(settings)
     } else {
-        let native: Signal<(String, [MessageTextEntity])?, TranslationError> = context.engine.messages.translate(text: message.text, toLang: target, entities: entities, tone: .neutral) |> `catch` { error -> Signal<(String, [MessageTextEntity])?, TranslationError> in
+        let native: Signal<(String, [MessageTextEntity])?, TranslationError> = regramTranslateTelegramText(engine: context.engine, text: message.text, to: target, entities: entities) |> `catch` { error -> Signal<(String, [MessageTextEntity])?, TranslationError> in
             if case .tryAlternative = error { return .single(nil) }
             return .fail(error)
         }

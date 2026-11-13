@@ -9,5 +9,12 @@ public func regramProtectedTranslation(text: String, to: String, accountId: Int6
         if segment.id != nil || segment.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return .single(segment.text) }
         return regramExternalTranslate(text: segment.text, to: to, accountId: accountId, settings: settings, context: context, permitsNetworkFallback: permitsNetworkFallback, telegramTranslate: telegramTranslate)
     }
-    return rgTranslateSequentially(signals, chunkTimeout: ["llm", "system"].contains(settings["translationBackend"].string) ? 120 : 30) |> map { plan.restore(translations: $0) }
+    let backend = settings["translationBackend"].string
+    let timeout: Double
+    switch backend {
+    case "llm": timeout = rgTranslationSegmentTimeout(utf16Length: text.utf16.count, maxChunkLength: 2000, chunkTimeout: 120)
+    case "system": timeout = 120
+    default: timeout = rgTranslationSegmentTimeout(utf16Length: text.utf16.count, maxChunkLength: 1000, chunkTimeout: 30)
+    }
+    return rgTranslateSequentially(signals, chunkTimeout: timeout) |> map { plan.restore(translations: $0) }
 }

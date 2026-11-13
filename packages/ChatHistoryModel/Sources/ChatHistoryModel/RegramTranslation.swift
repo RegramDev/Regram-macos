@@ -275,7 +275,7 @@ func regramTranslateMessages(account: Account, messageIds: [MessageId], to: Stri
                 }
             }
             let telegramTranslate: (String, String) -> Signal<String, TranslateFetchError> = { text, language in
-                TelegramEngine(account: account).messages.translate(text: text, toLang: RegramChatLanguagePolicy.comparisonCode(language), entities: [], tone: tone)
+                TelegramEngine(account: account).messages.translate(text: text, toLang: RegramChatLanguagePolicy.targetCode(language), entities: [], tone: tone)
                 |> mapError { _ in TranslateFetchError.network }
                 |> mapToSignal { result in
                     guard let result else { return .fail(.network) }

@@ -74,6 +74,46 @@ final class RegramChatTranslationPolicyTests: XCTestCase {
         XCTAssertFalse(invoked)
     }
 
+    func testLongTelegramTextUsesOrderedChunksAndRetainsItsTarget() {
+        let done = expectation(description: "long Telegram translation")
+        let text = String(repeating: "明天我們一起去公園散步👋。\n", count: 210)
+        var requests = 0
+        let task = regramExternalTranslate(text: text, to: "zh-CN", accountId: 1, settings: RegramAccountSettings(), telegramTranslate: { chunk, target in
+            requests += 1
+            XCTAssertLessThanOrEqual(chunk.utf16.count, 1024)
+            XCTAssertEqual(target, "zh-CN")
+            return .single(chunk.replacingOccurrences(of: "我們", with: "我们").replacingOccurrences(of: "公園", with: "公园"))
+        }).start(next: { result in
+            XCTAssertGreaterThan(requests, 1)
+            XCTAssertEqual(result, text.replacingOccurrences(of: "我們", with: "我们").replacingOccurrences(of: "公園", with: "公园"))
+            done.fulfill()
+        }, error: { _ in XCTFail("Each Telegram request fits the chunk limit") })
+        defer { task.dispose() }
+        wait(for: [done], timeout: 2)
+    }
+
+    func testPermissionIsCheckedBeforeSendingEachTelegramChunk() {
+        let done = expectation(description: "second request no longer authorized")
+        var checks = 0
+        var requests = 0
+        let task = regramExternalTranslate(text: String(repeating: "a", count: 2048), to: "zh-TW", accountId: 1, settings: RegramAccountSettings(), permitsNetworkFallback: {
+            checks += 1
+            return .single(checks == 1)
+        }, telegramTranslate: { text, _ in
+            requests += 1
+            return .single(text)
+        }).start(next: { _ in
+            XCTFail("An incomplete translation must not be returned")
+        }, error: { error in
+            guard case .outdated = error else { return XCTFail("Unexpected error") }
+            XCTAssertEqual(checks, 2)
+            XCTAssertEqual(requests, 1)
+            done.fulfill()
+        })
+        defer { task.dispose() }
+        wait(for: [done], timeout: 2)
+    }
+
     func testDisposingTheRequestCancelsTheSelectedAdapter() {
         var cancelled = false
         let task = regramExternalTranslate(text: "hello", to: "zh", accountId: 1, settings: RegramAccountSettings(), telegramTranslate: { _, _ in

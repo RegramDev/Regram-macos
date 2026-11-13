@@ -49,7 +49,9 @@ struct ChatHeaderState : Identifiable, Equatable {
         let tone: TranslationTone
 
         init?(_ state: ChatPresentationInterfaceState.TranslateState) {
-            guard RegramChatLanguagePolicy.canDisplay(source: state.from ?? "", target: state.to, interfaceLanguage: appCurrentLanguage.primaryLanguage.languageCode, active: state.translate) else { return nil }
+            let appearance = appAppearance
+            let interfaceLanguage = RegramChatLanguagePolicy.interfaceCode(primary: appearance.language.primaryLanguage.languageCode, base: appearance.languageCode)
+            guard RegramChatLanguagePolicy.canDisplay(source: state.from ?? "", target: state.to, interfaceLanguage: interfaceLanguage, active: state.translate) else { return nil }
             translate = state.translate
             from = state.from
             to = state.to

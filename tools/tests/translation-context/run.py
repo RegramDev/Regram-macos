@@ -32,9 +32,9 @@ def between(start, end):
     return source[a:source.index(end, a)]
 fixture = fixture.replace('__ADMISSION__', between('    let origin =', '    let actionsDisposable ='))
 fixture = fixture.replace('__STATE__', between('    let statePromise =', '    let reloadStyles:'))
-fixture = fixture.replace('__LOADING__', between('    let reloadStyles:', '    let input = ChatTextInputState(').replace('TelegramEngine.EngineData.Item.Peer.Peer(id:', 'PeerRequest(id:'))
+fixture = fixture.replace('__LOADING__', between('    let reloadStyles:', '    let request:()->Void = {').replace('TelegramEngine.EngineData.Item.Peer.Peer(id:', 'PeerRequest(id:'))
 fixture = fixture.replace('__REQUEST_GUARD__', between('    let request:()->Void = {', '        let state = stateValue.with'))
-fixture = fixture.replace('__REQUEST_RESULT__', between('        disposable.set(getAnalyticsContext().preservingPresentation(signal).start', '    var getController:'))
+fixture = fixture.replace('__REQUEST_RESULT__', between('        disposable.set(getAnalyticsContext().preservingPresentation(signal |> deliverOnMainQueue).start', '    var getController:'))
 fixture = fixture.replace('__RENDER__', between('    let signal = getAnalyticsContext().preservingPresentation(statePromise.get()', '    let controller = InputDataController('))
 fixture = fixture.replace('__CLEANUP__', between('    controller.onDeinit =', '    let modalInteractions:'))
 fixture = fixture.replace('__CLOSE__', between('    close = { [weak modalController]', '    return modalController'))
@@ -96,7 +96,7 @@ b = menu.index('public func chatMenuItems(', a)
 message = message.replace('__MESSAGE_PRIVACY__', menu[a:b])
 capture = '    let translationOrigin = messageTranslationAnalyticsContext(message, chatInteraction: chatInteraction)'
 assert capture in menu
-message = message.replace('__MESSAGE_CAPTURE__', capture)
+message = message.replace('__MESSAGE_CAPTURE__', capture + '\n    let translationTarget = appAppearance.languageCode\n    let regramUsesExternalTranslation = false')
 actions = []
 for i, source_case in enumerate(['richMessage', 'poll', 'message', 'selectedText', 'transcription']):
     point = menu.index('source: .' + source_case, menu.index(capture))

@@ -16,6 +16,7 @@ import ColorPalette
 import FoundationUtils
 import LocalAnimations
 import AppAnalytics
+import RegramServices
 
 private final class Arguments {
     public let context: any AccountContextProtocol
@@ -84,11 +85,13 @@ private func entries(_ state: State, arguments: Arguments) -> [InputDataEntry] {
     entries.append(.desc(sectionId: sectionId, index: index, text: .plain(strings().languageTranslateMessagesHeader), data: .init(color: theme.colors.listGrayText, viewType: .textTopItem)))
     index += 1
     
-    var ignoreCodes = state.settings.doNotTranslate.compactMap {
+    let interfaceLanguage = RegramChatLanguagePolicy.interfaceCode(primary: state.language.primaryLanguage.languageCode, base: state.language.baseLanguageCode)
+    let ignoredLanguages = Set(state.settings.doNotTranslate.map(RegramChatLanguagePolicy.targetCode))
+    var ignoreCodes = ignoredLanguages.compactMap {
         Translate.find($0)
     }.sorted(by: { $0.language < $1.language })
     
-    if ignoreCodes.isEmpty, let code = Translate.find(state.language.baseLanguageCode) {
+    if ignoreCodes.isEmpty, let code = Translate.find(interfaceLanguage) {
         ignoreCodes.append(code)
     }
 
@@ -105,7 +108,7 @@ private func entries(_ state: State, arguments: Arguments) -> [InputDataEntry] {
     })
     
     let codeIndex = codes.firstIndex(where: {
-        $0.code.contains(state.language.baseLanguageCode)
+        $0.code.contains(interfaceLanguage)
     })
     if let codeIndex = codeIndex {
         codes.move(at: codeIndex, to: 0)
@@ -330,7 +333,7 @@ public func LanguageController(_ context: any AccountContextProtocol, focusOnIte
         SettingsNavigationHooks.shared.showPremiumBoarding(context, .translations, true, context.window, nil)
     }, doNotTranslate: { code in
         actionsDisposable.add(updateBaseAppSettingsInteractively(accountManager: context.sharedContext.accountManager, { settings in
-            var current = settings.doNotTranslate
+            var current = Set(settings.doNotTranslate.map(RegramChatLanguagePolicy.targetCode))
             if current.contains(code) {
                 current.remove(code)
             } else {

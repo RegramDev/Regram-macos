@@ -26,6 +26,7 @@ public struct ChatTranslationState: Codable {
         case paywall
         case tone
         case timestamp
+        case recognitionVersion
     }
 
     public var baseLang: String
@@ -35,6 +36,7 @@ public struct ChatTranslationState: Codable {
     public var paywall: Bool
     public var tone: TranslationTone?
     public var timestamp: Int32?
+    private var recognitionVersion: Int?
 
     public init(
         baseLang: String,
@@ -52,6 +54,7 @@ public struct ChatTranslationState: Codable {
         self.paywall = paywall
         self.tone = tone
         self.timestamp = timestamp
+        self.recognitionVersion = 1
     }
 
     public init(from decoder: Decoder) throws {
@@ -63,6 +66,7 @@ public struct ChatTranslationState: Codable {
         self.isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled)
         self.paywall = try container.decodeIfPresent(Bool.self, forKey: .paywall) ?? false
         self.timestamp = try container.decodeIfPresent(Int32.self, forKey: .timestamp)
+        self.recognitionVersion = try container.decodeIfPresent(Int.self, forKey: .recognitionVersion)
         if let toneRaw = try container.decodeIfPresent(String.self, forKey: .tone) {
             self.tone = TranslationTone(rawValue: toneRaw)
         }
@@ -78,6 +82,11 @@ public struct ChatTranslationState: Codable {
         try container.encode(self.paywall, forKey: .paywall)
         try container.encodeIfPresent(self.tone?.rawValue, forKey: .tone)
         try container.encodeIfPresent(self.timestamp, forKey: .timestamp)
+        try container.encodeIfPresent(self.recognitionVersion, forKey: .recognitionVersion)
+    }
+
+    fileprivate func hasCurrentRecognition(baseLang: String, now: Int32) -> Bool {
+        self.recognitionVersion == 1 && self.baseLang == baseLang && RegramChatLanguagePolicy.isFresh(timestamp: self.timestamp, now: now)
     }
 }
 
@@ -272,22 +281,7 @@ private func makeChatTranslationQueue() -> Queue {
 }
 
 private func chatTranslationLanguageCode(_ code: String) -> String {
-    let components = code.replacingOccurrences(of: "_", with: "-").lowercased().components(separatedBy: "-")
-    let language = components.first ?? code
-    switch language {
-    case "zh":
-        if components.contains("hans") {
-            return "zh-CN"
-        }
-        if components.contains("hant") || components.contains("tw") || components.contains("hk") || components.contains("mo") {
-            return "zh-TW"
-        }
-        return "zh-CN"
-    case "iw":
-        return "he"
-    default:
-        return Translate.normalizeLanguageCode(language)
-    }
+    return RegramChatLanguagePolicy.targetCode(code)
 }
 
 @available(macOS 10.14, *)
@@ -757,7 +751,8 @@ public final class ChatLiveTranslateContext {
             let previousGeneration = self.stateValue.with { $0.regramGeneration }
             self.updateState { current in
                 var current = current
-                let target = state?.toLang ?? appearance.languageCode
+                let interfaceLanguage = RegramChatLanguagePolicy.interfaceCode(primary: appearance.language.primaryLanguage.languageCode, base: appearance.languageCode)
+                let target = state?.toLang ?? interfaceLanguage
                 let to = RegramChatLanguagePolicy.targetCode(target)
                 let active = (state?.isEnabled ?? autoTranslate) && canUseTranslation
                 let previousTranslation = current.translate
@@ -765,7 +760,7 @@ public final class ChatLiveTranslateContext {
                 current.regramConfiguration = regramConfiguration
                 current.hasTelegramPremium = hasTelegramPremium
                 current.tone = state?.tone ?? .neutral
-                if let state, RegramChatLanguagePolicy.canDisplay(source: state.fromLang, target: to, interfaceLanguage: appearance.languageCode, active: active) {
+                if let state, RegramChatLanguagePolicy.canDisplay(source: state.fromLang, target: to, interfaceLanguage: interfaceLanguage, active: active) {
                     current.from = RegramChatLanguagePolicy.comparisonCode(state.fromLang)
                     current.to = to
                     current.canTranslate = true
@@ -856,7 +851,7 @@ public final class ChatLiveTranslateContext {
                 }
             }
             return regramProtectedTranslation(text: text, to: state.to, accountId: accountId, settings: settings, ranges: [], protectedIds: [], context: history, permitsNetworkFallback: permitted, telegramTranslate: { text, target in
-                TelegramEngine(account: account).messages.translate(text: text, toLang: RegramChatLanguagePolicy.comparisonCode(target), entities: [], tone: state.tone)
+                TelegramEngine(account: account).messages.translate(text: text, toLang: RegramChatLanguagePolicy.targetCode(target), entities: [], tone: state.tone)
                 |> mapError { _ in TranslateFetchError.network }
                 |> mapToSignal { result -> Signal<String, TranslateFetchError> in
                     guard let result else { return .fail(.network) }
@@ -1126,13 +1121,14 @@ public func chatTranslationState(context: any AccountContextProtocol, peerId: En
     return combineLatest(baseAppSettings(accountManager: context.sharedContext.accountManager), appearanceSignal, context.engine.data.subscribe(TelegramEngine.EngineData.Item.Peer.AutoTranslateEnabled(id: peerId)))
     |> mapToSignal { settings, appearance, autoTranslate -> Signal<ChatTranslationState?, NoError> in
         guard settings.translateChats || autoTranslate else { return .single(nil) }
-        let baseLang = appearance.languageCode
+        let baseLang = RegramChatLanguagePolicy.interfaceCode(primary: appearance.language.primaryLanguage.languageCode, base: appearance.languageCode)
         let ignoredLanguages = RegramChatLanguagePolicy.ignoredLanguages(interfaceLanguage: baseLang, configured: settings.doNotTranslate, systemLanguages: Locale.preferredLanguages)
         return cachedChatTranslationState(engine: context.engine, peerId: peerId)
+        |> deliverOn(prepareQueue)
         |> mapToSignal { cached -> Signal<ChatTranslationState?, NoError> in
             let now = Int32(clamping: Int64(Date().timeIntervalSince1970))
-            if let cached, cached.baseLang == baseLang, RegramChatLanguagePolicy.isFresh(timestamp: cached.timestamp, now: now) {
-                return .single(ignoredLanguages.contains(RegramChatLanguagePolicy.comparisonCode(cached.fromLang)) ? nil : cached)
+            if let cached, cached.hasCurrentRecognition(baseLang: baseLang, now: now) {
+                return .single(RegramChatLanguagePolicy.isIgnored(source: cached.fromLang, languages: ignoredLanguages) ? nil : cached)
             }
             return .single(nil)
             |> then(context.account.viewTracker.aroundMessageHistoryViewForLocation(.peer(peerId: peerId, threadId: nil), index: .upperBound, anchorIndex: .upperBound, count: 32, fixedCombinedReadStates: nil)
@@ -1154,7 +1150,7 @@ public func chatTranslationState(context: any AccountContextProtocol, peerId: En
                 let fromLang = RegramChatLanguagePolicy.dominantLanguage(samples: samples, supported: Set(Translate.supportedTranslationLanguages), detect: Translate.detectLanguage) ?? ""
                 let state = ChatTranslationState(baseLang: baseLang, fromLang: fromLang, toLang: cached?.toLang, isEnabled: cached?.isEnabled ?? autoTranslate, paywall: false, tone: cached?.tone, timestamp: now)
                 _ = updateChatTranslationState(engine: context.engine, peerId: peerId, state: state).start()
-                return ignoredLanguages.contains(fromLang) ? nil : state
+                return RegramChatLanguagePolicy.isIgnored(source: fromLang, languages: ignoredLanguages) ? nil : state
             })
         }
     }

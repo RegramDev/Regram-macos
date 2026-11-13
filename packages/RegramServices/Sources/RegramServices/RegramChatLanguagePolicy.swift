@@ -16,15 +16,44 @@ public enum RegramChatLanguagePolicy {
     }
 
     public static func comparisonCode(_ code: String) -> String {
-        let code = code.lowercased().replacingOccurrences(of: "_", with: "-").split(separator: "-").first.map(String.init) ?? ""
-        return code == "nb" ? "no" : code
+        let code = code.lowercased().replacingOccurrences(of: "_", with: "-")
+        let components = code.split(separator: "-")
+        let language = components.first.map(String.init) ?? ""
+        if code == "zhcncc" || code == "zhcncc-raw" || components.starts(with: ["regram", "zh", "hans"]) { return "zh-CN" }
+        if language == "zh" {
+            if components.contains("hans") { return "zh-CN" }
+            if components.contains("hant") || components.contains("tw") || components.contains("hk") || components.contains("mo") { return "zh-TW" }
+            if components.contains("cn") || components.contains("sg") { return "zh-CN" }
+        }
+        if language == "nb" { return "no" }
+        if language == "iw" { return "he" }
+        return language
     }
 
     public static func targetCode(_ code: String) -> String {
-        let code = code.lowercased().replacingOccurrences(of: "_", with: "-")
-        if code.hasPrefix("zh-hant") || code == "zh-tw" || code == "zh-hk" { return "zh-TW" }
-        if code.hasPrefix("zh-hans") || code == "zh-cn" || code == "zh-sg" { return "zh-CN" }
-        return comparisonCode(code)
+        let code = comparisonCode(code)
+        return code == "zh" ? "zh-CN" : code
+    }
+
+    public static func interfaceCode(primary: String, base: String) -> String {
+        let primary = comparisonCode(primary)
+        return isChinese(primary) ? targetCode(primary) : targetCode(base)
+    }
+
+    private static func isChinese(_ code: String) -> Bool {
+        code == "zh" || code == "zh-CN" || code == "zh-TW"
+    }
+
+    public static func isIgnored(source: String, languages: Set<String>) -> Bool {
+        languages.contains(comparisonCode(source))
+    }
+
+    public static func canTranslateMessage(source: String?, interfaceLanguage: String, configured: Set<String>) -> Bool {
+        guard let language = source else { return true }
+        let interfaceLanguage = targetCode(interfaceLanguage)
+        let source = comparisonCode(language)
+        if !configured.isEmpty, isIgnored(source: source, languages: Set(configured.map(targetCode))) { return false }
+        return source != interfaceLanguage && !(source == "zh" && isChinese(interfaceLanguage))
     }
 
     public static func systemLanguages(_ preferred: [String]) -> [String] {
@@ -34,15 +63,18 @@ public enum RegramChatLanguagePolicy {
     }
 
     public static func ignoredLanguages(interfaceLanguage: String, configured: Set<String>, systemLanguages: [String]) -> Set<String> {
-        if !configured.isEmpty { return Set(configured.map(comparisonCode)) }
-        return Set([comparisonCode(interfaceLanguage)] + self.systemLanguages(systemLanguages)).subtracting([""])
+        if !configured.isEmpty { return Set(configured.map(targetCode)) }
+        let interfaceLanguage = targetCode(interfaceLanguage)
+        let preferred = self.systemLanguages(systemLanguages).filter { !(isChinese(interfaceLanguage) && isChinese($0)) }
+        return Set([interfaceLanguage] + preferred).subtracting([""])
     }
 
     public static func canDisplay(source: String, target: String, interfaceLanguage: String, active: Bool) -> Bool {
         let source = comparisonCode(source)
-        let target = comparisonCode(target)
-        guard !source.isEmpty && !target.isEmpty && source != target else { return false }
-        return source != comparisonCode(interfaceLanguage) || active
+        let target = targetCode(target)
+        let interfaceLanguage = targetCode(interfaceLanguage)
+        guard !source.isEmpty, !target.isEmpty, source != target, !(source == "zh" && isChinese(target)) else { return false }
+        return active || (source != interfaceLanguage && !(source == "zh" && isChinese(interfaceLanguage)))
     }
 
     public static func isFresh(timestamp: Int32?, now: Int32) -> Bool {
@@ -72,14 +104,17 @@ public enum RegramChatLanguagePolicy {
         var order: [String] = []
         var recognized = 0
         for sample in samples where sample.incoming && sample.text.count >= 10 {
+            let hint = sample.languageHint.map(comparisonCode)
             let language: String?
-            if let hint = sample.languageHint, !hint.isEmpty { language = comparisonCode(hint) }
-            else {
+            if let hint, !hint.isEmpty, hint != "zh" {
+                language = hint
+            } else {
                 let text = recognitionText(sample)
                 guard text.count >= 10 else { continue }
-                language = detect(text).map(comparisonCode)
+                let detected = detect(text).map(comparisonCode)
+                language = hint == "zh" && detected.map(isChinese) != true ? nil : detected
             }
-            guard let language, supported.contains(language) else { continue }
+            guard let language, supported.contains(language) || (isChinese(language) && supported.contains("zh")) else { continue }
             if weights[language] == nil { order.append(language) }
             weights[language, default: 0] += sample.text.count
             recognized += 1
