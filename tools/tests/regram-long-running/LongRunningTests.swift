@@ -125,7 +125,7 @@ func regramMessageHistoryPage(account: TestAccount, peerId: Int64, threadId: Int
     return account.network.signal()
 }
 
-func regramShouldHideMessage(_ message: Message, accountId: Int64, filter: Int, revision: Int64) -> Bool { message.hidden }
+func regramChatListMessageIsHidden(_ message: Message, accountId: Int64, filter: Int, revision: Int64) -> Bool { message.hidden }
 
 struct SourceKey: Equatable {
     let messageId = TestMessageId(peerId: 1, id: 100)

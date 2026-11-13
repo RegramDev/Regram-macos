@@ -29,7 +29,7 @@ sources = package / 'Sources/SwiftSignalKit'
 tests = package / 'Tests'
 package.mkdir(parents=True, exist_ok=True)
 shutil.rmtree(sources, ignore_errors=True)
-shutil.copytree(ROOT / 'submodules/telegram-ios/submodules/SSignalKit/SwiftSignalKit/Source', sources)
+shutil.copytree(ROOT / 'submodules/telegram-ios/submodules/SSignalKit/SwiftSignalKit2/Source', sources)
 tests.mkdir(exist_ok=True)
 (package / 'Package.swift').write_text('''// swift-tools-version:5.9
 import PackageDescription
@@ -47,7 +47,12 @@ gate, stories, preview, controller, chat_list = [source[path] for path in paths]
 remote = declaration(preview, '    private func isCurrentRemoteRequest(') + '\n' + declaration(preview, '    private func loadRemotePage(')
 history_mapper = controller[controller.index('    ) |> filter { historyRenderGate.isCurrent'):controller.index('        let appliedTransition = historyViewTransition')]
 owner_capture = '[weak self]' if '|> mapToQueue { [weak self]' in history_mapper else ''
-owner_assignment = re.search(r'self\??\.currentRanks = data', history_mapper).group(0)
+if '_ = currentRanksValue.swap(data)' in history_mapper:
+    assert 'let currentRanksValue = self.currentRanksValue' in controller
+    owner_capture = '[currentRanksValue]'
+    owner_assignment = '_ = currentRanksValue.swap(data)'
+else:
+    owner_assignment = re.search(r'self\??\.currentRanks = data', history_mapper).group(0)
 accept = 'gate.isCurrent($0.0.version)'
 scroll_guard = 'guard gate.capture() != nil, visibleMessageWorkEnabled else { return }'
 scroll_cancel = 'work?.cancel(); work = nil'
@@ -88,6 +93,8 @@ assert 'visibleMessageWorkEnabled = false' in hidden
 assert 'visibleMessageWorkEnabled = true' in declaration(controller, '    public override func viewWillAppear(')
 assert 'chatListVisibleStoryResources(visibility: self.viewOnStage' in chat_list
 fixture = (HERE / 'LongRunningTests.swift').read_text()
+if owner_capture == '[currentRanksValue]':
+    fixture = fixture.replace('    var currentRanks: Int?', '    private let currentRanksValue = Atomic<Int?>(value: nil)\n    var currentRanks: Int? { currentRanksValue.with { $0 } }')
 for marker, value in {'__REMOTE_METHODS__': remote, '__RENDER_ACCEPT__': accept, '__SCROLL_GUARD__': scroll_guard, '__SCROLL_CANCEL__': scroll_cancel, '__HISTORY_OWNER_CAPTURE__': owner_capture, '__HISTORY_OWNER_ASSIGNMENT__': owner_assignment}.items():
     fixture = fixture.replace(marker, value)
 (tests / 'ChatHistoryRenderGate.swift').write_text(gate)
