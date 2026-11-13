@@ -2,6 +2,13 @@
 
 [简体中文](CHANGELOG.md) · **English**
 
+## 13.2.0 (283469) — 2026-11-13
+
+- Fix high CPU usage caused by repeated chat history scans when the translation language cache failed to load.
+- Turn off channel reactions when the Enable Reactions switch is turned off.
+- Forward the entire album when using Forward → More… on an album item.
+- Fix member permission exceptions that unintentionally blocked inline bots.
+
 ## 13.2.0 (283468) — 2026-11-13
 
 - Merge Telegram for macOS upstream through `c64a3ea7`.
