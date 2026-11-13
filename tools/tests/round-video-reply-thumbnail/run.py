@@ -18,7 +18,7 @@ def section(source, start, end):
 
 
 reply = section(args.source.read_text(), 'public class ReplyModel:', 'public class StoryReplyModel:')
-selection = section(reply, '    public override var updatedMedia:', '    private func updateImageIfNeeded()')
+selection = section(reply, '    public override var updatedMedia:', '    private func updateImageIfNeeded(')
 geometry = section(reply, '            var imageDimensions:', '                let imageHost = view.makeAccessoryImage()')
 for use in (
     'cachedMedia(media: updatedMedia, arguments: arguments, scale: System.backingScale)',

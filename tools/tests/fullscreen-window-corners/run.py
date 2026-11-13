@@ -22,6 +22,10 @@ def section(start, end):
 state = section('    private var isInFullScreenTransition:', '    private let _ready:')
 observers = section('        NotificationCenter.default.addObserver(self, selector: #selector(handleFullScreenWillChange(_:)), name: NSWindow.willEnterFullScreenNotification', '\n\n        let accountId = context.account.id')
 methods = section('    @objc private func handleFullScreenWillChange(', '\n}\n\nextension Window {\n    func applyCornerRadius(')
+observers = '\n'.join(line for line in observers.splitlines() if 'handleSidebarWindowResize' not in line)
+if '    @objc private func handleSidebarWindowResize(' in methods:
+    sidebar_resize = section('    @objc private func handleSidebarWindowResize(', '    @objc private func handleFullScreenDidChange(')
+    methods = methods.replace(sidebar_resize, '')
 radius_start = 'extension Window {\n    func applyCornerRadius('
 if source.count(radius_start) != 1:
     raise ValueError('Expected one window corner radius extension')
