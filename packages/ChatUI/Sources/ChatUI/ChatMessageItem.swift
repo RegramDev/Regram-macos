@@ -615,6 +615,7 @@ public class ChatMessageItem: ChatRowItem {
                 
             }
             
+            restrictCopying(interactions, message: message, layout: textLayout, chatInteraction: chatInteraction)
             textLayout.set(interactions)
 
             var relativeDateTimestamps: [Int32] = []

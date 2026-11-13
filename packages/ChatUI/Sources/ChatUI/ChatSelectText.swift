@@ -13,6 +13,52 @@ import Localization
 import HTMLBubbles
 import MessageUtils
 import RegramCore
+import ChatHistoryModel
+
+func showCopyRestriction(_ message: Message, chatInteraction: ChatInteraction) -> Bool {
+    guard message.isCopyProtected(cachedData: chatInteraction.presentation.cachedData) else {
+        return false
+    }
+    showProtectedCopyAlert(message, for: chatInteraction.interactionContext.window)
+    return true
+}
+
+func restrictCopying(_ interactions: TextViewInteractions, message: Message, layout: TextViewLayout, chatInteraction: ChatInteraction) {
+    restrictCopying(interactions, message: message, chatInteraction: chatInteraction, isBlocked: { [weak layout] in
+        return layout?.mayItems == false
+    })
+}
+
+func restrictCopying(_ interactions: TextViewInteractions, message: Message, layout: FoldingTextLayout, chatInteraction: ChatInteraction) {
+    restrictCopying(interactions, message: message, chatInteraction: chatInteraction, isBlocked: { [weak layout] in
+        return layout?.blocks.contains(where: { !$0.text.mayItems }) == true
+    })
+}
+
+private func restrictCopying(_ interactions: TextViewInteractions, message: Message, chatInteraction: ChatInteraction, isBlocked: @escaping () -> Bool) {
+    let copy = interactions.copy
+    interactions.copy = { [weak chatInteraction] in
+        guard isBlocked() else {
+            return copy?() ?? false
+        }
+        if let chatInteraction {
+            _ = showCopyRestriction(message, chatInteraction: chatInteraction)
+        }
+        return true
+    }
+    let processURL = interactions.processURL
+    let makeLinkType = interactions.makeLinkType
+    interactions.processURL = { [weak chatInteraction] link in
+        if case .code = makeLinkType((link, "")), isBlocked() {
+            if let chatInteraction {
+                _ = showCopyRestriction(message, chatInteraction: chatInteraction)
+            }
+            return
+        }
+        processURL(link)
+    }
+}
+
 public struct SelectContainer {
     public let text:NSAttributedString
     public let range:NSRange
@@ -35,7 +81,7 @@ func copiedMessageHeader(_ message: Message, timeDifference: TimeInterval) -> St
     return header
 }
 
-func copiedMessageReplyLine(_ message: Message, threadId: Int64?) -> String? {
+func copiedMessageReplyLine(_ message: Message, threadId: Int64?, accountId: Int64, cachedData: CachedPeerData?) -> String? {
     guard let attribute = message.replyAttribute, let replied = message.associatedMessages[attribute.messageId] else {
         return nil
     }
@@ -48,6 +94,10 @@ func copiedMessageReplyLine(_ message: Message, threadId: Int64?) -> String? {
         author = forwardInfo.authorTitle
     }
     let title = quote != nil ? strings().chatReplyQuotePanelTitle(author) : strings().chatReplyMessagePanelTitle(author)
+    let replyCachedData = replied.id.peerId == message.id.peerId ? cachedData : nil
+    if !regramCanCopyMessageText(replied, accountId: accountId, cachedData: replyCachedData) {
+        return title
+    }
     let source = quote.map { messageReplyQuoteText($0).text } ?? (pullText(from: replied).string as String)
     let firstLine = source.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
     let snippet = firstLine.count > 100 ? String(firstLine.prefix(100)) + "…" : firstLine
@@ -349,7 +399,26 @@ public class SelectManager : NSResponder {
             if let selectionState = chatInteraction.presentation.selectionState {
                 let timeDifference = chatInteraction.interactionContext.timeDifference
                 let threadId = chatInteraction.chatLocation.threadId
-                _ = chatInteraction.interactionContext.account.postbox.messagesAtIds(Array(selectionState.selectedIds.sorted(by: <))).start(next: { messages in
+                let accountId = chatInteraction.interactionContext.peerId.toInt64()
+                let cachedData = chatInteraction.presentation.cachedData
+                let window = chatInteraction.interactionContext.window
+                _ = (chatInteraction.interactionContext.account.postbox.messagesAtIds(Array(selectionState.selectedIds.sorted(by: <))) |> deliverOnMainQueue).start(next: { messages in
+                    var blocked: Message?
+                    let messages = messages.filter { message in
+                        if regramCanCopyMessageText(message, accountId: accountId, cachedData: cachedData) {
+                            return true
+                        }
+                        if blocked == nil {
+                            blocked = message
+                        }
+                        return false
+                    }
+                    if let blocked {
+                        showProtectedCopyAlert(blocked, for: window)
+                    }
+                    guard !messages.isEmpty else {
+                        return
+                    }
                     var text: String = ""
                     for message in messages {
                         if !text.isEmpty {
@@ -357,7 +426,7 @@ public class SelectManager : NSResponder {
                         }
                         text += "> " + copiedMessageHeader(message, timeDifference: timeDifference) + ":"
                         text += "\n"
-                        if let replyLine = copiedMessageReplyLine(message, threadId: threadId) {
+                        if let replyLine = copiedMessageReplyLine(message, threadId: threadId, accountId: accountId, cachedData: cachedData) {
                             text += "> " + replyLine + "\n"
                         }
                         text += pullText(from: message).string as String
