@@ -62,6 +62,7 @@ public struct RGMessageFilterRule: Codable, Equatable {
 
 public final class RGMessageFilter {
     public enum MatchResult: Equatable { case matched, notMatched, disabled, invalidRegex, timedOut }
+    public enum Decision: Equatable { case hide, show, timedOut }
     public static let regexTimeBudget: TimeInterval = 0.005
     private static let regexCacheLock = NSLock()
     private static var regexCache: [String: NSRegularExpression?] = [:]
@@ -103,12 +104,12 @@ public final class RGMessageFilter {
             }
             let deadline = ProcessInfo.processInfo.systemUptime + self.regexTimeBudget
             var result: MatchResult = .notMatched
-            regex.enumerateMatches(in: text, options: .reportProgress, range: NSRange(location: 0, length: string.length)) { match, _, stop in
-                if ProcessInfo.processInfo.systemUptime >= deadline {
-                    result = .timedOut
-                    stop.pointee = true
-                } else if match != nil {
+            regex.enumerateMatches(in: text, options: [.reportProgress, .reportCompletion], range: NSRange(location: 0, length: string.length)) { match, flags, stop in
+                if match != nil {
                     result = .matched
+                    stop.pointee = true
+                } else if flags.contains(.internalError) || (flags.contains(.progress) && ProcessInfo.processInfo.systemUptime >= deadline) {
+                    result = .timedOut
                     stop.pointee = true
                 }
             }
@@ -121,14 +122,19 @@ public final class RGMessageFilter {
     }
 
     public static func shouldHide(text: String, peerId: Int64?, rules: [RGMessageFilterRule]) -> Bool {
+        return self.decision(text: text, peerId: peerId, rules: rules) == .hide
+    }
+
+    static func decision(text: String, peerId: Int64?, rules: [RGMessageFilterRule]) -> Decision {
         if rules.isEmpty {
-            return false
+            return .show
         }
         let string = text as NSString
         let needsSwiftMatching = self.needsSwiftMatching(text)
         for rule in rules where rule.isException && rule.isEnabled && rule.appliesTo(peerId: peerId) {
             let result = self.matchResult(rule: rule, text: text, string: string, needsSwiftMatching: needsSwiftMatching)
-            if result == .matched || result == .timedOut { return false }
+            if result == .matched { return .show }
+            if result == .timedOut { return .timedOut }
         }
         var timeoutCount = 0
         for rule in rules where !rule.isException && rule.isEnabled {
@@ -138,11 +144,11 @@ public final class RGMessageFilter {
             if rule.isRegex && timeoutCount >= 4 { continue }
             let result = self.matchResult(rule: rule, text: text, string: string, needsSwiftMatching: needsSwiftMatching)
             if result == .matched {
-                return true
+                return .hide
             }
             if result == .timedOut { timeoutCount += 1 }
         }
-        return false
+        return timeoutCount > 0 ? .timedOut : .show
     }
 
     public static func encode(_ rules: [RGMessageFilterRule]) -> String {

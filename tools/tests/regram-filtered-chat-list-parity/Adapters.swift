@@ -115,6 +115,8 @@ public struct EngineMessage: Equatable {
     public typealias Id = MessageId
     public typealias Index = MessageIndex
     let message: Message
+    public var index: MessageIndex { message.index }
+    public var stableVersion: UInt32 { message.stableVersion }
     public func _asMessage() -> Message { message }
 }
 
@@ -140,8 +142,16 @@ public struct EngineChatList {
     public enum MediaDraftContentType { case audio, video }
     public var items: [Item]
     public var hasEarlier: Bool
+    public enum Group { case root, archive }
     ENGINE_ITEM_DECLARATION
+    ENGINE_GROUP_DECLARATION
 }
+
+struct MessageHistoryEntry { let message: Message }
+struct PinnedHistoryView { let entries: [MessageHistoryEntry] }
+struct PinnedLocation { let threadId: Int64? }
+struct PinnedVisibleRange { let lowerBound: MessageId }
+struct DismissedPins { var ids: Set<MessageId> = []; var tempMaxId: MessageId? }
 
 public struct CachedPeerData: Equatable { let associatedHistoryMessageId: MessageId? }
 

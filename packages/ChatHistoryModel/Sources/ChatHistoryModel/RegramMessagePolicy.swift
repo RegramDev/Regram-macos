@@ -76,8 +76,11 @@ public struct RegramMessageFilterPayload: Equatable {
         guard incoming, !filter.isEmpty else { return false }
         let key = RegramMessageVisibilityCache.Key(accountId: accountId, messageId: messageId)
         if let hidden = RegramMessageVisibilityCache.shared.value(key, version: version, revision: revision, payload: self) { return hidden }
-        let hidden = filter.shouldHide(peerId: messageId.peerId.toInt64(), authorId: authorId?.toInt64(), incoming: true, text: { filterText() })
-        RegramMessageVisibilityCache.shared.store(hidden, key: key, version: version, revision: revision, payload: self)
+        let decision = filter.decision(peerId: messageId.peerId.toInt64(), authorId: authorId?.toInt64(), incoming: true, text: { filterText() })
+        let hidden = decision == .hide
+        if decision != .timedOut {
+            RegramMessageVisibilityCache.shared.store(hidden, key: key, version: version, revision: revision, payload: self)
+        }
         return hidden
     }
 

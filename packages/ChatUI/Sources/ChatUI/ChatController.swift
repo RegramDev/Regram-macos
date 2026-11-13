@@ -1344,7 +1344,7 @@ public class ChatControllerView : View, ChatInputDelegate {
             value = .pendingRequests(Int(count), inviteRequestsPendingPeers)
         } else if interfaceState.reportMode != nil {
             value = .none
-        } else if let initialAction = interfaceState.initialAction, case let .ad(kind) = initialAction {
+        } else if !hidesSponsoredMessages, let initialAction = interfaceState.initialAction, case let .ad(kind) = initialAction {
             value = .promo(kind)
         } else if let peerStatus = interfaceState.peerStatus, let settings = peerStatus.peerStatusSettings, !settings.flags.isEmpty {
             
@@ -8916,6 +8916,8 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         let topVisibleMessageRange = self.topVisibleMessageRange.get()
         let dismissedPinnedIds = self.dismissedPinnedIds.get()
         let ready = self.ready.get()
+        let filterAccountId = context.peerId.toInt64()
+        let messageFilterChanges = regramMessageFilterChanges(accountId: filterAccountId)
         
         let getPinned:()-> Signal<ChatPinnedMessage?, NoError> = {
            
@@ -8931,19 +8933,21 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
             
             return combineLatest(queue: queue, replyHistoryFirst |> then(ready |> mapToSignal { _ in
                 return  replyHistory
-            }), topVisibleMessageRange, dismissedPinnedIds)
-                |> map { update, topVisibleMessageRange, dismissed -> ChatPinnedMessage? in
+            }), topVisibleMessageRange, dismissedPinnedIds, messageFilterChanges)
+                |> map { update, topVisibleMessageRange, dismissed, _ -> ChatPinnedMessage? in
                     let chatLocation = update.1
                     var message: ChatPinnedMessage?
                     switch update.0 {
                     case .Loading:
                         break
                     case let .HistoryView(view, _, _, _):
-                        let isInLocation: (Message) -> Bool = { message in
-                            return chatLocation.threadId == nil || chatLocation.threadId == message.threadId || message.threadId == context.peerId.toInt64()
+                        let visibleIndices = view.entries.indices.filter { index in
+                            let message = view.entries[index].message
+                            let isInLocation = chatLocation.threadId == nil || chatLocation.threadId == message.threadId || message.threadId == filterAccountId
+                            return isInLocation && !regramShouldHideMessage(message, accountId: filterAccountId)
                         }
-                        let lastIndexInLocation = view.entries.lastIndex(where: { isInLocation($0.message) })
-                        for i in 0 ..< view.entries.count {
+                        let lastVisibleIndex = visibleIndices.last
+                        for i in visibleIndices {
                             let entry = view.entries[i]
                             var matches = false
                             if let topVisibleMessageRange = topVisibleMessageRange {
@@ -8954,15 +8958,15 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                             if let tempMaxId = dismissed.tempMaxId {
                                 var effectiveMatches = matches && entry.message.id < tempMaxId
                                 
-                                if matches, message == nil, i == lastIndexInLocation {
+                                if matches, message == nil, i == lastVisibleIndex {
                                     effectiveMatches = true
                                 }
                                 matches = effectiveMatches
                             }
-                            if i == lastIndexInLocation, message == nil {
+                            if i == lastVisibleIndex, message == nil {
                                 matches = true
                             }
-                            if matches, isInLocation(entry.message) {
+                            if matches {
                                 message = ChatPinnedMessage(messageId: entry.message.id, message: entry.message, others: view.entries.map { $0.message.id }, isLatest: i == view.entries.count - 1, index: view.entries.count - 1 - i, totalCount: view.entries.count)
                             }
                         }
@@ -9010,8 +9014,8 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                 |> distinctUntilChanged
         case .thread:
             if mode.isThreadMode, case let .thread(data) = chatLocation() {
-                topPinnedMessage = context.account.postbox.messageView(data.effectiveTopId) |> map { view in
-                    if let message = view.message {
+                topPinnedMessage = combineLatest(context.account.postbox.messageView(data.effectiveTopId), messageFilterChanges) |> map { view, _ in
+                    if let message = view.message, !regramShouldHideMessage(message, accountId: filterAccountId) {
                         return ChatPinnedMessage(messageId: message.id, message: message, others: [message.id], isLatest: true, index: 0, totalCount: 1)
                     } else {
                         return nil

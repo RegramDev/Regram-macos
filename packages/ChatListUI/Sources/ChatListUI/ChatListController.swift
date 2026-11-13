@@ -1109,6 +1109,12 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
                 })
             }
             let regramRevision = RegramPreferences.shared.revision(accountId: context.peerId.toInt64()) &+ RGGroupRemarks.shared.revision(accountId: context.peerId.toInt64()) &+ regramRefreshRevision.with { $0 }
+            let filterAccountId = context.peerId.toInt64()
+            func visibleGroup(_ group: EngineChatList.GroupItem) -> EngineChatList.GroupItem {
+                guard let message = group.topMessage?._asMessage(),
+                      message.rgIsRevoked || regramShouldHideMessage(message, accountId: filterAccountId) else { return group }
+                return EngineChatList.GroupItem(id: group.id, topMessage: nil, items: group.items, unreadCount: group.unreadCount)
+            }
             var mapped: [UIChatListEntry] = prepare.map { item in
                 let space: PeerActivitySpace
                 var generalStatus: ItemHideStatus? = nil
@@ -1125,13 +1131,13 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
             }
             
             if let group = regramArchiveGroup, !update.list.hasLater, state.mode == .plain {
-                mapped.append(.group(update.list.groupItems.count, group, false, state.hiddenItems.archive, state.controllerAppear, state.appear == .short, storyState))
+                mapped.append(.group(update.list.groupItems.count, visibleGroup(group), false, state.hiddenItems.archive, state.controllerAppear, state.appear == .short, storyState))
             }
             if case .filter = filterData.filter, mapped.isEmpty {} else {
                 if !update.list.hasLater, state.appear != .short {
                     let hideStatus: ItemHideStatus = hiddenItems.archive
                     for (i, group) in update.list.groupItems.reversed().enumerated() where !regramSettings["features.hideSavedAndArchivedMessagesInList"].bool {
-                        mapped.append(.group(i, group, animateGroupNextTransition.swap(nil) == group.id, hideStatus, state.controllerAppear, state.appear == .short, storyState))
+                        mapped.append(.group(i, visibleGroup(group), animateGroupNextTransition.swap(nil) == group.id, hideStatus, state.controllerAppear, state.appear == .short, storyState))
                     }
                     if state.mode == .plain, state.filterData.filter == .allChats, !update.list.hasLater {
                         if !regramSettings["features.hideSavedAndArchivedMessagesInList"].bool, update.list.groupItems.isEmpty, let storyState = storyState, !storyState.items.isEmpty {

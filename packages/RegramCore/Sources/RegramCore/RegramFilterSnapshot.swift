@@ -30,11 +30,14 @@ public struct RegramFilterSnapshot {
     }
 
     public func shouldHide(peerId: Int64, authorId: Int64?, incoming: Bool, text: () -> String) -> Bool {
-        guard incoming else { return false }
-        if let authorId, hiddenAuthors.contains(authorId) { return true }
-        guard !ignoredChats.contains(peerId) else { return false }
-        guard hasEnabledRules else { return false }
-        return RGMessageFilter.shouldHide(text: text(), peerId: peerId, rules: rules)
+        decision(peerId: peerId, authorId: authorId, incoming: incoming, text: text) == .hide
+    }
+
+    public func decision(peerId: Int64, authorId: Int64?, incoming: Bool, text: () -> String) -> RGMessageFilter.Decision {
+        guard incoming else { return .show }
+        if let authorId, hiddenAuthors.contains(authorId) { return .hide }
+        guard !ignoredChats.contains(peerId), hasEnabledRules else { return .show }
+        return RGMessageFilter.decision(text: text(), peerId: peerId, rules: rules)
     }
 }
 

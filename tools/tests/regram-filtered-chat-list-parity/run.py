@@ -36,6 +36,7 @@ adapters = (HERE / 'Adapters.swift').read_text()
 adapters = adapters.replace('MESSAGE_INDEX_COMPARATOR', declaration(message, 'public static func <(lhs: MessageIndex'))
 adapters = adapters.replace('CHAT_LIST_INDEX_COMPARATOR', declaration(message, 'public static func <(lhs: ChatListIndex'))
 adapters = adapters.replace('ENGINE_ITEM_DECLARATION', declaration(engine, 'public final class Item: Equatable'))
+adapters = adapters.replace('ENGINE_GROUP_DECLARATION', declaration(engine, 'public final class GroupItem: Equatable'))
 coordinator = (chat_list / 'RegramChatListPreview.swift').read_text()
 controller = (chat_list / 'ChatListController.swift').read_text()
 assert 'presentation.entries.sorted()' in controller
@@ -82,6 +83,23 @@ production += '\n' + declaration(message_policy, 'public func regramShouldHideMe
 legacy = declaration(message_policy, 'public func regramShouldHideMessage(_ message: Message, accountId: Int64, temporaryReveal:')
 assert 'captureFilter(accountId: accountId)' in legacy
 production += '\n' + legacy.replace('RegramPreferences.shared', 'testPreferences').replace('RegramTemporaryReveal.shared', 'testReveal')
+group = declaration(controller, 'func visibleGroup(').replace('_ group: EngineChatList.GroupItem)', '_ group: EngineChatList.GroupItem, filterAccountId: Int64)')
+production += '\n' + group
+chat = ROOT / 'packages/ChatUI/Sources/ChatUI'
+pinned_state = (chat / 'ChatPresentationInterfaceState.swift').read_text()
+production += '\n' + declaration(pinned_state, 'public final class ChatPinnedMessage:')
+chat_controller = (chat / 'ChatController.swift').read_text()
+pinned = declaration(chat_controller, 'let getPinned:()-> Signal<ChatPinnedMessage?, NoError> =')
+assert 'dismissedPinnedIds, messageFilterChanges)' in pinned
+assert 'messageView(data.effectiveTopId), messageFilterChanges)' in chat_controller
+pinned = pinned[pinned.index('case let .HistoryView(view, _, _, _):') + len('case let .HistoryView(view, _, _, _):'):pinned.index('\n                        break\n                    }\n                    return message')]
+production += '''
+func visiblePin(_ view: PinnedHistoryView, chatLocation: PinnedLocation, topVisibleMessageRange: PinnedVisibleRange?, dismissed: DismissedPins, filterAccountId: Int64) -> ChatPinnedMessage? {
+    var message: ChatPinnedMessage?
+''' + pinned + '''
+    return message
+}
+'''
 conditional = declaration(coordinator, 'when: { transaction, apply in')
 conditional = conditional[conditional.index('guard '):conditional.rindex('}')]
 conditional = conditional.replace('RegramPreferences.shared', 'preferences').replace('RegramTemporaryReveal.shared', 'reveal')
@@ -150,7 +168,7 @@ with tempfile.TemporaryDirectory(prefix='regram-filtered-chat-list-parity-') as 
     sources = sorted((ROOT / 'packages/RegramCore/Sources/RegramCore').glob('*.swift'))
     message_filter_path = ROOT / 'packages/RegramCore/Sources/RegramCore/MessageFilter.swift'
     instrumented_filter = work / 'MessageFilter.swift'
-    instrumented_filter.write_text(message_filter_path.read_text().replace('public static func shouldHide(text: String, peerId: Int64?, rules: [RGMessageFilterRule]) -> Bool {', 'public static func shouldHide(text: String, peerId: Int64?, rules: [RGMessageFilterRule]) -> Bool {\n        TestCounters.shared.increment("matches")'))
+    instrumented_filter.write_text(message_filter_path.read_text().replace('static func decision(text: String, peerId: Int64?, rules: [RGMessageFilterRule]) -> Decision {', 'static func decision(text: String, peerId: Int64?, rules: [RGMessageFilterRule]) -> Decision {\n        TestCounters.shared.increment("matches")'))
     sources = [path for path in sources if path != message_filter_path] + [instrumented_filter]
     subprocess.run(['xcrun', 'swiftc', '-swift-version', '5', '-DSTABLE', '-warnings-as-errors', *map(str, sources), str(source), str(HERE / 'main.swift'), '-o', str(binary)], cwd=ROOT, check=True)
     subprocess.run([str(binary)], cwd=ROOT, check=True, timeout=45)

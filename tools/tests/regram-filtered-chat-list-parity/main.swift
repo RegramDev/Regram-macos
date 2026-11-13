@@ -207,6 +207,25 @@ for operation in 0..<3 {
 expect(stress.wait(timeout: .now() + 10) == .success, "concurrent revision reveal native lock ordering")
 
 preferences.update(accountId: accountId) { $0.filterRules = settings.filterRules }
+let hiddenPin = message(20)
+let visiblePinMessage = message(18, text: "visible")
+let pinnedHistory = PinnedHistoryView(entries: [visiblePinMessage, hiddenPin].map { MessageHistoryEntry(message: $0) })
+let chatLocation = PinnedLocation(threadId: nil)
+let archived = EngineChatList.GroupItem(id: .archive, topMessage: EngineMessage(message: hiddenPin), items: [.init(peer: "peer", isUnread: true)], unreadCount: 3)
+let filteredArchive = visibleGroup(archived, filterAccountId: accountId)
+expect(filteredArchive.topMessage == nil && filteredArchive.items == archived.items && filteredArchive.unreadCount == 3, "archived summary hides the matching message and keeps its unread metadata")
+let filteredPin = visiblePin(pinnedHistory, chatLocation: chatLocation, topVisibleMessageRange: nil, dismissed: .init(), filterAccountId: accountId)
+expect(filteredPin?.messageId == visiblePinMessage.id && filteredPin?.others == [visiblePinMessage.id, hiddenPin.id], "pinned header falls back to a visible pin and keeps pin metadata")
+let allHiddenPins = PinnedHistoryView(entries: [MessageHistoryEntry(message: hiddenPin)])
+expect(visiblePin(allHiddenPins, chatLocation: chatLocation, topVisibleMessageRange: nil, dismissed: .init(), filterAccountId: accountId) == nil, "pinned header omits an entirely filtered set")
+expect(visiblePin(pinnedHistory, chatLocation: chatLocation, topVisibleMessageRange: nil, dismissed: .init(), filterAccountId: accountId + 1000)?.messageId == hiddenPin.id, "another account keeps its own pin visibility")
+reveal.setRevealed(true, accountId: accountId, peerId: peer.toInt64())
+expect(visibleGroup(archived, filterAccountId: accountId) == archived, "temporary reveal restores archive previews")
+expect(visiblePin(pinnedHistory, chatLocation: chatLocation, topVisibleMessageRange: nil, dismissed: .init(), filterAccountId: accountId)?.messageId == hiddenPin.id, "temporary reveal restores the latest pin")
+expect(regramShouldHideMessage(hiddenPin, accountId: accountId, temporaryReveal: false), "visibility checks can ignore temporary reveal")
+reveal.setRevealed(false, accountId: accountId, peerId: peer.toInt64())
+expect(visibleGroup(archived, filterAccountId: accountId) == filteredArchive, "archive filtering resumes after temporary reveal")
+expect(visiblePin(pinnedHistory, chatLocation: chatLocation, topVisibleMessageRange: nil, dismissed: .init(), filterAccountId: accountId)?.messageId == visiblePinMessage.id, "pin filtering resumes after temporary reveal")
 func scheduledRequests(_ account: Account, ids: ClosedRange<Int>, readable: Set<Int>) -> [UnreadRequest] {
     ids.map { index in
         let peerId = PeerId(namespace: Namespaces.Peer.CloudUser, value: Int64(1000 + index))
@@ -298,6 +317,15 @@ for _ in 0..<200 { _ = regramShouldHideMessage(message(20), accountId: performan
 expect(TestCounters.shared.count("text") - textBeforeRepeated == 1 && TestCounters.shared.count("matches") - matchesBeforeRepeated == 1, "two hundred stable classifications share one text extraction and regex")
 let changedText = message(20).withUpdatedText("visible")
 expect(changedText.stableVersion == message(20).stableVersion && !regramShouldHideMessage(changedText, accountId: performanceAccount, filter: filter, revision: performanceRevision), "same-version updated text invalidates decision")
+let timeoutMessage = message(24, text: String(repeating: "a", count: 400) + "!")
+var timeoutSettings = RegramAccountSettings()
+timeoutSettings.filterRules = [RGMessageFilterRule(pattern: "^(a+)+$", isRegex: true)]
+let timeoutFilter = RegramFilterSnapshot(settings: timeoutSettings)
+let matchesBeforeTimeout = TestCounters.shared.count("matches")
+for _ in 0..<2 {
+    expect(!regramShouldHideMessage(timeoutMessage, accountId: performanceAccount, filter: timeoutFilter, revision: performanceRevision), "timed-out regex keeps the message visible")
+}
+expect(TestCounters.shared.count("matches") - matchesBeforeTimeout == 2, "timed-out regex is retried on the next evaluation")
 let richAttribute = RichTextMessageAttribute(InstantPage(["hidden"]))
 let richMessage = message(25, text: "visible").withUpdatedAttributes([richAttribute])
 expect(regramShouldHideMessage(richMessage, accountId: performanceAccount, filter: filter, revision: performanceRevision), "rich block participates in text filtering")
