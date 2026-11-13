@@ -8,7 +8,7 @@
 
 ## 安装发布包
 
-下载 Regram 13.2.0 (283467) 的 [Apple Silicon 安装包](https://github.com/RegramDev/Regram-macos/releases/download/v13.2.0-283467/Regram-13.2.0-283467-arm64.dmg)或 [Intel 安装包](https://github.com/RegramDev/Regram-macos/releases/download/v13.2.0-283467/Regram-13.2.0-283467-x86_64.dmg)。此版本要求 macOS 12.0 或更高版本，校验值见 [SHA256SUMS.txt](https://github.com/RegramDev/Regram-macos/releases/download/v13.2.0-283467/SHA256SUMS.txt)。
+下载 Regram 13.2.0 (283468) 的 [Apple Silicon 安装包](https://github.com/RegramDev/Regram-macos/releases/download/v13.2.0-283468/Regram-13.2.0-283468-arm64.dmg)或 [Intel 安装包](https://github.com/RegramDev/Regram-macos/releases/download/v13.2.0-283468/Regram-13.2.0-283468-x86_64.dmg)。此版本要求 macOS 12.0 或更高版本，校验值见 [SHA256SUMS.txt](https://github.com/RegramDev/Regram-macos/releases/download/v13.2.0-283468/SHA256SUMS.txt)。
 
 此版本使用 Apple/Mac Development 开发证书签名，尚未经 Apple 公证。打开下载的 DMG，将 Regram 拖到 Applications（应用程序）文件夹，再从该文件夹启动。
 
@@ -63,7 +63,7 @@ git submodule update --init --recursive
 `third-party/widget-sandbox` 无法访问，可以显式初始化应用所需的依赖：
 
 ```
-git submodule update --init --recursive -- submodules/libtgvoip submodules/Sparkle submodules/telegram-ios submodules/rlottie submodules/tgcalls submodules/tg_owt submodules/libprisma submodules/regex submodules/tlottie
+git submodule update --init --recursive -- submodules/libtgvoip submodules/Sparkle submodules/telegram-ios submodules/tgcalls submodules/tg_owt submodules/libprisma submodules/regex submodules/tlottie
 bash scripts/prepare-regram-core.sh
 ```
 
@@ -147,7 +147,7 @@ xcframework 不纳入版本管理，每台机器自行构建。
 ## 4. 构建应用
 
 在 Xcode 中打开 `Telegram-Mac.xcworkspace`，而非 `Telegram.xcodeproj`。
-工作区还包含应用需要链接的 `RLottie_Xcode`、`CodeSyntax` 和 `Sparkle` 工程，
+工作区还包含应用需要链接的 `CodeSyntax` 和 `Sparkle` 工程，
 单独构建 `Telegram.xcodeproj` 无法找到它们。
 
 可用方案：
@@ -166,7 +166,7 @@ xcodebuild -workspace Telegram-Mac.xcworkspace -scheme Release -configuration Re
   'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) STABLE' build
 ```
 
-v13.2.0-283467 发布版的部署目标为 macOS 12.0 或更高版本。
+v13.2.0-283468 发布版的部署目标为 macOS 12.0 或更高版本。
 Swift 包从工作区中的本地路径解析，不需要访问网络。
 
 <a id="separate-architecture-packages"></a>

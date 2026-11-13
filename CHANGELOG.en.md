@@ -2,6 +2,13 @@
 
 [简体中文](CHANGELOG.md) · **English**
 
+## 13.2.0 (283468) — 2026-11-13
+
+- Merge Telegram for macOS upstream through `c64a3ea7`.
+- Add the original Telegram icon under Settings → Appearance → App Icon.
+- Fix sponsored banners escaping the hide setting, stale filtered previews in the archive and pinned messages, and missed matches being cached after a regex timeout.
+- Restore translation controls in both directions between Simplified and Traditional Chinese. Retry long plain-text messages in chunks when Telegram reports a length error, preserving line breaks and link positions.
+
 ## 13.2.0 (283467) — 2026-11-11
 
 - Fix stale sync results moving a group back to the main chat list after you send a message in the archived group.
