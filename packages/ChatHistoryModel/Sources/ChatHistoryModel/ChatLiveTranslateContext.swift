@@ -17,7 +17,9 @@ import MessageUtils
 
 
 
-public struct ChatTranslationState: Codable {
+public struct ChatTranslationState: Codable, Equatable {
+    private static let currentRecognitionVersion: Int32 = 1
+
     public enum CodingKeys: String, CodingKey {
         case baseLang
         case fromLang
@@ -36,7 +38,7 @@ public struct ChatTranslationState: Codable {
     public var paywall: Bool
     public var tone: TranslationTone?
     public var timestamp: Int32?
-    private var recognitionVersion: Int?
+    private let recognitionVersion: Int32?
 
     public init(
         baseLang: String,
@@ -54,7 +56,7 @@ public struct ChatTranslationState: Codable {
         self.paywall = paywall
         self.tone = tone
         self.timestamp = timestamp
-        self.recognitionVersion = 1
+        self.recognitionVersion = Self.currentRecognitionVersion
     }
 
     public init(from decoder: Decoder) throws {
@@ -66,7 +68,7 @@ public struct ChatTranslationState: Codable {
         self.isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled)
         self.paywall = try container.decodeIfPresent(Bool.self, forKey: .paywall) ?? false
         self.timestamp = try container.decodeIfPresent(Int32.self, forKey: .timestamp)
-        self.recognitionVersion = try container.decodeIfPresent(Int.self, forKey: .recognitionVersion)
+        self.recognitionVersion = try container.decodeIfPresent(Int32.self, forKey: .recognitionVersion)
         if let toneRaw = try container.decodeIfPresent(String.self, forKey: .tone) {
             self.tone = TranslationTone(rawValue: toneRaw)
         }
@@ -85,8 +87,8 @@ public struct ChatTranslationState: Codable {
         try container.encodeIfPresent(self.recognitionVersion, forKey: .recognitionVersion)
     }
 
-    fileprivate func hasCurrentRecognition(baseLang: String, now: Int32) -> Bool {
-        self.recognitionVersion == 1 && self.baseLang == baseLang && RegramChatLanguagePolicy.isFresh(timestamp: self.timestamp, now: now)
+    func hasCurrentRecognition(baseLang: String, now: Int32) -> Bool {
+        self.recognitionVersion == Self.currentRecognitionVersion && self.baseLang == baseLang && RegramChatLanguagePolicy.isFresh(timestamp: self.timestamp, now: now)
     }
 }
 
@@ -99,6 +101,7 @@ private func cachedChatTranslationState(engine: TelegramEngine, peerId: EnginePe
     |> map { entry -> ChatTranslationState? in
         return entry?.get(ChatTranslationState.self)
     }
+    |> distinctUntilChanged
 }
 
 private func updateChatTranslationState(engine: TelegramEngine, peerId: EnginePeer.Id, state: ChatTranslationState?) -> Signal<Never, NoError> {
@@ -1116,6 +1119,8 @@ extension MessageTextEntityType {
     }
 }
 
+private let chatLanguageRecognitionQueue = Queue(name: "chatLanguageRecognition", qos: .userInitiated)
+
 public func chatTranslationState(context: any AccountContextProtocol, peerId: EnginePeer.Id) -> Signal<ChatTranslationState?, NoError> {
     if peerId == PeerId(namespace: Namespaces.Peer.CloudUser, id: ._internalFromInt64Value(777000)) || peerId.namespace == Namespaces.Peer.SecretChat { return .single(nil) }
     return combineLatest(baseAppSettings(accountManager: context.sharedContext.accountManager), appearanceSignal, context.engine.data.subscribe(TelegramEngine.EngineData.Item.Peer.AutoTranslateEnabled(id: peerId)))
@@ -1134,6 +1139,7 @@ public func chatTranslationState(context: any AccountContextProtocol, peerId: En
             |> then(context.account.viewTracker.aroundMessageHistoryViewForLocation(.peer(peerId: peerId, threadId: nil), index: .upperBound, anchorIndex: .upperBound, count: 32, fixedCombinedReadStates: nil)
             |> filter { $0.0.entries.count > 1 }
             |> take(1)
+            |> deliverOn(chatLanguageRecognitionQueue)
             |> map { history, _, _ -> ChatTranslationState? in
                 let samples = history.entries.map { entry -> RegramChatLanguagePolicy.Sample in
                     let message = entry.message
@@ -1148,7 +1154,8 @@ public func chatTranslationState(context: any AccountContextProtocol, peerId: En
                     return .init(text: message.text, incoming: message.effectivelyIncoming(context.peerId), excludedRanges: excluded, languageHint: hint)
                 }
                 let fromLang = RegramChatLanguagePolicy.dominantLanguage(samples: samples, supported: Set(Translate.supportedTranslationLanguages), detect: Translate.detectLanguage) ?? ""
-                let state = ChatTranslationState(baseLang: baseLang, fromLang: fromLang, toLang: cached?.toLang, isEnabled: cached?.isEnabled ?? autoTranslate, paywall: false, tone: cached?.tone, timestamp: now)
+                let timestamp = Int32(clamping: Int64(Date().timeIntervalSince1970))
+                let state = ChatTranslationState(baseLang: baseLang, fromLang: fromLang, toLang: cached?.toLang, isEnabled: cached?.isEnabled ?? autoTranslate, paywall: false, tone: cached?.tone, timestamp: timestamp)
                 _ = updateChatTranslationState(engine: context.engine, peerId: peerId, state: state).start()
                 return RegramChatLanguagePolicy.isIgnored(source: fromLang, languages: ignoredLanguages) ? nil : state
             })
