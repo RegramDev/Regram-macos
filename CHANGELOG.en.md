@@ -2,6 +2,14 @@
 
 [简体中文](CHANGELOG.md) · **English**
 
+## 13.2.0 (283470) — 2026-11-15
+
+- Regram settings are shared across accounts on the same Mac. The upgrade uses the main account's existing settings first and matches the startup folder by name.
+- Keep Telegram's camera in the attachment menu and remove message screenshot export.
+- Refresh open previews when the large-photo setting changes. Restore large-photo sending, Enter-to-send, and outgoing-message alignment from settings backups.
+- Keep sticker sizes above 100% and retain eligible attachments when a mixed paste includes an oversized file.
+- Remove duplicate link-preview search results and retired settings entries. Use the localized Save label for deleted-message markers.
+
 ## 13.2.0 (283469) — 2026-11-13
 
 - Fix high CPU usage caused by repeated chat history scans when the translation language cache failed to load.
