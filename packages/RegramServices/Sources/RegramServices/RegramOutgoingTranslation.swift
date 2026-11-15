@@ -3,7 +3,7 @@ import RegramCore
 
 public enum RegramOutgoingTranslationPolicy {
     public static func key(accountId: Int64, peerId: Int64) -> String {
-        "v2:\(accountId):\(peerId)"
+        RegramPeerPreferenceKey.outgoingTranslation(accountId: accountId, peerId: peerId)
     }
 
     public static func language(settings: RegramAccountSettings, accountId: Int64, peerId: Int64) -> String? {

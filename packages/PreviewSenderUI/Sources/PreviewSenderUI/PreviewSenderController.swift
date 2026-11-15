@@ -428,9 +428,10 @@ fileprivate class PreviewSenderView : Control {
             if state.state == .media {
                 menu.addItem(ContextSeparatorItem())
                 menu.addItem(ContextMenuItem(strings().generalSettingsSendLargePhotos, handler: { [weak self] in
-                    FastSettings.sendLargePhotos(!FastSettings.sendLargePhotos)
+                    let enabled = !FastSettings.sendLargePhotos
+                    FastSettings.sendLargePhotos(enabled)
                     if let window = self?.window as? Window {
-                        showModalText(for: window, text: FastSettings.sendLargePhotos ? strings().generalSettingsSendLargePhotosTooltipEnabled : strings().generalSettingsSendLargePhotosTooltipDisabled)
+                        showModalText(for: window, text: enabled ? strings().generalSettingsSendLargePhotosTooltipEnabled : strings().generalSettingsSendLargePhotosTooltipDisabled)
                     }
                 }, state: FastSettings.sendLargePhotos ? .on : nil, itemImage: MenuAnimation.menu_hd.value))
             }
@@ -1067,19 +1068,21 @@ private final class PreviewMedia : Comparable, Identifiable {
         return lhs.index < rhs.index
     }
     static func == (lhs: PreviewMedia, rhs: PreviewMedia) -> Bool {
-        return lhs.container == rhs.container && lhs.isCollage == rhs.isCollage && lhs.customPreview == rhs.customPreview
+        return lhs.container == rhs.container && lhs.isCollage == rhs.isCollage && lhs.customPreview == rhs.customPreview && lhs.photoDimension == rhs.photoDimension
     }
     let container: MediaSenderContainer
     let index: Int
     let isCollage: Bool
+    let photoDimension: CGFloat?
     private(set) var media: Media?
     let customPreview: String?
-    init(container: MediaSenderContainer, index: Int, media: Media?, isCollage: Bool, customPreview: String?) {
+    init(container: MediaSenderContainer, index: Int, media: Media?, isCollage: Bool, customPreview: String?, photoDimension: CGFloat?) {
         self.container = container
         self.index = index
         self.media = media
         self.isCollage = isCollage
         self.customPreview = customPreview
+        self.photoDimension = photoDimension
     }
     
 
@@ -1103,7 +1106,7 @@ private final class PreviewMedia : Comparable, Identifiable {
             }
         }
         
-        _ = Sender.generateMedia(for: container, account: account, isSecretRelated: isSecretRelated, isCollage: isCollage, customPreview: customPreview, runQueue: runQueue).start(next: { media, path in
+        _ = Sender.generateMedia(for: container, account: account, isSecretRelated: isSecretRelated, isCollage: isCollage, customPreview: customPreview, runQueue: runQueue, photoDimension: photoDimension).start(next: { media, path in
             generated = media
             semaphore.signal()
         })
@@ -1116,7 +1119,7 @@ private final class PreviewMedia : Comparable, Identifiable {
     
     func prepareFinalMedia(account: Account, isSecretRelated: Bool, isCollage: Bool, customPreview: String?, randomId: Int64) -> Media {
         var generated: Media!
-        _ = Sender.generateMedia(for: container, account: account, isSecretRelated: isSecretRelated, isCollage: isCollage, customPreview: customPreview, runQueue: nil, preferredRandomId: randomId).start(next: { media, _ in
+        _ = Sender.generateMedia(for: container, account: account, isSecretRelated: isSecretRelated, isCollage: isCollage, customPreview: customPreview, runQueue: nil, preferredRandomId: randomId, photoDimension: photoDimension).start(next: { media, _ in
             generated = media
         })
         return generated
@@ -1141,7 +1144,7 @@ private final class PreviewMedia : Comparable, Identifiable {
         guard orientation >= 1 && orientation <= 8 else {
             return nil
         }
-        let dimension = FastSettings.photoDimension
+        guard let dimension = photoDimension else { return nil }
         var size = orientation >= 5 ? CGSize(width: pixelHeight, height: pixelWidth) : CGSize(width: pixelWidth, height: pixelHeight)
         let longest = max(size.width, size.height)
         if longest > dimension {
@@ -1235,12 +1238,18 @@ func canEditPreviewVideo(_ media: Media) -> Bool {
     return file.resource is LocalFileVideoMediaResource
 }
 
-private func previewMedias(containers:[MediaSenderContainer], savedState: [PreviewMedia]?, isCollage: Bool, previews: [String: String]) -> [PreviewMedia] {
+private func previewMedias(containers:[MediaSenderContainer], savedState: [PreviewMedia]?, isCollage: Bool, previews: [String: String], sendsLargePhotos: Bool) -> [PreviewMedia] {
     var index: Int = 0
     var result:[PreviewMedia] = []
     for container in containers {
-        let found = savedState?.first(where: {$0.stableId == .container(container)})
-        result.append(PreviewMedia(container: container, index: index, media: found?.media, isCollage: isCollage, customPreview: previews[container.path]))
+        let dimension: CGFloat?
+        if !container.isFile, MIMEType(container.path).hasPrefix("image/") {
+            dimension = CGFloat(RGMediaPolicy.photoMaximumDimension(sendsLargePhotos: sendsLargePhotos, pasted: RGMediaPolicy.isPastedPhoto(path: container.path)))
+        } else {
+            dimension = nil
+        }
+        let found = savedState?.first(where: { $0.stableId == .container(container) && $0.photoDimension == dimension })
+        result.append(PreviewMedia(container: container, index: index, media: found?.media, isCollage: isCollage, customPreview: previews[container.path], photoDimension: dimension))
         index += 1
     }
     return result
@@ -1341,6 +1350,7 @@ public class PreviewSenderController: ModalViewController, Notifable {
     }
    
     private let pendingActions = PreviewSenderPendingActions()
+    private let preparedLargePhotos = Atomic<Bool?>(value: nil)
 
     private func capturePendingAction() -> () -> Bool {
         let previewAction = pendingActions.capture()
@@ -1609,7 +1619,9 @@ public class PreviewSenderController: ModalViewController, Notifable {
         if captionInput.attributes.isEmpty { captionInput = ChatTextInputState(inputText: captionInput.inputText.trimmed) }
         pendingActions.invalidate()
         analyticsMediaJourney?.retrySubmissionIfBlocked()
-        if self.getMedias().contains(where: isPreviewPlaceholder) {
+        let media = getMedias()
+        let photoPreparationPending = genericView.state.state == .media && media.contains { $0 is TelegramMediaImage } && preparedLargePhotos.with { $0 } != FastSettings.sendLargePhotos
+        if photoPreparationPending || media.contains(where: isPreviewPlaceholder) {
             analyticsMediaJourney?.submissionBlocked(.preparation)
             self.genericView.sendButton.shake(beep: false)
             return
@@ -2095,7 +2107,13 @@ public class PreviewSenderController: ModalViewController, Notifable {
         let savedStateMedias:Atomic<[PreviewSendingState : [PreviewMedia]]> = Atomic(value: [:])
 
         let preparationQueue = self.preparationQueue
-        let urlSignal = self.urlsAndStateValue.get() |> deliverOn(preparationQueue)
+        let photoSettings = ValuePromise(FastSettings.sendLargePhotos, ignoreRepeated: true)
+        let photoObserver = NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: UserDefaults.standard, queue: .main) { _ in
+            photoSettings.set(FastSettings.sendLargePhotos)
+        }
+        actionsDisposable.add(ActionDisposable { NotificationCenter.default.removeObserver(photoObserver) })
+        let urlSignal = combineLatest(self.urlsAndStateValue.get(), photoSettings.get()) |> deliverOn(preparationQueue)
+        let preparedLargePhotos = self.preparedLargePhotos
         
         let placeholderResource = previewPlaceholderResource(color: (self.presentation ?? theme).colors.grayBackground)
         let mediaPreparationQueue = self.mediaPreparationQueue
@@ -2156,7 +2174,7 @@ public class PreviewSenderController: ModalViewController, Notifable {
             }
         }
         
-        let urlsTransition: Signal<(UpdateTransition<Media>, [URL], PreviewSendingState, [PreviewMedia], [PreviewMediaPreparation]), NoError> = urlSignal |> map { urlsAndState -> ([PreviewMedia], [URL], PreviewSendingState) in
+        let urlsTransition = urlSignal |> map { urlsAndState, sendsLargePhotos -> ([PreviewMedia], [URL], PreviewSendingState, Bool) in
             
             let urls = urlsAndState.urls
             let state = urlsAndState.state
@@ -2178,16 +2196,17 @@ public class PreviewSenderController: ModalViewController, Notifable {
                 containers.append(ArchiverSenderContainer(path: dir, files: urls))
             }
             
-            return (previewMedias(containers: containers, savedState: savedStateMedias.with { $0[state]}, isCollage: state.isCollage, previews: urlsAndState.previews), urls, state)
-        } |> map { previews, urls, state in
+            return (previewMedias(containers: containers, savedState: savedStateMedias.with { $0[state]}, isCollage: state.isCollage, previews: urlsAndState.previews, sendsLargePhotos: sendsLargePhotos), urls, state, sendsLargePhotos)
+        } |> map { previews, urls, state, sendsLargePhotos in
             let (transition, preparations) = prepareMedias(left: previousMedias.swap(previews), right: previews, isSecretRelated: isSecretRelated, isCollage: state.isCollage, account: context.account, placeholderResource: placeholderResource)
-            return (transition, urls, state, previews, preparations)
+            return (transition, urls, state, previews, preparations, sendsLargePhotos)
         }
 
-        actionsDisposable.add(urlsTransition.start(next: { transition, urls, state, previews, preparations in
+        actionsDisposable.add(urlsTransition.start(next: { transition, urls, state, previews, preparations, sendsLargePhotos in
             updateState {
                 $0.apply(transition: transition, urls: urls, state: state)
             }
+            _ = preparedLargePhotos.swap(sendsLargePhotos)
             _ = savedStateMedias.modify { current in
                 var current = current
                 current[state] = previews

@@ -48,7 +48,7 @@ if 'chatExportIsRestricted' in manager:
     assert 'run.run(isVerified: true)' in full_loop
     assert manager.count('isVerified: true') == 1
     assert 'case let .failed(reason):\n                showModalText(for: context.window, text: reason)\n                self.finish(nil)' in export_controller
-    assert 'if chatExportSkipsMessage(entry.message) {\n                    continue\n                }\n                appendMessage(entry.message)' in manager
+    assert 'if chatExportSkipsMessage(entry.message) {\n                    continue\n                }\n                do {\n                    try appendMessage(entry.message)' in manager
     assert manager.count('appendMessage(entry.message)') == 1
     assert 'public var canExportChat: (Peer, CachedPeerData?) -> Bool = { _, _ in false }' in navigation
     assert 'hooks.canExportChat = { peer, cachedData in\n        return !chatExportIsRestricted(peer: peer, cachedData: cachedData)\n    }' in hooks

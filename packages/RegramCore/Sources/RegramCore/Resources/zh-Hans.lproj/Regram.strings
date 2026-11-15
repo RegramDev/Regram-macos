@@ -1,3 +1,5 @@
+"About.Attribution" = "Regram · 基于 Telegram for macOS\nCopyright © 2016 – %@ Telegram Messenger";
+"About.Description" = "基于 Telegram 的 macOS 客户端，提供 Regram 的个性化与隐私功能。";
 "AccessDenied.Camera" = "Regram 需要访问摄像头才能拍摄照片和视频。\n\n请前往系统设置 > 隐私与安全性 > 摄像头，并允许 Regram 访问。";
 "AccessDenied.Settings" = "设置";
 "AccessDenied.VideoMicrophone" = "Regram 需要访问麦克风才能录制视频声音。\n\n请前往系统设置 > 隐私与安全性 > 麦克风，并允许 Regram 访问。";
@@ -229,7 +231,7 @@
 "Chat.NextUnreadTopicSwipeProgress" = "向上拉动，前往下一个话题";
 "Chat.RegDate" = "注册日期";
 "ChatPreferences.Inherit" = "跟随全局设置";
-"ChatPreferences.Notice" = "仅对当前账户的所选会话生效，包含该会话的主题。发送时明确选择无格式仍有最高优先级。";
+"ChatPreferences.Notice" = "这组设置适用于所选会话及其话题。同一个云端会话在各账号中共享设置。发送时仍可手动选择无格式。";
 "ChatPreferences.Off" = "关闭";
 "ChatPreferences.On" = "开启";
 "ChatPreferences.Reset" = "恢复跟随全局";
@@ -479,7 +481,7 @@
 "LocalGifts.InvalidAmount" = "请输入范围内有效的非负金额。";
 "LocalGifts.Limit" = "本地礼物已达到存储上限（最多 500 份），请移除部分礼物后再试。";
 "LocalGifts.NativeHint" = "保存后，到 Telegram 原有礼物页面购买普通或收藏礼物。目录和预览正常联网加载，购买和余额扣除仅在本机模拟。";
-"LocalGifts.Notice" = "购买使用独立的本地星币和 TON 余额。礼物及装扮仅在本机自己的个人资料页展示。关闭后隐藏本地礼物和装扮，保留记录。";
+"LocalGifts.Notice" = "本机各账号共用模拟星币和 TON 余额。各账号的本地礼物和装扮显示在自己的个人资料页。";
 "LocalGifts.Owned" = "我的本地礼物";
 "LocalGifts.OwnedHint" = "本地购买不会发送付款或赠送请求，无法在 Telegram 转赠、出售、升级或兑换。";
 "LocalGifts.PinnedLimit" = "置顶礼物已达上限，请先取消其他礼物的置顶。";
@@ -495,7 +497,7 @@
 "LocalGifts.TonHint" = "用于本地收藏礼物购买及本地资料卡。最多 9 位小数，最高 9000000 TON，不连接钱包，也不发起转账。";
 "LocalPhone.CountryCode" = "区号";
 "LocalPhone.Enabled" = "启用本地手机号显示";
-"LocalPhone.Hint" = "仅修改本机自己个人资料页和设置中的号码显示，不改变登录手机号和 Telegram 账号。各账号独立保存。";
+"LocalPhone.Hint" = "设置本机所有账号在个人资料页和设置中显示的号码。";
 "LocalPhone.Invalid" = "请填写 1–3 位区号和手机号码，合计 5–20 位数字。";
 "LocalPhone.Number" = "手机号码";
 "LocalPhone.Save" = "保存并启用";
@@ -590,9 +592,6 @@
 "MessageFilter.Test.Title" = "规则试匹配";
 "MessageFilter.Title" = "消息过滤器";
 "MessageFilter.Transfer" = "导出 / 导入";
-"MessageScreenshot.Action" = "消息截图";
-"MessageScreenshot.Unavailable" = "部分选中消息不可用或不允许导出。";
-"MessageScreenshot.UnknownSender" = "未知发送者";
 "MutualContact.Label" = "双向联系人";
 "Native.All" = "全部";
 "Native.AllChats" = "所有聊天";
@@ -804,9 +803,11 @@
 "Revoked.Unavailable" = "曾无法从服务端获取 · 已在本机保留";
 "RevokedMarker.Color" = "标记颜色";
 "RevokedMarker.DefaultText" = "已撤回";
+"RevokedMarker.DimMessages" = "半透明显示已撤回消息";
 "RevokedMarker.InvalidColor" = "请输入 #RRGGBB，留空使用时间文字的颜色。";
 "RevokedMarker.Notice" = "自定义本机保留的已撤回消息在时间旁的标记。文字留空使用默认标记，颜色留空跟随主题；此设置不改变防撤回规则。";
 "RevokedMarker.Preview" = "预览";
+"RevokedMarker.RequiresEnabled" = "开启“保留被撤回的消息”后，才能设置撤回标记和半透明效果。";
 "RevokedMarker.Saved" = "已保存，当前显示的已撤回消息已更新标记。";
 "RevokedMarker.Style" = "标记样式";
 "RevokedMarker.Style.icon" = "图标";
@@ -855,7 +856,7 @@
 "Settings.ContentSettings" = "敏感内容设置";
 "Settings.ContextMenu" = "消息菜单";
 "Settings.ContextMenu.Customize" = "自定义菜单";
-"Settings.ContextMenu.Notice" = "关闭后隐藏，拖动可调整排序。这里只列出 Regram 的常用操作，以及当前账号实际出现过的其他菜单项。";
+"Settings.ContextMenu.Notice" = "关闭可隐藏操作，拖动可调整顺序。列表包括常用操作以及曾在这台 Mac 上出现的可自定义操作。";
 "Settings.CustomColors.Header" = "账户颜色";
 "Settings.CustomColors.Saturation" = "饱和度";
 "Settings.CustomColors.Saturation.Notice" = "设置饱和度为 0%% 以禁用账户颜色";
@@ -993,6 +994,7 @@
 "Settings.Transcription.Backend.apple" = "Apple";
 "Settings.Transcription.Backend.default" = "Telegram";
 "Settings.Transcription.Backend.openAICompatible" = "自定义 API（OpenAI 格式）";
+"Settings.Transcription.ConfigurationNotice" = "选择语音识别服务。选用自定义 API 后可配置连接参数；切换服务会保留已保存的配置。";
 "Settings.Transcription.Header" = "语音转文字";
 "Settings.Translation.Backend" = "翻译服务";
 "Settings.Translation.Backend.Notice" = "所选服务不可用时，Regram 会尝试使用 %@。";
@@ -1018,10 +1020,9 @@
 "Settings.showChannelBottomButton" = "频道底部面板";
 "Settings.wideChannelPosts" = "在频道中以更宽的版面显示消息";
 "Share.RepostToStory" = "转发\n到故事";
-"Showroom.Description" = "本地会员、礼物、评级、TON 资料卡与号码显示";
+"Showroom.Description" = "本地资料、礼物与余额预览";
 "Showroom.PremiumRefresh" = "已打开的会员界面可在重新打开 App 后刷新。";
 "Showroom.Title" = "展示空间";
-"Showroom.Description" = "本地资料、礼物与余额预览";
 "StickerBackup.Action" = "导出贴纸包备份";
 "StickerBackup.Failed" = "贴纸包备份失败。请确认文件能下载及设备有足够空间，然后重试。";
 "StickerSave.Failed" = "保存失败，请检查相册权限后重试。";
@@ -1505,7 +1506,7 @@
 "ios.Chat.JoinedDateTitle" = "加入 %@ 的日期";
 "ios.Chat.RegDate" = "注册日期";
 "ios.ChatPreferences.Inherit" = "跟随全局设置";
-"ios.ChatPreferences.Notice" = "仅对当前账户的所选会话生效，包含该会话的主题。发送时明确选择无格式仍有最高优先级。";
+"ios.ChatPreferences.Notice" = "这组设置适用于所选会话及其话题。同一个云端会话在各账号中共享设置。发送时仍可手动选择无格式。";
 "ios.ChatPreferences.Off" = "关闭";
 "ios.ChatPreferences.On" = "开启";
 "ios.ChatPreferences.Reset" = "恢复跟随全局";
@@ -1640,17 +1641,6 @@
 "ios.EditHistory.RevealPhoto" = "点击显示图片";
 "ios.EditHistory.Title" = "编辑历史";
 "ios.EditHistory.ViewPhoto" = "查看图片";
-"ios.EraseData.Action" = "清除全部并关闭";
-"ios.EraseData.Close" = "关闭应用";
-"ios.EraseData.Confirm" = "将退出所有账号并删除本 App 的全部本地数据，此操作无法撤销。";
-"ios.EraseData.ContainerUnavailable" = "无法访问数据容器。清除任务已保留，请重新打开 Regram 重试。";
-"ios.EraseData.Done" = "数据已全部清除";
-"ios.EraseData.DoneNotice" = "关闭 Regram 后重新打开，即可从零开始。";
-"ios.EraseData.Errors" = "清除完成，但有部分错误";
-"ios.EraseData.ErrorsNotice" = "未能删除：%@";
-"ios.EraseData.Notice" = "退出所有账号，删除这台 Mac 上 Regram 的本地数据、缓存和设置。清除后需要重新登录。";
-"ios.EraseData.Progress" = "正在清除数据… 请保持 Regram 打开。";
-"ios.EraseData.Title" = "清除全部数据";
 "ios.Fonts.Areas" = "应用位置";
 "ios.Fonts.Areas.Notice" = "勾选的位置会立即更新。代码、图标和大表情保留各自的字体。";
 "ios.Fonts.Cancel" = "取消下载";
@@ -1759,7 +1749,7 @@
 "ios.LocalGifts.InvalidAmount" = "请输入范围内有效的非负金额。";
 "ios.LocalGifts.Limit" = "本地礼物已达到存储上限（最多 500 份），请移除部分礼物后再试。";
 "ios.LocalGifts.NativeHint" = "保存后，到 Telegram 原有礼物页面购买普通或收藏礼物。目录和预览正常联网加载，购买和余额扣除仅在本机模拟。";
-"ios.LocalGifts.Notice" = "购买使用独立的本地星币和 TON 余额。礼物及装扮仅在本机自己的个人资料页展示。关闭后隐藏本地礼物和装扮，保留记录。";
+"ios.LocalGifts.Notice" = "本机各账号共用模拟星币和 TON 余额。各账号的本地礼物和装扮显示在自己的个人资料页。";
 "ios.LocalGifts.Owned" = "我的本地礼物";
 "ios.LocalGifts.OwnedHint" = "本地购买不会发送付款或赠送请求，无法在 Telegram 转赠、出售、升级或兑换。";
 "ios.LocalGifts.PinnedLimit" = "置顶礼物已达上限，请先取消其他礼物的置顶。";
@@ -1775,7 +1765,7 @@
 "ios.LocalGifts.TonHint" = "用于本地收藏礼物购买及本地资料卡。最多 9 位小数，最高 9000000 TON，不连接钱包，也不发起转账。";
 "ios.LocalPhone.CountryCode" = "区号";
 "ios.LocalPhone.Enabled" = "启用本地手机号显示";
-"ios.LocalPhone.Hint" = "仅修改本机自己个人资料页和设置中的号码显示，不改变登录手机号和 Telegram 账号。各账号独立保存。";
+"ios.LocalPhone.Hint" = "设置本机所有账号在个人资料页和设置中显示的号码。";
 "ios.LocalPhone.Invalid" = "请填写 1–3 位区号和手机号码，合计 5–20 位数字。";
 "ios.LocalPhone.Number" = "手机号码";
 "ios.LocalPhone.Save" = "保存并启用";
@@ -1858,9 +1848,6 @@
 "ios.MessageFilter.Test.Title" = "规则试匹配";
 "ios.MessageFilter.Title" = "消息过滤器";
 "ios.MessageFilter.Transfer" = "导出 / 导入";
-"ios.MessageScreenshot.Action" = "消息截图";
-"ios.MessageScreenshot.Unavailable" = "部分选中消息不可用或不允许导出。";
-"ios.MessageScreenshot.UnknownSender" = "未知发送者";
 "ios.MutualContact.Label" = "双向联系人";
 "ios.Native.All" = "全部";
 "ios.Native.AllChats" = "所有聊天";
@@ -2119,7 +2106,7 @@
 "ios.Settings.ContentSettings" = "敏感内容设置";
 "ios.Settings.ContextMenu" = "消息菜单";
 "ios.Settings.ContextMenu.Customize" = "自定义菜单";
-"ios.Settings.ContextMenu.Notice" = "关闭后隐藏，拖动可调整排序。这里只列出 Regram 的常用操作，以及当前账号实际出现过的其他菜单项。";
+"ios.Settings.ContextMenu.Notice" = "关闭可隐藏操作，拖动可调整顺序。列表包括常用操作以及曾在这台 Mac 上出现的可自定义操作。";
 "ios.Settings.CustomColors.Header" = "账户颜色";
 "ios.Settings.CustomColors.Saturation" = "饱和度";
 "ios.Settings.CustomColors.Saturation.Notice" = "设置饱和度为 0%% 以禁用账户颜色";
@@ -2483,7 +2470,6 @@
 "menu.hideSender" = "隐藏此发送者";
 "menu.json" = "JSON";
 "menu.messageReplies" = "查看回复";
-"menu.messageScreenshot" = "导出消息截图";
 "menu.pin" = "置顶";
 "menu.removeBookmark" = "移除书签";
 "menu.repeatCopy" = "无引用复读";
@@ -2620,7 +2606,7 @@
 "profile.registered" = "注册年月";
 "profile.registeredEstimate" = "估算注册时间";
 "profile.userId" = "用户 ID";
-"protectedExport.notice" = "允许保存受保护的云端消息，并在截图中显示其图片和视频。秘密聊天、阅后即焚媒体和付费媒体仍受保护。";
+"protectedExport.notice" = "允许保存受保护的云端消息，并让其中的图片和视频显示在 macOS 系统截屏中。秘密聊天、阅后即焚媒体和付费媒体仍受保护。";
 "quickTranslate.action" = "快速翻译";
 "quickTranslate.busy" = "请等待一个翻译任务完成，或先取消正在进行的任务。";
 "quickTranslate.cancel" = "取消翻译";
@@ -2671,6 +2657,8 @@
 "service.transcription.description" = "识别方式、自定义接口与语言";
 "service.translation" = "LLM 翻译接口";
 "service.translation.description" = "接口地址、模型、密钥与提示词";
+"setting.alignOwnMessagesLeft" = "自己的消息靠左显示";
+"setting.alignOwnMessagesLeft.notice" = "在气泡聊天中，将自己发送的消息也显示在左侧，保留消息颜色和已读状态。";
 "setting.allowSavingProtectedContent" = "允许导出受保护内容";
 "setting.antiAutoDelete" = "保留自动删除消息";
 "setting.antiRevoke" = "保留撤回消息";
@@ -2724,6 +2712,7 @@
 "setting.quickTranslateButton" = "快速翻译按钮";
 "setting.recentChatsEnabled" = "记录最近会话";
 "setting.recentStickerLimit" = "最近贴纸数量";
+"setting.revokedMarkerDimMessages" = "半透明显示已撤回消息";
 "setting.saveEditHistory" = "保存编辑记录";
 "setting.secondsInMessages" = "时间显示秒数";
 "setting.sendLargePhotos" = "发送大尺寸照片";
@@ -2847,11 +2836,3 @@
 "webTranslation.tooLarge" = "此网页过大，无法翻译。上限为 2000 个文字节点、500000 字节。";
 "ImageTranslation.TooLarge" = "图片中的文字过多，无法一次翻译。请选择部分文字，或裁剪图片后重试。";
 "webTranslation.translate" = "翻译";
-"Settings.Transcription.ConfigurationNotice" = "选择语音识别服务。选用自定义 API 后可配置连接参数；切换服务会保留已保存的配置。";
-"About.Description" = "基于 Telegram 的 macOS 客户端，提供 Regram 的个性化与隐私功能。";
-"About.Attribution" = "Regram · 基于 Telegram for macOS\nCopyright © 2016 – %@ Telegram Messenger";
-"RevokedMarker.DimMessages" = "半透明显示已撤回消息";
-"RevokedMarker.RequiresEnabled" = "开启“保留被撤回的消息”后，才能设置撤回标记和半透明效果。";
-"setting.revokedMarkerDimMessages" = "半透明显示已撤回消息";
-"setting.alignOwnMessagesLeft" = "自己的消息靠左显示";
-"setting.alignOwnMessagesLeft.notice" = "在气泡聊天中，将自己发送的消息也显示在左侧，保留消息颜色和已读状态。";

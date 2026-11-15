@@ -8,6 +8,13 @@ final class FixtureSavePanel {
         completionHandler(.OK)
     }
 }
+enum FixtureSendingType { case enter, cmdEnter }
+enum FastSettings {
+    static var sendingType = FixtureSendingType.enter
+    static var sendLargePhotos = false
+    static func changeSendingType(_ value: FixtureSendingType) { sendingType = value }
+    static func sendLargePhotos(_ value: Bool) { sendLargePhotos = value }
+}
 final class FixtureOpenPanel {
     static var presentations = 0
     static var selectedURL: URL?
@@ -90,6 +97,8 @@ func selectCategories(_ selected: Set<RegramBackupCategory>, in controller: Inpu
     precondition(selectedCategories(controller) == selected)
 }
 func seed() {
+    FastSettings.changeSendingType(.enter)
+    FastSettings.sendLargePhotos(false)
     testPreferences.reset(accountId: 42)
     testPreferences.update(accountId: 42) {
         $0["fontFamily"] = .string("inter")
@@ -110,6 +119,7 @@ struct BackupActionChecks {
         try checkExportUsesCurrentCategories()
         checkResetUsesCurrentCategories()
         try checkRestoreUsesCurrentCategoriesAndCandidate()
+        try checkSharedNativeSettingsRoundTrip()
         checkEmptySelectionAndCancelledPreviewAreNoops()
         precondition(RegramUIHooks.shared.restarts == 0)
         print("Backup action checks passed: reused export/reset/restore actions, current category selection, unrelated settings preserved, latest imported candidate, isolated real backup encoding/applying/reload, empty/canceled noops; no real file dialogs, files or accounts were used")
@@ -198,6 +208,37 @@ struct BackupActionChecks {
         controller.entry("backup.cancelPreview").action!()
         restore()
         precondition(testPreferences.settings(accountId: 42) == before && alerts.count == alertCount)
-        precondition(testPreferences.settings(accountId: 43).values.isEmpty)
+        precondition(testPreferences.settings(accountId: 43) == before)
+    }
+
+    static func checkSharedNativeSettingsRoundTrip() throws {
+        seed()
+        FastSettings.changeSendingType(.cmdEnter)
+        FastSettings.sendLargePhotos(true)
+        let controller = RegramSettingsBackupController(context: EditorContext())
+        selectCategories([.messages, .media], in: controller)
+        let count = FixtureFiles.exports.count
+        controller.entry("backup.export").action!()
+        waitUntil { FixtureFiles.exports.count == count + 1 }
+        let backup = try RegramSettingsBackup.decode(FixtureFiles.exports.last!)
+        precondition(backup.values["sendWithReturnKey"] == .bool(false))
+        precondition(backup.values["sendLargePhotos"] == .bool(true))
+
+        FastSettings.changeSendingType(.enter)
+        FastSettings.sendLargePhotos(false)
+        let restore = RegramSettingsBackupController(context: EditorContext(), initialBackup: backup)
+        selectCategories([.messages], in: restore)
+        restore.entry("backup.restore").action!()
+        precondition(FastSettings.sendingType == .cmdEnter && !FastSettings.sendLargePhotos)
+        selectCategories([.media], in: restore)
+        restore.entry("backup.restore").action!()
+        precondition(FastSettings.sendingType == .cmdEnter && FastSettings.sendLargePhotos)
+        let settings = testPreferences.settings(accountId: 43)
+        precondition(settings.values["sendWithReturnKey"] == nil && settings.values["sendLargePhotos"] == nil)
+
+        selectCategories([.messages, .media], in: restore)
+        restore.entry("backup.reset").action!()
+        precondition(FastSettings.sendingType == .enter && !FastSettings.sendLargePhotos)
+        precondition(testPreferences.settings(accountId: 42) == testPreferences.settings(accountId: 43))
     }
 }

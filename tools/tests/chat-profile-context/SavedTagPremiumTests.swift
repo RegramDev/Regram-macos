@@ -22,9 +22,11 @@ struct SavedPremiumMenu {
     let reveal: () -> Void
     let add: () -> Void
 }
-func savedPremiumMenu(_ chatInteraction: ChatInteraction, message: Message, peer: Peer) -> Signal<SavedPremiumMenu, NoError> {
+func savedPremiumMenu(_ chatInteraction: ChatInteraction, message: Message, peer: Peer, tagIsSelected: Bool = false) -> Signal<SavedPremiumMenu, NoError> {
     let context = chatInteraction.interactionContext
     let isTags = context.peerId == chatInteraction.peerId
+    let value = MessageReaction.Reaction.builtin("tag")
+    func isSelected(_ reaction: MessageReaction.Reaction) -> Bool { tagIsSelected && reaction == value }
 __PREMIUM_MENU_ORIGIN__
     let signal = savedPremiumInput()
     return __PREMIUM_MENU_SIGNAL__ |> map { _ in
@@ -230,6 +232,17 @@ final class SavedTagPremiumTests: XCTestCase {
         menu?.link(0); menu?.reveal(); menu?.add()
         XCTAssertEqual(RecommendationProbe.premium.count, 3)
         XCTAssertTrue(RecommendationProbe.premium.allSatisfy { $0.analyticsContext?.scope === source.scope })
+        disposable.dispose()
+    }
+    func testRemovingAnExistingSavedTagDoesNotOpenPremium() {
+        var menu: SavedPremiumMenu?
+        let disposable = savedPremiumMenu(parent(origin()), message: message(), peer: Peer(1), tagIsSelected: true).start(next: { menu = $0 })
+        SavedPremiumProbe.sink?.putNext(0)
+        SavedPremiumProbe.sink?.putCompletion()
+        XCTAssertNotNil(menu)
+        menu?.reveal()
+        menu?.add()
+        XCTAssertTrue(RecommendationProbe.premium.isEmpty)
         disposable.dispose()
     }
     func testReactionMenuRevokedWhileLoadingCannotRefreshAtClick() {

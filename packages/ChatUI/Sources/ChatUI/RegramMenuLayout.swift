@@ -24,7 +24,7 @@ func regramOrderedMessageMenu(_ items: [ContextMenuItem], accountId: Int64) -> [
         }
     }
     let configuration = RegramContextMenuConfiguration(settings: RegramPreferences.shared.settings(accountId: accountId))
-    RegramMessageMenuInventory.shared.record(Set(generated.map { $0.0 }), accountId: accountId)
+    RegramMessageMenuInventory.shared.record(Set(generated.map { $0.0 }))
     remaining.insert(contentsOf: configuration.orderedItems(generated), at: min(anchor ?? remaining.count, remaining.count))
     var result: [ContextMenuItem] = []
     for item in remaining {

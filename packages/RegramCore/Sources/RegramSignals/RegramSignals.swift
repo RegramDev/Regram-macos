@@ -5,7 +5,7 @@ import SwiftSignalKit
 public func regramPreferenceChanges(accountId: Int64, keys: Set<String>? = nil, excluding excludedKeys: Set<String> = []) -> Signal<RegramAccountSettings, NoError> {
     Signal { subscriber in
         let observer = NotificationCenter.default.addObserver(forName: RegramPreferences.didChange, object: nil, queue: nil) { notification in
-            guard notification.object as? Int64 == accountId else { return }
+            guard RegramPreferences.applies(notification, to: accountId) else { return }
             if let changed = notification.userInfo?[RegramPreferences.changedKeysUserInfoKey] as? Set<String> {
                 let relevant = changed.subtracting(excludedKeys)
                 guard !relevant.isEmpty, keys.map({ !$0.isDisjoint(with: relevant) }) ?? true else { return }

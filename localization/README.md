@@ -1,6 +1,6 @@
 # Regram 共享语言包
 
-`Regram/en.json`、`Regram/zh-Hans.json` 和 `Regram/zh-Hant.json` 是 iOS 与 macOS 的共同源文件。包含 1694 个共用键；`macos` 包含 27 个平台覆盖或 macOS 专用文案。`nativeMacos` 包含 37 个原生界面补充文案，例如聊天记录导出。
+`Regram/en.json`、`Regram/zh-Hans.json` 和 `Regram/zh-Hant.json` 是 iOS 与 macOS 的共同源文件。包含 1694 个共用键。`macos` 包含 52 个平台覆盖或 macOS 专用文案。`nativeMacos` 包含 37 个原生界面补充文案，例如聊天记录导出。
 
 生成两端资源：
 
@@ -21,7 +21,7 @@ python3 scripts/generate-regram-language-pack.py --ios-root /path/to/Regram-ios
 
 生成器检查键名一致性、非空值和格式参数，也会校验 `.strings` 语法。`--check` 只检查，不改写文件。修改文案后重新生成，提交源文件和两端输出；不直接编辑生成文件。向 iOS 项目同步后仍需在该项目独立验证。
 
-输出默认按键名排序。`manifest.json` 中可选的 `macosInsertBefore` 指定 macOS 键的兼容位置，保留现有应用资源的字节顺序；它不影响 iOS 输出。约束的键和目标必须存在，不能自指或形成环。
+输出默认按键名排序。`manifest.json` 的 `macosExcludedKeys` 指定仅供 iOS 使用的退役功能文案，macOS 生成时也会省略相应别名。`macos` 中明示的文案优先于别名。可选的 `macosInsertBefore` 指定 macOS 键的兼容位置。约束的键和目标必须存在，不能自指或形成环。
 
 标准分享链接为 `https://t.me/setlanguage/regram-zh-hans`，对应的翻译项目为 `https://translations.telegram.org/regram-zh-hans/`。在线语言包尚未完成，不属于本版交付。应用内置的三语资源可以独立生成和使用；更新这些资源不代表在线项目已更新，Release 也不附带在线语言包导入文件。
 

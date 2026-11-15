@@ -331,7 +331,7 @@ private final class GeneralSettingsArguments {
    
 }
 
-private func generalSettingsEntries(arguments:GeneralSettingsArguments, baseSettings: BaseApplicationSettings, appearance: Appearance, launchSettings: LaunchSettings, secretChatSettings: SecretChatSettings, additionalSettings: AdditionalSettings) -> [GeneralSettingsEntry] {
+private func generalSettingsEntries(arguments:GeneralSettingsArguments, baseSettings: BaseApplicationSettings, appearance: Appearance, launchSettings: LaunchSettings, secretChatSettings: SecretChatSettings, additionalSettings: AdditionalSettings, sendsLargePhotos: Bool, sendingType: SendingType) -> [GeneralSettingsEntry] {
     var sectionId:Int = 1
     var entries:[GeneralSettingsEntry] = []
     
@@ -402,7 +402,7 @@ private func generalSettingsEntries(arguments:GeneralSettingsArguments, baseSett
     entries.append(.header(sectionId: sectionId, uniqueId: headerUnique, text: strings().generalSettingsAdvancedHeader))
     headerUnique -= 1
     entries.append(.enableRFTCopy(sectionId: sectionId, enabled: FastSettings.enableRTF, viewType: .firstItem))
-    entries.append(.sendLargePhotos(sectionId: sectionId, enabled: FastSettings.sendLargePhotos, viewType: .lastItem))
+    entries.append(.sendLargePhotos(sectionId: sectionId, enabled: sendsLargePhotos, viewType: .lastItem))
     
     entries.append(.section(sectionId: sectionId))
     sectionId += 1
@@ -420,8 +420,8 @@ private func generalSettingsEntries(arguments:GeneralSettingsArguments, baseSett
     
     entries.append(.header(sectionId: sectionId, uniqueId: headerUnique, text: strings().generalSettingsInputSettings))
     headerUnique -= 1
-    entries.append(.enterBehavior(sectionId: sectionId, enabled: FastSettings.sendingType == .enter, viewType: .firstItem))
-    entries.append(.cmdEnterBehavior(sectionId: sectionId, enabled: FastSettings.sendingType == .cmdEnter, viewType: .lastItem))
+    entries.append(.enterBehavior(sectionId: sectionId, enabled: sendingType == .enter, viewType: .firstItem))
+    entries.append(.cmdEnterBehavior(sectionId: sectionId, enabled: sendingType == .cmdEnter, viewType: .lastItem))
     
     entries.append(.section(sectionId: sectionId))
     sectionId += 1
@@ -470,6 +470,13 @@ open class GeneralSettingsViewController<Context: AccountContextProtocol>: Table
        
         let context = self.context
         let inputPromise:ValuePromise<SendingType> = ValuePromise(FastSettings.sendingType, ignoreRepeated: true)
+        let photosPromise = ValuePromise(FastSettings.sendLargePhotos, ignoreRepeated: true)
+        let disposables = DisposableSet()
+        let inputObserver = NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: UserDefaults.standard, queue: .main) { _ in
+            inputPromise.set(FastSettings.sendingType)
+            photosPromise.set(FastSettings.sendLargePhotos)
+        }
+        disposables.add(ActionDisposable { NotificationCenter.default.removeObserver(inputObserver) })
         
         let forceTouchPromise:ValuePromise<ForceTouchAction> = ValuePromise(FastSettings.forceTouchAction, ignoreRepeated: true)
         
@@ -518,6 +525,7 @@ open class GeneralSettingsViewController<Context: AccountContextProtocol>: Table
             FastSettings.enableRTF = enable
         }, toggleLargePhotos: { enable in
             FastSettings.sendLargePhotos(enable)
+            photosPromise.set(enable)
         }, acceptSecretChats: { enable in
             _ = context.account.postbox.transaction({ transaction -> Void in
                 transaction.updatePreferencesEntry(key: PreferencesKeys.secretChatSettings, { _ in
@@ -549,22 +557,23 @@ open class GeneralSettingsViewController<Context: AccountContextProtocol>: Table
         let baseSettingsSignal: Signal<BaseApplicationSettings, NoError> = .single(context.sharedContext.baseSettings) |> then(baseAppSettings(accountManager: context.sharedContext.accountManager))
         
         let settingsQueue = Queue(name: "settings.general", qos: .userInitiated)
-        let signal = combineLatest(queue: settingsQueue, baseSettingsSignal, inputPromise.get(), forceTouchPromise.get(), appearanceSignal, appLaunchSettings(postbox: context.account.postbox), context.account.postbox.preferencesView(keys: [PreferencesKeys.secretChatSettings]), additionalSettings(accountManager: context.sharedContext.accountManager)) |> map { settings, _, _, appearance, launchSettings, preferencesView, additionalSettings -> TableUpdateTransition in
+        let signal = combineLatest(queue: settingsQueue, baseSettingsSignal, inputPromise.get(), forceTouchPromise.get(), appearanceSignal, appLaunchSettings(postbox: context.account.postbox), context.account.postbox.preferencesView(keys: [PreferencesKeys.secretChatSettings]), additionalSettings(accountManager: context.sharedContext.accountManager), photosPromise.get()) |> map { settings, sendingType, _, appearance, launchSettings, preferencesView, additionalSettings, sendsLargePhotos -> TableUpdateTransition in
             
             let baseSettings: BaseApplicationSettings = settings
             
             let secretChatSettings = preferencesView.values[PreferencesKeys.secretChatSettings]?.get(SecretChatSettings.self) ?? SecretChatSettings.defaultSettings
             
-            let entries = generalSettingsEntries(arguments: arguments, baseSettings: baseSettings, appearance: appearance, launchSettings: launchSettings, secretChatSettings: secretChatSettings, additionalSettings: additionalSettings).map({AppearanceWrapperEntry(entry: $0, appearance: appearance)})
+            let entries = generalSettingsEntries(arguments: arguments, baseSettings: baseSettings, appearance: appearance, launchSettings: launchSettings, secretChatSettings: secretChatSettings, additionalSettings: additionalSettings, sendsLargePhotos: sendsLargePhotos, sendingType: sendingType).map({AppearanceWrapperEntry(entry: $0, appearance: appearance)})
             let previous = previos.swap(entries)
             return prepareEntries(left: previous, right: entries, arguments: arguments, initialSize: initialSize.modify({$0}))
             
         } |> deliverOnMainQueue
         
-        disposable.set(signal.start(next: { [weak self] transition in
+        disposables.add(signal.start(next: { [weak self] transition in
             self?.genericView.merge(with:  transition)
             self?.readyOnce()
         }))
+        disposable.set(disposables)
                 
     }
     

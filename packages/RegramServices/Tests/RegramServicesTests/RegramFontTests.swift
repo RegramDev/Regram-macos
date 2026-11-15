@@ -17,7 +17,7 @@ final class RegramFontTests: XCTestCase {
         let directory = root()
         defer { try? FileManager.default.removeItem(at: directory) }
         let store = RegramFontStore(root: directory)
-        let imported = try store.importFonts(url: fixture(), accountId: 1)
+        let imported = try store.importFonts(url: fixture())
         XCTAssertFalse(imported.isEmpty)
         XCTAssertEqual(Set(imported.map(\.id)).count, imported.count)
         for face in imported { XCTAssertNotNil(store.font(importedId: face.id, size: 17)) }
@@ -31,22 +31,22 @@ final class RegramFontTests: XCTestCase {
         if imported.count > 1 { XCTAssertNotNil(restored.font(importedId: imported[1].id, size: 17)) }
     }
 
-    func testImportedFontAccountRemovalPreservesAnotherAccountsSelection() throws {
+    func testLegacyImportedFontsLoadWithoutAccountOwnership() throws {
         let directory = root()
         defer { try? FileManager.default.removeItem(at: directory) }
         let store = RegramFontStore(root: directory)
-        let imported = try store.importFonts(url: fixture(), accountId: 101)
+        let imported = try store.importFonts(url: fixture())
         let selected = try XCTUnwrap(imported.first)
-        var settings = RegramAccountSettings()
-        settings["fontImportedLatin"] = .string(selected.id)
-        store.retainSelections(settings: settings, accountId: 202)
-        try store.removeAccount(accountId: 101)
-        XCTAssertEqual(store.imported.map(\.id), [selected.id])
-        XCTAssertNotNil(store.font(importedId: selected.id, size: 17))
-        try store.removeAccount(accountId: 202)
-        XCTAssertTrue(store.imported.isEmpty)
-        XCTAssertEqual(store.storageBytes(downloads: false), 0)
-        XCTAssertNil(store.font(importedId: selected.id, size: 17))
+        let index = directory.appendingPathComponent("imported.json")
+        var legacy = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: index)) as? [[String: Any]])
+        legacy[0]["accountIds"] = [101, 202]
+        try JSONSerialization.data(withJSONObject: legacy).write(to: index)
+        let shared = RegramFontStore(root: directory)
+        XCTAssertEqual(shared.imported, imported)
+        XCTAssertNotNil(shared.font(importedId: selected.id, size: 17))
+        try shared.rename(id: selected.id, title: "Shared font")
+        let updated = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: index)) as? [[String: Any]])
+        XCTAssertNil(updated[0]["accountIds"])
     }
 
     func testInvalidOversizedAndTamperedFilesAreRejected() throws {

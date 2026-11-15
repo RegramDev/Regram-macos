@@ -47,6 +47,7 @@ for path in paths:
 signal_path = ROOT / "packages/RegramCore/Sources/RegramSignals/RegramSignals.swift"
 signal = declaration(signal_path.read_text(), "public func regramPreferenceChanges(")
 signal = signal.replace("public func regramPreferenceChanges", "func fixturePreferenceChanges").replace("RegramPreferences.shared", "fixturePreferences")
+signal = signal.replace("RegramPreferences.applies(notification, to: accountId)", "(notification.object as? RegramPreferences) === fixturePreferences || notification.object as? Int64 == accountId")
 generated = options.output / "ProductionToggleControllers.swift"
 generated.write_text("\n".join(parts) + "\n" + signal)
 fixture = options.output / "ToggleCombinationChecks.swift"

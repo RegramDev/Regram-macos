@@ -41,14 +41,14 @@ final class RegramCredentials {
     var values: [String: String] = [:]
     var writeFailuresRemaining = 0
     var writeAttempts = 0
-    func read(accountId: Int64, purpose: RegramCredentialPurpose) throws -> String { values["\(accountId).\(purpose.rawValue)"] ?? "" }
-    func write(_ value: String, accountId: Int64, purpose: RegramCredentialPurpose) throws {
+    func read(purpose: RegramCredentialPurpose) throws -> String { values[purpose.rawValue] ?? "" }
+    func write(_ value: String, purpose: RegramCredentialPurpose) throws {
         writeAttempts += 1
         if writeFailuresRemaining > 0 {
             writeFailuresRemaining -= 1
             throw RegramKeychainError(status: -1)
         }
-        values["\(accountId).\(purpose.rawValue)"] = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        values[purpose.rawValue] = value.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 final class ControlledRequest<T, E> {
@@ -138,7 +138,7 @@ struct ServiceEditorChecks {
         precondition(fetched.baseURL == configuration.baseURL && fetched.model == configuration.model && fetched.apiKey == configuration.apiKey)
         models.next(["latest-model", "another"]); models.complete()
         precondition(hasModelPicker(controller))
-        precondition((try! RegramCredentials.shared.read(accountId: 42, purpose: .translation)) == "latest-key")
+        precondition((try! RegramCredentials.shared.read(purpose: .translation)) == "latest-key")
         precondition(testPreferences.settings(accountId: 42)["translationLLMModel"].string == "latest-model")
     }
     static func checkModelListsBelongToConnection() {
@@ -218,7 +218,7 @@ struct ServiceEditorChecks {
         precondition(leaving.cancelled)
         leaving.fail(.network("after-leave"))
         precondition(serviceNotices.isEmpty && serviceAlerts.isEmpty)
-        let savedKey = try RegramCredentials.shared.read(accountId: 42, purpose: .transcription)
+        let savedKey = try RegramCredentials.shared.read(purpose: .transcription)
         precondition(savedKey == "changed-key")
     }
     static func checkLeavingAndDeinitCancelLLM() {
@@ -244,7 +244,7 @@ struct ServiceEditorChecks {
             RegramCredentials.shared.writeFailuresRemaining = 2
             controller.input(prefix + ".apiKey", "retry-key")
             let failed = testPreferences.settings(accountId: 42)
-            let unsaved = try RegramCredentials.shared.read(accountId: 42, purpose: purpose.credentialPurpose)
+            let unsaved = try RegramCredentials.shared.read(purpose: purpose.credentialPurpose)
             precondition((failed.translationIdentity != before) == (purpose == .translation))
             precondition(unsaved.isEmpty)
             action()
@@ -252,7 +252,7 @@ struct ServiceEditorChecks {
             precondition(ServiceRequests.tests.isEmpty && ServiceRequests.models.isEmpty && ServiceRequests.transcriptions.isEmpty)
             action()
             let saved = testPreferences.settings(accountId: 42)
-            let persisted = try RegramCredentials.shared.read(accountId: 42, purpose: purpose.credentialPurpose)
+            let persisted = try RegramCredentials.shared.read(purpose: purpose.credentialPurpose)
             precondition(saved[purpose.configurationRevisionKey].integer == failed[purpose.configurationRevisionKey].integer &+ 1)
             precondition((saved.translationIdentity != failed.translationIdentity) == (purpose == .translation))
             precondition(saved.hasSameTranscriptionConfiguration(as: failed) == (purpose == .translation))

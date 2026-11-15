@@ -41,10 +41,10 @@ public struct RegramSettingsBackup: Codable, Equatable {
 
     public static let categoryKeys: [RegramBackupCategory: [String]] = [
         .appearance: ["features.hideTabBarPermissionWarnings", "bottomBarLayout", "showTabNames", "fontFamily", "fontChineseFamily", "fontImportedLatin", "fontImportedChinese", "fontApplyToMessages", "fontApplyToInterface", "rememberLastFolder", "hideReactions", "disableChatSwipeOptions", "hideTabBar", "hideChatListSeparators", "compactChatList", "chatListLines", "compactFolderNames", "allChatsTitleLengthOverride", "allChatsHidden", "wideChannelPosts", "secondsInMessages", "hideChannelBottomButton", "tabBarWidthPercent", "hideStories", "showRepostToStoryV2", "nyStyle", "stickerSize", "stickerTimestamp", "recentStickerLimit", "native.showContactsTab", "native.showCallsTab", "native.foldersAtBottom", "unlimitedPinnedChats", "recentChatsEnabled", "chooseFolderAfterJoining", "features.chatListFolderTabDisplayMode", "features.chatListSwipeAction", "features.communityAvatarTapAction", "features.groupProfileSettingItems", "features.hideFolderUnreadCount", "features.hideTopStories", "features.keepNewChatsVisibleAtTop", "features.showArchiveInFolders", "features.showFoldersInShareSheet", "features.chatListStartupFolderMode", "features.startupFolders", "features.stayAtLatestMessageAfterRefresh"],
-        .messages: ["messageBookmarksEnabled", "messageSummaryEnabled", "contextShowSelectFromUser", "contextShowSaveToCloud", "contextShowRestrict", "contextShowHideForwardName", "contextShowReport", "contextShowReply", "contextShowPin", "contextShowSaveMedia", "contextShowMessageReplies", "contextShowJson", "contextShowRepeatForward", "contextShowRepeatCopy", "contextShowEditHistory", "contextMenuOrder", "contextMenuDisabledItems", "mentionAsUserIdLink", "disableLinkPreview", "fixLinkPreviews", "linkPreviewXHost", "linkPreviewInstagramHost", "defaultEmojisFirst", "messageDoubleTapActionOutgoing", "messageDoubleTapAction", "messageDoubleTapActionWithoutEditPermission", "showMessageId", "automaticallyRevealSpoilers", "showForwardedMessageDate", "forceEmojiTab", "panguSpacing", "defaultOutgoingFormatting", "sendWithReturnKey", "hideRecordingButton", "disableSendAsButton", "chatPreferences", "features.autoInlineBotEnabled", "features.tapMessageRowToOpenContextMenu", "features.confirmUnpin", "features.enablePanguOnEditing", "features.enablePanguOnReceiving"],
+        .messages: ["messageBookmarksEnabled", "alignOwnMessagesLeft", "contextShowSelectFromUser", "contextShowSaveToCloud", "contextShowRestrict", "contextShowHideForwardName", "contextShowReport", "contextShowReply", "contextShowPin", "contextShowSaveMedia", "contextShowMessageReplies", "contextShowJson", "contextShowRepeatForward", "contextShowRepeatCopy", "contextShowEditHistory", "contextMenuOrder", "contextMenuDisabledItems", "mentionAsUserIdLink", "disableLinkPreview", "fixLinkPreviews", "linkPreviewXHost", "linkPreviewInstagramHost", "defaultEmojisFirst", "messageDoubleTapActionOutgoing", "messageDoubleTapAction", "messageDoubleTapActionWithoutEditPermission", "showMessageId", "automaticallyRevealSpoilers", "showForwardedMessageDate", "forceEmojiTab", "panguSpacing", "defaultOutgoingFormatting", "sendWithReturnKey", "hideRecordingButton", "disableSendAsButton", "chatPreferences", "features.autoInlineBotEnabled", "features.tapMessageRowToOpenContextMenu", "features.confirmUnpin", "features.enablePanguOnEditing", "features.enablePanguOnReceiving"],
         .privacy: ["hidePhoneInSettings", "profileDefaultTabGroupsInCommon", "showDC", "showCreationDate", "showRegDate", "showProfileId", "confirmCalls", "messageFilterRules", "blockedPeerIds", "messageFilterDisabledPeerIds", "antiRevokePeerIds", "disableAllAds", "antiRevoke", "antiRevokeSkipBots", "revokedMarkerStyle", "revokedMarkerText", "revokedMarkerColor", "revokedMarkerDimMessages", "saveEditHistory", "antiAutoDelete", "antiSelfDestruct", "allowSavingProtectedContent", "allowDownloadingStories", "ghostDontReadStories", "ghostDontSendOnline", "ghostDontSendTyping", "storyStealthMode", "warnOnStoriesOpen", "features.hideSavedAndArchivedMessagesInList", "features.hidePrivateChatActivities", "features.disableChatAvatarStories"],
-        .translation: ["sttBaseURL", "sttEndpoint", "sttModel", "sttLanguage", "sttPrompt", "summaryLLMAPIFormat", "summaryLLMBaseURL", "summaryLLMEndpoint", "summaryLLMModel", "summaryLLMPrompt", "summaryLLMTemperatureTenths", "translationLLMAPIFormat", "translationLLMBaseURL", "translationLLMEndpoint", "translationLLMModel", "translationLLMPrompt", "translationLLMUseContext", "translationLLMTemperatureTenths", "quickTranslateButton", "translationBackend", "transcriptionBackend", "outgoingLanguageTranslation"],
-        .media: ["clipboardOriginalImages", "forceBuiltInMic", "uploadSpeedBoost", "downloadSpeedBoost", "showMediaMetadata", "defaultVideoQuality", "customDoHEnabled", "customDoHEndpoint", "ipVersionPolicy", "disableBackupAddresses", "localDNSForProxyHost", "sendLargePhotos", "outgoingPhotoQuality", "disableGalleryCamera", "native.enableVoipTcp"],
+        .translation: ["sttBaseURL", "sttEndpoint", "sttModel", "sttLanguage", "sttPrompt", "translationLLMAPIFormat", "translationLLMBaseURL", "translationLLMEndpoint", "translationLLMModel", "translationLLMPrompt", "translationLLMUseContext", "translationLLMTemperatureTenths", "quickTranslateButton", "translationBackend", "transcriptionBackend", "outgoingLanguageTranslation"],
+        .media: ["clipboardOriginalImages", "forceBuiltInMic", "uploadSpeedBoost", "downloadSpeedBoost", "showMediaMetadata", "defaultVideoQuality", "customDoHEnabled", "customDoHEndpoint", "ipVersionPolicy", "disableBackupAddresses", "localDNSForProxyHost", "sendLargePhotos", "outgoingPhotoQuality", "native.enableVoipTcp"],
         .notifications: ["pinnedMessageNotifications", "mentionsAndRepliesNotifications", "pinnedMessageNotificationsExceptions", "mentionsAndRepliesNotificationsExceptions", "filterNotifications"]
     ]
 
@@ -83,7 +83,7 @@ public struct RegramSettingsBackup: Codable, Equatable {
 
     public var skippedKeys: [String] { values.keys.filter { key in Self.category(for: key).map { !RegramBackupCategory.available.contains($0) } ?? true }.sorted() }
 
-    public func applying(to settings: RegramAccountSettings, categories: Set<RegramBackupCategory> = Set(RegramBackupCategory.available), resetCategories: Set<RegramBackupCategory> = []) -> RegramAccountSettings {
+    public func applying(to settings: RegramAccountSettings, categories: Set<RegramBackupCategory> = Set(RegramBackupCategory.available), resetCategories: Set<RegramBackupCategory> = [], legacyAccountId: Int64? = nil) -> RegramAccountSettings {
         var result = settings
         let reset = resetCategories.intersection(Set(RegramBackupCategory.available))
         for key in reset.flatMap({ Self.categoryKeys[$0] ?? [] }) { result.values.removeValue(forKey: key) }
@@ -99,6 +99,12 @@ public struct RegramSettingsBackup: Codable, Equatable {
             selected[RegramBottomBarSettings.storageKey] = .dictionary(layout.storedValues)
         }
         selected = Self(values: selected).values
+        if let legacyAccountId {
+            var imported = RegramAccountSettings(values: selected)
+            imported.migratePeerPreferences(legacyAccountId: legacyAccountId)
+            RegramChatListPolicy.keepLegacyStartupFolder(settings: &imported, accountId: legacyAccountId)
+            selected = imported.values
+        }
         if selected["features.chatListStartupFolderMode"] == nil, case let .bool(value)? = selected["rememberLastFolder"] { selected["features.chatListStartupFolderMode"] = .string(value ? "last" : "telegram") }
         for (key, value) in selected where Self.isValid(value, key: key) {
             if key == "translationBackend", value == .string("gtranslate") { result.values[key] = .string("google") }
@@ -133,6 +139,8 @@ public struct RegramSettingsBackup: Codable, Equatable {
             }; return false
         case "features.startupFolders":
             if case let .dictionary(v) = value {
+                if v == ["allChats": "true"] { return true }
+                if v.count == 1, let title = v["title"] { return !title.isEmpty && title.utf8.count <= 512 }
                 return v.count <= 10000 && v.allSatisfy { entry in
                     Int64(entry.key) != nil && Int32(entry.value).map { $0 >= -1 } == true
                 }
@@ -144,14 +152,14 @@ public struct RegramSettingsBackup: Codable, Equatable {
             if case let .integer(v) = value { return (0...100).contains(v) }; return false
         case "ipVersionPolicy": if case let .integer(v) = value { return [0, 1, 2, 4, 6].contains(v) }; return false
         case "customDoHEndpoint": if case let .string(v) = value { return v.isEmpty || RegramNetworkPolicy.validEndpoint(v) }; return false
-        case "summaryLLMTemperatureTenths", "translationLLMTemperatureTenths": if case let .integer(v) = value { return (0...10).contains(v) }; return false
+        case "translationLLMTemperatureTenths": if case let .integer(v) = value { return (0...10).contains(v) }; return false
         case "sttPrompt": if case let .string(v) = value { return v.utf8.count <= 16000 }; return false
         case "sttBaseURL", "sttEndpoint", "sttModel": if case let .string(v) = value { return v.utf8.count <= 2048 }; return false
         case "linkPreviewXHost", "linkPreviewInstagramHost": if case let .string(v) = value { return RGLinkPreviewRules.isValidHost(v) }; return false
-        case "summaryLLMPrompt", "translationLLMPrompt": if case let .string(v) = value { return v.utf8.count <= 16000 }; return false
-        case "summaryLLMAPIFormat", "translationLLMAPIFormat": if case let .string(v) = value { return v == "openai" || v == "anthropic" }; return false
-        case "summaryLLMBaseURL", "summaryLLMEndpoint", "summaryLLMModel", "translationLLMBaseURL", "translationLLMEndpoint", "translationLLMModel": if case let .string(v) = value { return v.utf8.count <= 2048 }; return false
-        case "stickerSize": if case let .integer(v) = value { return (0...200).contains(v) }; return false
+        case "translationLLMPrompt": if case let .string(v) = value { return v.utf8.count <= 16000 }; return false
+        case "translationLLMAPIFormat": if case let .string(v) = value { return v == "openai" || v == "anthropic" }; return false
+        case "translationLLMBaseURL", "translationLLMEndpoint", "translationLLMModel": if case let .string(v) = value { return v.utf8.count <= 2048 }; return false
+        case "stickerSize": if case let .integer(v) = value { return RGMediaPolicy.stickerSizeRange.contains(v) }; return false
         case "recentStickerLimit": if case let .integer(v) = value { return (1...1000).contains(v) }; return false
         case "bottomBarLayout":
             if case let .dictionary(v) = value { return v.count <= 13 && v.allSatisfy { $0.key.count < 32 && $0.value.count < 128 } }; return false

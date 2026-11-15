@@ -9,12 +9,12 @@ public struct RegramSettingsRoute: Equatable {
         "pro.home", "pro.messages", "pro.input", "pro.privacy", "pro.translation", "pro.media", "pro.appearance", "pro.notifications", "pro.network", "pro.tools",
         "settings.appearance", "settings.folders", "settings.chatList", "settings.profiles", "settings.stories", "settings.translation", "settings.messageActions", "settings.media", "settings.photos", "settings.stickers", "settings.recording", "settings.app",
         "settings.input", "settings.transfer", "settings.privacy",
-        "inlineBots", "groupProfile", "startupFolder", "summary", "networkPolicy", "bottomBar", "llm", "stt", "updates", "linkPreview", "antiFeatures", "revokedMarker", "ghostMode", "backup", "diagnostics", "datacenters", "bookmarks", "chatPreferences", "messageFilter", "hiddenUsers", "antiRevokeChats", "revokedMessages", "localGifts", "contextMenu"
+        "inlineBots", "groupProfile", "startupFolder", "networkPolicy", "bottomBar", "llm", "stt", "updates", "linkPreview", "antiFeatures", "revokedMarker", "ghostMode", "backup", "diagnostics", "datacenters", "bookmarks", "chatPreferences", "messageFilter", "hiddenUsers", "antiRevokeChats", "revokedMessages", "localGifts", "contextMenu"
     ]
     public static func normalized(page: String, item: String? = nil) -> (page: String, item: String?)? {
         guard Self.pages.contains(page), item.map(Self.validItem) ?? true else { return nil }
         if item == "eraseAllData" { return nil }
-        if ["disableDeleteChatSwipeOption", "mediaLoadingExperiment"].contains(item ?? "") { return nil }
+        if ["disableDeleteChatSwipeOption", "mediaLoadingExperiment", "disableGalleryCamera"].contains(item ?? "") { return nil }
         if ["appBages", "appBadges", "customAppBadge"].contains(item ?? "") { return nil }
         if ["inputToolbar", "textStyleMenu", "disableSwipeToRecordStory", "disableSnapDeletionEffect", "forceSystemSharing", "disableGalleryCameraPreview", "startTelescopeWithRearCam", "antiScreenshotNotification", "accountColorsSaturation", "videoPIPSwipeDirection", "features.videoPIPSwipeDirection", "disableScrollToNextChannel", "disableScrollToNextTopic", "appIcons"].contains(item ?? "") || (item?.hasPrefix("features.textStyleMenu.") ?? false) { return nil }
         if page == "bottomBar", ["hidden", "preview", "topSearch", "automaticWidth", "reset", "search", "bottomSearch", "searchMode"].contains(item ?? "") { return nil }
@@ -39,7 +39,6 @@ public struct RegramSettingsRoute: Equatable {
             "pro.tools:diagnostics": "pro.network",
             "settings.messageActions:hideRecordingButton": "settings.input", "settings.messageActions:disableSendAsButton": "settings.input", "settings.messageActions:sendWithReturnKey": "settings.input",
             "settings.media:uploadSpeedBoost": "settings.transfer", "settings.media:downloadSpeedBoost": "settings.transfer", "settings.app:enableVoipTcp": "settings.transfer",
-            "settings.media:disableGalleryCamera": "settings.recording",
             "settings.app:hideChannelBottomButton": "settings.messageActions", "settings.app:contentSettings": "settings.privacy", "settings.profiles:hidePhoneInSettings": "settings.privacy"
         ]
         return (item.flatMap { moves[page + ":" + $0] } ?? page, item)

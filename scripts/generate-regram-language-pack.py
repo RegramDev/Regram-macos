@@ -43,9 +43,12 @@ def placeholders(value):
 def generate(check=False, ios_root=None):
     manifest = json.loads((SOURCE / "manifest.json").read_text())
     aliases = manifest["macosAliases"]
+    macos_excluded_keys = set(manifest.get("macosExcludedKeys", []))
     macos_insert_before = manifest.get("macosInsertBefore", {})
     packs = {language: json.loads((SOURCE / (language + ".json")).read_text()) for language in LANGUAGES}
     reference = packs["en"]
+    if not macos_excluded_keys.issubset(reference["strings"]):
+        raise ValueError("macOS exclusions must name shared strings")
     outputs = {}
     for language, ios_language in LANGUAGES.items():
         pack = packs[language]
@@ -57,8 +60,8 @@ def generate(check=False, ios_root=None):
                     raise ValueError(f"{language}: empty value for {key}")
                 if placeholders(value) != placeholders(reference[group][key]):
                     raise ValueError(f"{language}: format arguments differ for {key}")
-        macos = pack["strings"] | pack["macos"]
-        macos.update({alias: macos[key] for alias, key in aliases.items()})
+        macos = {key: value for key, value in (pack["strings"] | pack["macos"]).items() if key not in macos_excluded_keys}
+        macos.update({alias: macos[key] for alias, key in aliases.items() if key not in macos_excluded_keys and alias not in pack["macos"]})
         macos.update({"native.macos." + key: value for key, value in pack["nativeMacos"].items()})
         outputs[ROOT / f"packages/RegramCore/Sources/RegramCore/Resources/{language}.lproj/Regram.strings"] = strings_text(macos, macos_insert_before)
         ios = pack["strings"]

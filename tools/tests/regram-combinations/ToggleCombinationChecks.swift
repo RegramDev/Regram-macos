@@ -1,6 +1,7 @@
 import Cocoa
 import TGUIKit
 import InputDataUI
+import InAppSettings
 import GeneralRows
 import TelegramCore
 import Postbox
@@ -79,13 +80,25 @@ struct ToggleCombinationChecks {
     static func drain() {
         _ = RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.03))
     }
+    static func snapshot(accountId: Int64) -> RegramAccountSettings {
+        var settings = fixturePreferences.settings(accountId: accountId)
+        settings["sendWithReturnKey"] = .bool(FastSettings.sendingType == .enter)
+        settings["sendLargePhotos"] = .bool(FastSettings.sendLargePhotos)
+        return settings
+    }
     static func main() throws {
         UITestBootstrap.install()
         NSApp.setActivationPolicy(.prohibited)
-        defer { fixtureDefaults.removePersistentDomain(forName: fixtureSuite) }
+        let originalSendingType = FastSettings.sendingType
+        let originalLargePhotos = FastSettings.sendLargePhotos
+        defer {
+            fixtureDefaults.removePersistentDomain(forName: fixtureSuite)
+            FastSettings.changeSendingType(originalSendingType)
+            FastSettings.sendLargePhotos(originalLargePhotos)
+        }
         let accountId: Int64 = 283392
         let context = ToggleFixtureContext(peerId: PeerId(accountId))
-        fixtureInventory.record(Set(RGContextMenuItemId.allCases), accountId: accountId)
+        fixtureInventory.record(Set(RGContextMenuItemId.allCases))
         fixturePreferences.update(accountId: accountId) { $0["showMessageId"] = .bool(true) }
         _ = fixtureGiftStore.setEnabled(account: fixtureGiftAccount, enabled: true)
         _ = fixtureGiftStore.setPhone(account: fixtureGiftAccount, enabled: false, number: "88800011111")
@@ -140,59 +153,64 @@ struct ToggleCombinationChecks {
             }
         }
         check(actions.count > 70, "Broad toggle coverage includes menu, appearance, input, media and network pages")
-        let unrelatedAccount = fixturePreferences.settings(accountId: accountId + 1)
         for mask in 0..<4 {
             fixturePreferences.update(accountId: accountId) { settings in
                 for (index, key) in ["panguSpacing", "disableLinkPreview", "features.autoInlineBotEnabled", "localPremium", "translationHideOriginal"].enumerated() { settings[key] = .bool((mask & (1 << (index % 2))) != 0) }
             }
             for action in actions {
-                var expected = fixturePreferences.settings(accountId: accountId)
+                var expected = snapshot(accountId: accountId)
                 for _ in 0..<4 {
                     action.transform(&expected)
                     action.activate()
-                    check(fixturePreferences.settings(accountId: accountId) == expected, "\(mask)/\(action.name) repeated native action uses latest stored state")
+                    check(snapshot(accountId: accountId) == expected, "\(mask)/\(action.name) repeated native action uses latest stored state")
                 }
             }
             drain()
         }
-        var replacement = fixturePreferences.settings(accountId: accountId)
+        var replacement = snapshot(accountId: accountId)
         for setting in RegramSetting.all {
             if case .bool = setting.defaultValue { replacement[setting.key] = .bool(!replacement[setting.key].bool) }
         }
         let backup = try RegramSettingsBackup.decode(RegramSettingsBackup(settings: replacement).encoded())
-        fixturePreferences.update(accountId: accountId) { $0 = backup.applying(to: $0) }
+        fixturePreferences.update(accountId: accountId) { settings in
+            settings = backup.applying(to: settings)
+            settings.values.removeValue(forKey: "sendWithReturnKey")
+            settings.values.removeValue(forKey: "sendLargePhotos")
+        }
+        if let returnKey = backup.values["sendWithReturnKey"] { FastSettings.changeSendingType(returnKey.bool ? .enter : .cmdEnter) }
+        if let largePhotos = backup.values["sendLargePhotos"] { FastSettings.sendLargePhotos(largePhotos.bool) }
         for action in actions {
-            var expected = fixturePreferences.settings(accountId: accountId)
+            var expected = snapshot(accountId: accountId)
             for _ in 0..<2 {
                 action.transform(&expected)
                 action.activate()
-                check(fixturePreferences.settings(accountId: accountId) == expected, "\(action.name) immediate action after backup restore uses restored values")
+                check(snapshot(accountId: accountId) == expected, "\(action.name) immediate action after backup restore uses restored values")
             }
         }
         for category in RegramCategory.allCases {
             fixturePreferences.reset(accountId: accountId, category: category)
             for action in actions {
-                var expected = fixturePreferences.settings(accountId: accountId)
+                var expected = snapshot(accountId: accountId)
                 action.transform(&expected)
                 action.activate()
-                check(fixturePreferences.settings(accountId: accountId) == expected, "\(category)/\(action.name) immediate action after category reset preserves other settings")
+                check(snapshot(accountId: accountId) == expected, "\(category)/\(action.name) immediate action after category reset preserves other settings")
             }
         }
         drain()
         var pairs = 0
         for first in actions.indices {
             for second in actions.indices where second > first {
-                var expected = fixturePreferences.settings(accountId: accountId)
+                var expected = snapshot(accountId: accountId)
                 for index in [first, second, first, second] {
                     actions[index].transform(&expected)
                     actions[index].activate()
-                    check(fixturePreferences.settings(accountId: accountId) == expected, "\(actions[first].name)/\(actions[second].name) interleaved toggles preserve other settings")
+                    check(snapshot(accountId: accountId) == expected, "\(actions[first].name)/\(actions[second].name) interleaved toggles preserve other settings")
                 }
                 pairs += 1
             }
             drain()
         }
-        check(fixturePreferences.settings(accountId: accountId + 1) == unrelatedAccount, "All toggle combinations preserve another account")
+        check(fixturePreferences.settings(accountId: accountId + 1) == fixturePreferences.settings(accountId: accountId), "All accounts read the same settings after the toggle combinations")
         check(giftActions.count == 4, "Showroom covers phone, rating, local gifts and wallet-card switches")
         for first in giftActions.indices {
             for second in giftActions.indices {
@@ -204,7 +222,7 @@ struct ToggleCombinationChecks {
                 }
             }
         }
-        check(fixtureGiftStore.state(account: fixtureGiftAccount + ".other") == RGLocalGiftsState(), "Showroom toggles preserve another isolated account")
+        check(fixtureGiftStore.state(account: fixtureGiftAccount + ".other") == fixtureGiftStore.state(account: fixtureGiftAccount), "Showroom settings are shared across accounts")
         check(hosts.allSatisfy { !$0.isVisible && !$0.isKeyWindow && !$0.isMainWindow }, "All native action fixtures remain hidden and inactive")
         check(NSApp.activationPolicy() == .prohibited, "Fixture cannot activate the user's application")
         let report: [String: Any] = ["checks": checks, "toggleBindings": actions.count, "togglePairs": pairs, "showroomBindings": giftActions.count, "failures": failures, "failedBindings": Array(Set(failures)).sorted(), "messagesSent": 0, "realAccountsUsed": false]

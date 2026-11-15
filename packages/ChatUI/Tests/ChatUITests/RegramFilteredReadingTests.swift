@@ -34,7 +34,8 @@ final class RegramFilteredReadingTests: XCTestCase {
 
     func testFilterCacheInvalidatesForMessageEditsAndRuleChanges() {
         let accountId = Int64.min + 283369
-        defer { RegramPreferences.shared.removeAccount(accountId) }
+        let previous = RegramPreferences.shared.settings(accountId: accountId).values["messageFilterRules"]
+        defer { RegramPreferences.shared.update(accountId: accountId) { $0.values["messageFilterRules"] = previous } }
         RegramPreferences.shared.update(accountId: accountId) { $0["messageFilterRules"] = .string(RGMessageFilter.encode([RGMessageFilterRule(pattern: "hidden")])) }
         XCTAssertTrue(regramShouldHideMessage(message(1), accountId: accountId))
         XCTAssertFalse(regramShouldHideMessage(message(1, text: "edited", version: 1), accountId: accountId))
@@ -43,9 +44,10 @@ final class RegramFilteredReadingTests: XCTestCase {
     }
     func testRevokedMessagesRequireExplicitRetentionEvenWhenTimersAreIgnored() {
         let accountId = Int64.min + 283395
+        let previous = RegramPreferences.shared.settings(accountId: accountId)
         defer {
             RegramTemporaryReveal.shared.clear(accountId: accountId)
-            RegramPreferences.shared.removeAccount(accountId)
+            RegramPreferences.shared.update(accountId: accountId) { $0 = previous }
         }
         RegramPreferences.shared.update(accountId: accountId) {
             $0["antiAutoDelete"] = .bool(true)

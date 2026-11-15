@@ -24,8 +24,9 @@ final class RegramSettingsPortabilityTests: XCTestCase {
     func testSourceSearchFollowsMovedControlsAndRejectsRetiredLinks() throws {
         let composer = try XCTUnwrap(RegramSettingsRoute(page: "pro.messages", item: "mentionAsUserIdLink"))
         XCTAssertEqual(composer.destination, "pro.input/mentionAsUserIdLink")
-        let camera = try XCTUnwrap(RegramSettingsRoute(page: "settings.media", item: "disableGalleryCamera"))
-        XCTAssertEqual(camera.destination, "settings.recording/disableGalleryCamera")
+        XCTAssertNil(RegramSettingsRoute(page: "settings.media", item: "disableGalleryCamera"))
+        XCTAssertNil(RegramSettingsRoute(page: "settings.recording", item: "disableGalleryCamera"))
+        XCTAssertFalse(RegramSettingsCatalog.sourceEntries.contains { $0.key == "disableGalleryCamera" })
         XCTAssertEqual(RegramSettingsRoute(page: "settings.app", item: "enableVoipTcp")?.destination, "settings.transfer/enableVoipTcp")
         XCTAssertEqual(RegramSettingsRoute(page: "antiFeatures", item: "revokedMarker")?.destination, "revokedMarker/revokedMarker")
         XCTAssertEqual(RegramSettingsRoute(page: "startupFolder")?.destination, "settings.folders/startupFolder")
@@ -37,7 +38,6 @@ final class RegramSettingsPortabilityTests: XCTestCase {
             XCTAssertNil(RegramSettingsRoute(page: "pro.input", item: item))
             XCTAssertFalse(RegramSettingsCatalog.sourceEntries.contains { $0.key == item })
         }
-        XCTAssertEqual(RegramSettingsRoute(url: camera.url), camera)
         XCTAssertEqual(RegramSettingsRoute(page: "pro.tools", item: "localPremium")?.destination, "localGifts/localPremium")
         XCTAssertEqual(RegramSettingsRoute(page: "pro.home", item: "localGifts")?.destination, "localGifts")
         XCTAssertEqual(RegramSettingsRoute(page: "localGifts", item: "owned")?.destination, "localGifts/balance")
@@ -134,12 +134,57 @@ final class RegramSettingsPortabilityTests: XCTestCase {
         XCTAssertFalse(restored["mediaLoadingExperiment"].bool)
     }
 
+    func testLegacyCameraSettingDoesNotBlockRestoringRecordingPreferences() throws {
+        let data = Data("""
+        {"version":1,"createdAt":"2026-10-26T00:00:00Z","values":{"disableGalleryCamera":true,"forceBuiltInMic":true}}
+        """.utf8)
+        let backup = try RegramSettingsBackup.decode(data)
+        XCTAssertNil(backup.values["disableGalleryCamera"])
+        let restored = backup.applying(to: RegramAccountSettings())
+        XCTAssertNil(restored.values["disableGalleryCamera"])
+        XCTAssertTrue(restored["forceBuiltInMic"].bool)
+    }
+
     func testBackupRejectsInvalidSourceRangesAndRetainsValidImportedStickerSize() throws {
         let valid = RegramSettingsBackup(values: ["stickerSize": .integer(200), "recentStickerLimit": .integer(1000)])
-        let restored = try RegramSettingsBackup.decode(valid.encoded()).applying(to: RegramAccountSettings())
+        let backup = try RegramSettingsBackup.decode(valid.encoded())
+        let name = "regram-sticker-import-" + UUID().uuidString
+        let defaults = UserDefaults(suiteName: name)!
+        defer { defaults.removePersistentDomain(forName: name) }
+        RegramPreferences(defaults: defaults).update(accountId: 1) { $0 = backup.applying(to: $0) }
+        let restored = RegramPreferences(defaults: defaults).settings(accountId: 1)
         XCTAssertEqual(restored["stickerSize"], .integer(200))
+        XCTAssertEqual(RGMediaPolicy.stickerScale(settings: restored), 2)
         for values: [String: RegramValue] in [["outgoingPhotoQuality": .integer(101)], ["tabBarWidthPercent": .integer(49)], ["native.enableVoipTcp": .string("true")]] {
             XCTAssertThrowsError(try RegramSettingsBackup.decode(RegramSettingsBackup(values: values).encoded()))
         }
+    }
+
+    func testExportsOwnMessageAlignmentAndIgnoresRetiredSummarySettings() throws {
+        var settings = RegramAccountSettings()
+        settings["alignOwnMessagesLeft"] = .bool(true)
+        let backup = RegramSettingsBackup(settings: settings, categories: [.messages])
+        let restored = try RegramSettingsBackup.decode(backup.encoded()).applying(to: RegramAccountSettings())
+        XCTAssertTrue(restored["alignOwnMessagesLeft"].bool)
+        XCTAssertNil(RegramSettingsRoute(url: URL(string: "tg://rg/settings?page=summary")!))
+        let legacy = Data("""
+        {"version":1,"createdAt":"2026-10-26T00:00:00Z","values":{"messageSummaryEnabled":true,"summaryLLMModel":"old-model","alignOwnMessagesLeft":true}}
+        """.utf8)
+        let imported = try RegramSettingsBackup.decode(legacy)
+        XCTAssertEqual(imported.values, ["alignOwnMessagesLeft": .bool(true)])
+    }
+
+    func testSearchFindsOneLinkPreviewRepairAndOmitsRetiredIOSAliases() {
+        for language in ["en", "zh-Hans", "zh-Hant"] {
+            let title = regramLocalizedString("LinkPreview.Repair", languageCode: language)
+            let results = RegramSettingsCatalog.results(query: title, language: language).filter { $0.titleKey == "LinkPreview.Repair" }
+            XCTAssertEqual(results.map(\.destination), ["linkPreview/enabled"])
+            let oldScreenshotTitle = regramLocalizedString("AntiFeatures.Screenshot", languageCode: language)
+            XCTAssertFalse(RegramSettingsCatalog.results(query: oldScreenshotTitle, language: language).contains { $0.key == "antiFeatures" })
+            for query in ["p12", "ipa"] {
+                XCTAssertFalse(RegramSettingsCatalog.results(query: query, language: language).contains { $0.key == "appUpdate" })
+            }
+        }
+        XCTAssertEqual(RegramSettingsCatalog.entries.first(where: { $0.destination == "revokedMarker/apply" })?.titleKey, "Common.Save")
     }
 }

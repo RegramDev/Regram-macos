@@ -25,7 +25,6 @@ public func RegramChatPreferencesController(context: any AccountContextProtocol,
             var values = (try? JSONDecoder().decode([String: RGChatPreferences].self, from: Data(settings["chatPreferences"].string.utf8))) ?? [:]
             var value = settings.chatPreferences(accountId: accountId, peerId: peerId.toInt64())
             transform(&value)
-            values.removeValue(forKey: String(peerId.toInt64()))
             values[RGChatPreferences.key(accountId: accountId, peerId: peerId.toInt64())] = value.isEmpty ? nil : value
             if let data = try? JSONEncoder().encode(values), let text = String(data: data, encoding: .utf8) { settings["chatPreferences"] = .string(text) }
         }

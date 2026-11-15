@@ -25,15 +25,13 @@ final class RegramInputMediaPolicyTests: XCTestCase {
     func testMediaPolicyRetainsNativeResolutionAndUsesBoundedPreferences() {
         var settings = RegramAccountSettings()
         settings["outgoingPhotoQuality"] = .integer(72)
-        settings["sendLargePhotos"] = .bool(true)
         settings["recentStickerLimit"] = .integer(150)
         settings["stickerSize"] = .integer(84)
         XCTAssertEqual(RGMediaPolicy.photoQuality(settings: settings), 0.72)
         XCTAssertEqual(RGMediaPolicy.photoQuality(settings: settings, pasted: true), 1.0)
-        XCTAssertEqual(RGMediaPolicy.photoMaximumDimension(native: 1280, settings: settings), 2560)
-        XCTAssertEqual(RGMediaPolicy.photoMaximumDimension(native: 4096, settings: settings), 4096)
-        settings["sendLargePhotos"] = .bool(false)
-        XCTAssertEqual(RGMediaPolicy.photoMaximumDimension(native: 1280, settings: settings, pasted: true), 2560)
+        XCTAssertEqual(RGMediaPolicy.photoMaximumDimension(sendsLargePhotos: true), 2560)
+        XCTAssertEqual(RGMediaPolicy.photoMaximumDimension(sendsLargePhotos: false), 1280)
+        XCTAssertEqual(RGMediaPolicy.photoMaximumDimension(sendsLargePhotos: false, pasted: true), 2560)
         XCTAssertEqual(RGMediaPolicy.recentStickerLimit(settings: settings), 150)
         XCTAssertEqual(RGMediaPolicy.stickerScale(settings: settings), 0.84)
         settings["outgoingPhotoQuality"] = .integer(0)
@@ -45,6 +43,22 @@ final class RegramInputMediaPolicyTests: XCTestCase {
         XCTAssertEqual(RGMediaPolicy.stickerScale(settings: settings), 2)
         settings.values["recentStickerLimit"] = .integer(1000)
         XCTAssertEqual(RGMediaPolicy.recentStickerLimit(settings: settings), 20)
+    }
+
+    func testLargePhotoMigrationRunsOnceAndAllowsTurningItOff() throws {
+        let name = "RegramPhotoMigrationTests.\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        let legacy = RegramAccountSettings(values: ["sendLargePhotos": .bool(true)])
+        defaults.set(try JSONEncoder().encode(legacy), forKey: "Regram.Preferences.v1.21")
+        let store = RegramPreferences(defaults: defaults)
+        store.prepareSharedSettings(preferredAccountId: 21)
+        var globalEnabled = false
+        store.migrateLegacyLargePhotos { globalEnabled = true }
+        XCTAssertTrue(globalEnabled)
+        globalEnabled = false
+        RegramPreferences(defaults: defaults).migrateLegacyLargePhotos { globalEnabled = true }
+        XCTAssertFalse(globalEnabled)
     }
 
     func testDoubleClickOverrideOnlyAffectsMessagesWithoutEditPermission() {

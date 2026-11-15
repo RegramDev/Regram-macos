@@ -107,7 +107,7 @@ public func RegramRevokedMarkerController(context: any AccountContextProtocol, f
         preview.append(NSAttributedString(string: "12:34", attributes: [.foregroundColor: theme.colors.grayText]))
         rows.append(.desc(sectionId: 3, index: 6, text: .attributed(preview), data: .init(color: theme.colors.grayText, viewType: .singleItem)))
         rows.append(.sectionId(3, type: .normal))
-        rows.append(.general(sectionId: 4, index: 7, value: .none, error: nil, identifier: InputDataIdentifier("revokedMarker.apply"), data: .init(name: regramString("NetworkPolicy.Apply"), color: theme.colors.accent, type: .none, viewType: .singleItem, enabled: !invalidColor, action: {
+        rows.append(.general(sectionId: 4, index: 7, value: .none, error: nil, identifier: InputDataIdentifier("revokedMarker.apply"), data: .init(name: regramString("Common.Save"), color: theme.colors.accent, type: .none, viewType: .singleItem, enabled: !invalidColor, action: {
             var marker = state.with { $0 }
             marker.dimMessages = RegramPreferences.shared.settings(accountId: accountId)["revokedMarkerDimMessages"].bool
             guard !context.isFrozen, RegramPreferences.shared.settings(accountId: accountId)["antiRevoke"].bool, marker.style == .none || marker.color.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || RegramRevokedMarker.rgb(marker.color) != nil else { return }

@@ -10,9 +10,9 @@ final class RegramPreferenceInvalidationTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suite) }
         let store = RegramPreferences(defaults: defaults)
         let accountId = Int64.random(in: 1_000_000_000...Int64.max)
-        let delivered = expectation(description: "scoped preference change")
+        let delivered = expectation(description: "shared preference change")
         let observer = NotificationCenter.default.addObserver(forName: RegramPreferences.didChange, object: nil, queue: .main) { notification in
-            guard notification.object as? Int64 == accountId else { return }
+            guard (notification.object as? RegramPreferences) === store else { return }
             XCTAssertEqual(notification.userInfo?[RegramPreferences.changedKeysUserInfoKey] as? Set<String>, ["showTabNames"])
             XCTAssertFalse(RegramPreferences.isContentChange(notification))
             delivered.fulfill()
@@ -29,6 +29,7 @@ final class RegramPreferenceInvalidationTests: XCTestCase {
         let store = RegramPreferences(defaults: defaults)
         let accountId: Int64 = 1
         let captured = store.captureFilter(accountId: accountId)
+        let otherAccount = store.captureFilter(accountId: 2)
         for width in 50...100 {
             store.update(accountId: accountId) { settings in
                 var layout = RegramBottomBarSettings(settings: settings)
@@ -43,6 +44,7 @@ final class RegramPreferenceInvalidationTests: XCTestCase {
         store.update(accountId: accountId) { $0["showMessageId"] = .bool(true) }
         XCTAssertGreaterThan(store.revision(accountId: accountId), captured.revision)
         XCTAssertNil(store.withCurrentRevision(accountId: accountId, revision: captured.revision) { true })
+        XCTAssertNil(store.withCurrentRevision(accountId: 2, revision: otherAccount.revision) { true })
     }
 
     func testScopedNotificationsKeepTransientRevealAndAccountResetEvents() {
@@ -50,10 +52,12 @@ final class RegramPreferenceInvalidationTests: XCTestCase {
         var bottomBarUpdates = 0
         var contentUpdates = 0
         var accountInfoUpdates = 0
+        var otherAccountInfoUpdates = 0
         let bottomBar = regramPreferenceChanges(accountId: accountId, keys: RegramBottomBarSettings.preferenceKeys).start(next: { _ in bottomBarUpdates += 1 })
         let content = regramContentPreferenceChanges(accountId: accountId).start(next: { _ in contentUpdates += 1 })
         let accountInfo = regramPreferenceChanges(accountId: accountId, keys: ["hidePhoneInSettings"]).start(next: { _ in accountInfoUpdates += 1 })
-        defer { bottomBar.dispose(); content.dispose(); accountInfo.dispose() }
+        let otherAccountInfo = regramPreferenceChanges(accountId: -1, keys: ["hidePhoneInSettings"]).start(next: { _ in otherAccountInfoUpdates += 1 })
+        defer { bottomBar.dispose(); content.dispose(); accountInfo.dispose(); otherAccountInfo.dispose() }
         func notify(_ keys: Set<String>?, account: Int64? = nil) {
             NotificationCenter.default.post(name: RegramPreferences.didChange, object: account ?? accountId, userInfo: keys.map { [RegramPreferences.changedKeysUserInfoKey: $0] })
         }
@@ -76,5 +80,9 @@ final class RegramPreferenceInvalidationTests: XCTestCase {
         XCTAssertEqual(accountInfoUpdates, 3)
         notify(["hidePhoneInSettings"], account: -1)
         XCTAssertEqual(accountInfoUpdates, 3)
+        XCTAssertEqual(otherAccountInfoUpdates, 2)
+        NotificationCenter.default.post(name: RegramPreferences.didChange, object: RegramPreferences.shared, userInfo: [RegramPreferences.changedKeysUserInfoKey: Set(["hidePhoneInSettings"])])
+        XCTAssertEqual(accountInfoUpdates, 4)
+        XCTAssertEqual(otherAccountInfoUpdates, 3)
     }
 }

@@ -39,13 +39,16 @@ final class RegramLocalGiftsTests: XCTestCase {
         try withStore { store, _ in
             _ = try store.setEnabled(account: "live:1", enabled: true).get()
             _ = try store.setBalance(account: "live:1", balance: 25).get()
-            DispatchQueue.concurrentPerform(iterations: 100) { _ in
-                _ = store.purchase(account: "live:1", title: "gift", price: 1, gift: Data([1]))
+            DispatchQueue.concurrentPerform(iterations: 100) { index in
+                let account = index.isMultiple(of: 2) ? "live:1" : "live:2"
+                _ = store.purchase(account: account, title: "gift", price: 1, gift: Data([1]))
             }
             let result = store.state(account: "live:1")
+            let other = store.state(account: "live:2")
             XCTAssertEqual(result.balance, 0)
-            XCTAssertEqual(result.purchases.count, 25)
-            XCTAssertEqual(Set(result.purchases.map(\.id)).count, 25)
+            XCTAssertEqual(other.balance, 0)
+            XCTAssertEqual(result.purchases.count + other.purchases.count, 25)
+            XCTAssertEqual(Set((result.purchases + other.purchases).map(\.id)).count, 25)
         }
     }
 
@@ -81,7 +84,10 @@ final class RegramLocalGiftsTests: XCTestCase {
             let test = store.state(account: "test:1")
             let other = store.state(account: "live:2")
             store.removeAccount(account: "live:1")
-            XCTAssertEqual(store.state(account: "live:1"), RGLocalGiftsState())
+            let removed = store.state(account: "live:1")
+            XCTAssertTrue(removed.enabled)
+            XCTAssertTrue(removed.purchases.isEmpty)
+            XCTAssertEqual(removed.balance, other.balance)
             XCTAssertNil(defaults.data(forKey: "regram.localGifts.v1.live:1"))
             XCTAssertEqual(store.state(account: "test:1"), test)
             XCTAssertEqual(store.state(account: "live:2"), other)
@@ -103,10 +109,35 @@ final class RegramLocalGiftsTests: XCTestCase {
             XCTAssertTrue(phone.ratingEnabled)
             failure(store.setRating(account: "live:1", enabled: true, level: 1000), .invalidAmount)
             XCTAssertEqual(store.state(account: "live:1"), phone)
+            XCTAssertEqual(store.state(account: "live:2"), phone)
             let corrupt = Data("invalid".utf8)
             defaults.set(corrupt, forKey: "regram.localGifts.v1.test:1")
             failure(store.setEnabled(account: "test:1", enabled: true), .storage)
             XCTAssertEqual(defaults.data(forKey: "regram.localGifts.v1.test:1"), corrupt)
+        }
+    }
+
+    func testMigrationSharesPrimaryAccountConfigurationAndLoadsBothGiftInventories() throws {
+        try withStore { store, defaults in
+            var first = RGLocalGiftsState()
+            first.enabled = true
+            first.balance = 800
+            first.phoneEnabled = true
+            first.phoneNumber = "88812345678"
+            first.purchases = [RGLocalGiftPurchase(id: UUID(), date: 1, title: "First", price: 10, gift: Data([1]))]
+            var other = RGLocalGiftsState()
+            other.balance = 130
+            other.purchases = [RGLocalGiftPurchase(id: UUID(), date: 2, title: "Second", price: 20, gift: Data([2]))]
+            defaults.set(try JSONEncoder().encode(first), forKey: "regram.localGifts.v1.live:2")
+            defaults.set(try JSONEncoder().encode(other), forKey: "regram.localGifts.v1.live:1")
+            store.prepareSharedSettings(preferredAccount: "live:2")
+            let reopened = RGLocalGiftsStore(defaults: defaults)
+            reopened.prepareSharedSettings(preferredAccount: "live:1")
+            XCTAssertEqual(reopened.state(account: "live:2"), first)
+            let shared = reopened.state(account: "live:1")
+            XCTAssertEqual(shared.phoneNumber, first.phoneNumber)
+            XCTAssertEqual(shared.balance, first.balance)
+            XCTAssertEqual(shared.purchases, other.purchases)
         }
     }
 
@@ -152,7 +183,7 @@ final class RegramLocalGiftsTests: XCTestCase {
         XCTAssertFalse(store.state(account: "live:1").enabled)
     }
 
-    func testStarsBalanceChangesKeepCommittedAmountsAndAccountEnvironmentScope() throws {
+    func testStarsBalanceChangesReachAccountsInCommitOrder() throws {
         let suite = "RegramLocalGiftsTests." + UUID().uuidString
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
@@ -163,7 +194,7 @@ final class RegramLocalGiftsTests: XCTestCase {
         var amounts: [Int64?] = []
         let subscription = regramLocalGiftsChanges(account: account, store: store, notifications: notifications).start(next: { state in
             amounts.append(state.enabled ? state.balance : nil)
-            if amounts.count == 5 { delivered.fulfill() }
+            if amounts.count == 6 { delivered.fulfill() }
         })
         defer { subscription.dispose() }
         _ = try store.setEnabled(account: account, enabled: true).get()
@@ -177,8 +208,8 @@ final class RegramLocalGiftsTests: XCTestCase {
         }
         _ = try store.setEnabled(account: account, enabled: false).get()
         wait(for: [delivered], timeout: 2)
-        XCTAssertEqual(amounts, [nil, 10_000, 0, RGLocalGiftsStore.maximumBalance, nil])
-        XCTAssertEqual(store.state(account: account).balance, RGLocalGiftsStore.maximumBalance)
+        XCTAssertEqual(amounts, [nil, 10_000, 0, RGLocalGiftsStore.maximumBalance, 42, nil])
+        XCTAssertEqual(store.state(account: account).balance, 42)
         XCTAssertFalse(store.state(account: account).enabled)
     }
 

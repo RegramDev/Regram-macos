@@ -98,7 +98,7 @@ public final class GalleryRecognition {
                 return self?.menu(for: barcode)
             }
             settingsObserver = NotificationCenter.default.addObserver(forName: RegramPreferences.didChange, object: nil, queue: .main) { [weak self] notification in
-                guard let self, notification.object as? Int64 == accountId, let identity = self.translationIdentity,
+                guard let self, RegramPreferences.applies(notification, to: accountId), let identity = self.translationIdentity,
                       RegramPreferences.shared.settings(accountId: accountId).translationIdentity != identity else { return }
                 self.applyResult(self.result as? TextRecognizing.Result)
             }

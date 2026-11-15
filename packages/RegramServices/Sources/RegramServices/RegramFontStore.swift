@@ -3,7 +3,6 @@ import AppKit
 import CoreText
 import CryptoKit
 import SwiftSignalKit
-import RegramCore
 
 public struct RegramFontSelection: Equatable {
     public let fileId: String
@@ -29,7 +28,6 @@ public struct RegramImportedFont: Codable, Equatable {
     public var title: String
     public let latin: Bool
     public let chinese: Bool
-    public var accountIds: [Int64]?
 }
 
 public enum RegramFontError: Error {
@@ -110,7 +108,7 @@ public final class RegramFontStore {
         return version
     }
 
-    public func importFonts(url: URL, accountId: Int64? = nil) throws -> [RegramImportedFont] {
+    public func importFonts(url: URL) throws -> [RegramImportedFont] {
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         let attributes = try url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
@@ -126,7 +124,7 @@ public final class RegramFontStore {
             let chinese = characters.contains("中".unicodeScalars.first!) || characters.contains("あ".unicodeScalars.first!) || characters.contains("한".unicodeScalars.first!)
             guard latin || chinese else { return nil }
             let title = (CTFontDescriptorCopyAttribute(descriptor, kCTFontDisplayNameAttribute) as? String) ?? url.deletingPathExtension().lastPathComponent
-            return RegramImportedFont(id: RegramFontSelection.id(fileId: hash, faceIndex: index), title: String(title.prefix(80)), latin: latin, chinese: chinese, accountIds: accountId.map { [$0] })
+            return RegramImportedFont(id: RegramFontSelection.id(fileId: hash, faceIndex: index), title: String(title.prefix(80)), latin: latin, chinese: chinese)
         }
         guard !imported.isEmpty else { throw RegramFontError.invalidFont }
         lock.lock()
@@ -137,12 +135,7 @@ public final class RegramFontStore {
             let destination = directory.appendingPathComponent(hash + ".font")
             if !FileManager.default.fileExists(atPath: destination.path) { try data.write(to: destination, options: .atomic) }
             let additions = imported.filter { font in !values.contains(where: { $0.id == font.id }) }
-            var updated = values + additions
-            if let accountId {
-                for index in updated.indices where imported.contains(where: { $0.id == updated[index].id }) {
-                    updated[index].accountIds = Array(Set((updated[index].accountIds ?? []) + [accountId])).sorted()
-                }
-            }
+            let updated = values + additions
             try JSONEncoder().encode(updated).write(to: root.appendingPathComponent("imported.json"), options: .atomic)
             values = updated
             version &+= 1
@@ -153,49 +146,6 @@ public final class RegramFontStore {
             lock.unlock()
             throw error
         }
-    }
-
-    public func retainSelections(settings: RegramAccountSettings, accountId: Int64) {
-        let ids = Set([settings["fontImportedLatin"].string, settings["fontImportedChinese"].string].filter { !$0.isEmpty })
-        guard !ids.isEmpty else { return }
-        lock.lock()
-        defer { lock.unlock() }
-        var updated = values
-        var changed = false
-        for index in updated.indices where ids.contains(updated[index].id) && !(updated[index].accountIds ?? []).contains(accountId) {
-            updated[index].accountIds = Array(Set((updated[index].accountIds ?? []) + [accountId])).sorted()
-            changed = true
-        }
-        guard changed, let data = try? JSONEncoder().encode(updated), (try? data.write(to: root.appendingPathComponent("imported.json"), options: .atomic)) != nil else { return }
-        values = updated
-    }
-
-    public func removeAccount(accountId: Int64) throws {
-        lock.lock()
-        do {
-            let old = values
-            let updated = old.compactMap { font -> RegramImportedFont? in
-                guard var accounts = font.accountIds, accounts.contains(accountId) else { return font }
-                accounts.removeAll(where: { $0 == accountId })
-                guard !accounts.isEmpty else { return nil }
-                var font = font
-                font.accountIds = accounts
-                return font
-            }
-            guard updated != old else { lock.unlock(); return }
-            try JSONEncoder().encode(updated).write(to: root.appendingPathComponent("imported.json"), options: .atomic)
-            values = updated
-            let retained = Set(updated.compactMap { RegramFontSelection(id: $0.id)?.fileId })
-            let deleted = Set(old.filter { font in !updated.contains(where: { $0.id == font.id }) }.compactMap { RegramFontSelection(id: $0.id)?.fileId }).subtracting(retained)
-            for fileId in deleted {
-                let url = root.appendingPathComponent("Imported/\(fileId).font")
-                unregister(url)
-                try? FileManager.default.removeItem(at: url)
-            }
-            version &+= 1
-            lock.unlock()
-            publish()
-        } catch { lock.unlock(); throw error }
     }
 
     public func rename(id: String, title: String) throws {

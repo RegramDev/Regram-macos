@@ -19,6 +19,7 @@ final class NSPasteboard {
     }
     var pasteboardItems: [Item]?
     var image: NSImage?
+    var photoSnapshot: RegramClipboardImages.Snapshot?
     init(paths: [String] = [], image: NSImage? = nil) {
         pasteboardItems = paths.isEmpty ? [Item(path: nil)] : paths.map { Item(path: URL(fileURLWithPath: $0).absoluteString) }
         self.image = image
@@ -30,7 +31,10 @@ final class NSPDFImageRep { let pdfRepresentation = Data() }
 final class Window {}
 let mainWindow = Window()
 struct Peer {}
-struct PeerId { let namespace = 0 }
+struct PeerId {
+    let namespace = 0
+    func toInt64() -> Int64 { 1 }
+}
 enum Namespaces { enum Peer { static let SecretChat = 1 } }
 enum Permission { case banSendMedia }
 enum Entry { case clipboard }
@@ -59,7 +63,28 @@ struct Presentation {
     var interfaceState = InterfaceState()
     var peer: Peer? = Peer()
 }
-struct InteractionContext { let account = 0 }
+struct InteractionContext {
+    let account = 0
+    let peerId = PeerId()
+}
+enum RegramClipboardImages {
+    struct Snapshot {
+        let urls: [URL]
+        let containsImage = true
+        let asMedia = true
+    }
+    static func snapshot(from pasteboard: NSPasteboard) -> Snapshot? { pasteboard.photoSnapshot }
+    static func snapshot(urls: [URL]) -> Snapshot { Snapshot(urls: urls) }
+    static func preparingPhotos(_ snapshot: Snapshot, originalQuality: Bool) throws -> Snapshot { snapshot }
+}
+struct FixturePreference { let bool = true }
+struct FixtureSettings {
+    subscript(key: String) -> FixturePreference { FixturePreference() }
+}
+struct RegramPreferences {
+    static let shared = RegramPreferences()
+    func settings(accountId: Int64) -> FixtureSettings { FixtureSettings() }
+}
 final class ChatInteraction {
     let context = Context()
     var presentation = Presentation()
@@ -81,7 +106,7 @@ final class ChatInteraction {
     func rejectMediaReplacement(entry: Entry, mode: Mode, context: Context, reason: Blocker) { replacementRejections.append(reason) }
     func beginMediaReplacement(entry: Entry, mode: Mode, context: Context) -> Int { 0 }
     func applyMediaReplacement(_ media: Int, request: Int) { replacements += 1 }
-    func showPreviewSender(_ files: [URL], _ media: Bool, _ caption: String?, analyticsContext: Context, journey: Journey?) {
+    func showPreviewSender(_ files: [URL], _ media: Bool, _ caption: String?, analyticsContext: Context, journey: Journey? = nil) {
         preview = files
         previewJourney = journey
     }
@@ -96,6 +121,9 @@ func permissionText(from: Peer, for: Permission) -> String? { permissionDenied ?
 func showFileLimit(context: InteractionContext, fileSize: Int64?) { limitAlerts += 1 }
 func alert(for: Window, info: String) { permissionAlerts += 1 }
 func putToTemp(image: NSImage, compress: Bool = true) -> Signal<String> { Signal(value: "/prepared-image") }
+func regramPastedPhotoPath(_ path: String) -> String { path }
+struct FixtureStrings { let unknownError = "unknown error" }
+func strings() -> FixtureStrings { FixtureStrings() }
 final class InputPasteboardParser {
 __PROCESS__
 }
@@ -134,6 +162,23 @@ final class PasteTests: XCTestCase {
         XCTAssertEqual(chat.previewJourney?.blockers, [.sizeLimit])
         XCTAssertNil(chat.previewJourney?.failure)
         XCTAssertEqual(limitAlerts, 0)
+    }
+    func testClipboardImageSelectionKeepsEligibleFiles() {
+        let chat = ChatInteraction()
+        let board = NSPasteboard()
+        board.photoSnapshot = RegramClipboardImages.snapshot(urls: ["/large", "/unreadable", "/small", "/other"].map { URL(fileURLWithPath: $0) })
+        XCTAssertFalse(paste(board, into: chat))
+        XCTAssertEqual(chat.preview?.map(\.path), ["/small", "/other"])
+        XCTAssertEqual(limitAlerts, 0)
+    }
+
+    func testClipboardImageSelectionRejectsWhenNoFilesAreEligible() {
+        let chat = ChatInteraction()
+        let board = NSPasteboard()
+        board.photoSnapshot = RegramClipboardImages.snapshot(urls: [URL(fileURLWithPath: "/large")])
+        XCTAssertFalse(paste(board, into: chat))
+        XCTAssertNil(chat.preview)
+        XCTAssertEqual(limitAlerts, 1)
     }
     func testPartialUnavailableMetadataAndMixedGatePriority() {
         for rejected in [["/unreadable"], ["/unreadable", "/large"]] {

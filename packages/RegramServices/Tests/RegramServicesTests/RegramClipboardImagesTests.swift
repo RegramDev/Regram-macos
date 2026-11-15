@@ -79,7 +79,7 @@ final class RegramClipboardImagesTests: XCTestCase {
         settings["outgoingPhotoQuality"] = .integer(20)
         XCTAssertEqual(RGMediaPolicy.photoQuality(settings: settings), 0.2)
         XCTAssertEqual(RGMediaPolicy.photoQuality(settings: settings, pasted: true), 1)
-        XCTAssertEqual(RGMediaPolicy.photoMaximumDimension(native: 1280, settings: settings, pasted: true), 2560)
+        XCTAssertEqual(RGMediaPolicy.photoMaximumDimension(sendsLargePhotos: false, pasted: true), 2560)
     }
 
     func testInvalidBytesCannotBecomeAnOriginalImage() {
@@ -104,7 +104,7 @@ final class RegramClipboardImagesTests: XCTestCase {
             XCTAssertEqual(RGMediaPolicy.isPastedPhoto(path: photo.path), highestQuality)
             XCTAssertEqual(try Data(contentsOf: photo), original)
             XCTAssertEqual(RGMediaPolicy.photoQuality(settings: settings, pasted: RGMediaPolicy.isPastedPhoto(path: photo.path)), highestQuality ? 1 : 0.2)
-            XCTAssertEqual(RGMediaPolicy.photoMaximumDimension(native: 1280, settings: settings, pasted: RGMediaPolicy.isPastedPhoto(path: photo.path)), highestQuality ? 2560 : 1280)
+            XCTAssertEqual(RGMediaPolicy.photoMaximumDimension(sendsLargePhotos: false, pasted: RGMediaPolicy.isPastedPhoto(path: photo.path)), highestQuality ? 2560 : 1280)
             let repeated = try RegramClipboardImages.preparingPhotos(snapshot, originalQuality: highestQuality)
             XCTAssertEqual(repeated.urls, snapshot.urls)
         }

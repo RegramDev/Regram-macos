@@ -63,7 +63,7 @@ public func RegramServiceController(context: any AccountContextProtocol, purpose
     let prefix = purpose == .translation ? "translationLLM" : "stt"
     let suffixes = purpose == .transcription ? ["BaseURL", "Endpoint", "Model", "Language", "Prompt"] : ["BaseURL", "Model", "Prompt"]
     var fields = Dictionary(uniqueKeysWithValues: suffixes.map { ($0, settings[prefix + $0].string) })
-    fields["APIKey"] = (try? RegramCredentials.shared.read(accountId: accountId, purpose: purpose.credentialPurpose)) ?? ""
+    fields["APIKey"] = (try? RegramCredentials.shared.read(purpose: purpose.credentialPurpose)) ?? ""
     let initial = ServiceDraft(fields: fields, format: settings[prefix + "APIFormat"].string, temperatureTenths: settings[prefix + "TemperatureTenths"].integer, useContext: settings["translationLLMUseContext"].bool, transcriptionBackend: settings["transcriptionBackend"].string)
     let state = Atomic(value: initial)
     let promise = ValuePromise(initial, ignoreRepeated: true)
@@ -89,7 +89,7 @@ public func RegramServiceController(context: any AccountContextProtocol, purpose
         if persist {
             if before.fields["APIKey"] != next.fields["APIKey"] {
                 do {
-                    try RegramCredentials.shared.write(next.fields["APIKey"] ?? "", accountId: accountId, purpose: purpose.credentialPurpose)
+                    try RegramCredentials.shared.write(next.fields["APIKey"] ?? "", purpose: purpose.credentialPurpose)
                     credentialSaveFailed = false
                 } catch {
                     if !credentialSaveFailed { alert(for: context.window, header: regramString(purpose == .transcription ? "RG.STTSaveFailed" : "LLMTranslation.Title"), info: purpose == .transcription ? regramServiceErrorDescription(error) : regramString("LLMTranslation.KeySaveFailed")) }
@@ -127,7 +127,7 @@ public func RegramServiceController(context: any AccountContextProtocol, purpose
     func saveCredential(_ draft: ServiceDraft) -> Bool {
         guard credentialSaveFailed else { return true }
         do {
-            try RegramCredentials.shared.write(draft.fields["APIKey"] ?? "", accountId: accountId, purpose: purpose.credentialPurpose)
+            try RegramCredentials.shared.write(draft.fields["APIKey"] ?? "", purpose: purpose.credentialPurpose)
             credentialSaveFailed = false
             RegramPreferences.shared.update(accountId: accountId) { value in
                 value[purpose.configurationRevisionKey] = .integer(value[purpose.configurationRevisionKey].integer &+ 1)

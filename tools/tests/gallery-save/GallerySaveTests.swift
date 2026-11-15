@@ -5,11 +5,16 @@ enum MediaResourceStatus { case Local, Remote }
 struct Message {
     var adAttribute: Int?
     var protected = false
+    var stableVersion = 0
     func isCopyProtected(cachedData: Int?) -> Bool { protected }
 }
 struct Entry {
     var message: Message?
     var isProtected = false
+    let stableId = UUID()
+    func regramCanExport(accountId: Int64, cachedData: Int?) -> Bool {
+        !isProtected && message?.isCopyProtected(cachedData: cachedData) != true
+    }
 }
 class MGalleryItem {
     var entry = Entry()
@@ -27,12 +32,21 @@ struct Strings {
 }
 func strings() -> Strings { Strings() }
 func alert(for window: Window, info: String) { window.alerts.append(info) }
+struct FixturePeerId { func toInt64() -> Int64 { 1 } }
+struct FixtureGalleryContext { let peerId = FixturePeerId() }
+func regramValidateGalleryExport(context: FixtureGalleryContext, entry: Entry) -> Signal<Bool, NoError> {
+    .single(entry.regramCanExport(accountId: context.peerId.toInt64(), cachedData: nil))
+}
+private weak var viewer: Gallery?
 final class Gallery {
+    let context = FixtureGalleryContext()
+    var presentationGeneration = 0
     let pager = Pager()
     let window = Window()
     let operationDisposable = MetaDisposable()
     var cachedPeerData: Int?
     var saved: [String] = []
+    init() { viewer = self }
     __SAVE__
     deinit { operationDisposable.dispose() }
 }
@@ -131,6 +145,25 @@ final class GallerySaveTests: XCTestCase {
         gallery.saveAs()
         gallery.operationDisposable.set(nil)
         item.path.set(.single("/cancelled.jpg"))
+        XCTAssertEqual(gallery.saved, [])
+    }
+    func testProtectionAddedDuringDownloadPreventsOutput() {
+        let gallery = Gallery()
+        let item = MGalleryPhotoItem()
+        gallery.pager.selectedItem = item
+        gallery.saveAs()
+        item.entry.isProtected = true
+        item.path.set(.single("/must-not-save.jpg"))
+        XCTAssertEqual(gallery.saved, [])
+    }
+
+    func testChangedPresentationPreventsOutput() {
+        let gallery = Gallery()
+        let item = MGalleryPhotoItem()
+        gallery.pager.selectedItem = item
+        gallery.saveAs()
+        gallery.presentationGeneration += 1
+        item.path.set(.single("/must-not-save.jpg"))
         XCTAssertEqual(gallery.saved, [])
     }
 }

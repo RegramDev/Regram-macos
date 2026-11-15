@@ -15,4 +15,4 @@ let package = Package(name: "MediaPasteAcquisition", targets: [.testTarget(name:
 ''')
     (directory / 'Tests').mkdir()
     (directory / 'Tests/PasteTests.swift').write_text(fixture)
-    raise SystemExit(subprocess.run(['swift', 'test', '--package-path', str(directory), '--disable-sandbox', '--jobs', '4']).returncode)
+    raise SystemExit(subprocess.run(['swift', 'test', '--package-path', str(directory), '-c', 'release', '-Xswiftc', '-DSTABLE', '--disable-sandbox', '--jobs', '4']).returncode)

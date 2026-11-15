@@ -55,7 +55,7 @@ func llmTranslate(_ text: String, _ target: String, context: [String], configura
 enum FixtureCredentialPurpose { case translation }
 final class RegramCredentials {
     static let shared = RegramCredentials()
-    func read(accountId: Int64, purpose: FixtureCredentialPurpose) throws -> String { "memory-key" }
+    func read(purpose: FixtureCredentialPurpose) throws -> String { "memory-key" }
 }
 enum Translate {
     static func detectLanguage(for text: String) -> String? { nil }
@@ -319,7 +319,7 @@ func checkPermissionsConfigurationAndLifetime() {
         let old = FixtureProviders.requests[0]
         if reason == "hidden" { audit.replaceSource([], visible: false) }
         else if reason == "permission" { audit.item.context.allowed = false }
-        else { fixturePreferences.update(accountId: 42) { $0["serviceConfigurationRevision"] = .integer($0["serviceConfigurationRevision"].integer + 1) }; drain() }
+        else { fixturePreferences.update(accountId: 43) { $0["serviceConfigurationRevision"] = .integer($0["serviceConfigurationRevision"].integer + 1) }; drain() }
         old.next("Old configuration"); old.complete()
         waitFor { audit.selectorView.state != "progress" }
         precondition(audit.selectorView.state == "idle" && audit.selectorView.values.isEmpty && FixtureProviders.requests.count == 1 && notices.isEmpty)

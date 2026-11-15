@@ -2,7 +2,7 @@ import XCTest
 @testable import RegramCore
 
 final class RegramAccountCleanupTests: XCTestCase {
-    func testRemovingAccountClearsPersistedSettingsAndCachedFiltersOnlyForThatAccount() throws {
+    func testRemovingAccountPreservesSharedSettingsAndInvalidatesOnlyItsWork() throws {
         let name = "Regram.AccountCleanupTests.\(UUID())"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
         defer { defaults.removePersistentDomain(forName: name) }
@@ -11,11 +11,15 @@ final class RegramAccountCleanupTests: XCTestCase {
             preferences.update(accountId: account) { $0["blockedPeerIds"] = .strings(["10"]); $0["localPremium"] = .bool(true) }
             XCTAssertTrue(preferences.filter(accountId: account).shouldHide(text: "", peerId: 30, authorId: 10, incoming: true))
         }
+        let first = preferences.captureFilter(accountId: 1)
+        let second = preferences.captureFilter(accountId: 2)
         preferences.removeAccount(1)
-        XCTAssertFalse(preferences.settings(accountId: 1)["localPremium"].bool)
-        XCTAssertFalse(preferences.filter(accountId: 1).shouldHide(text: "", peerId: 30, authorId: 10, incoming: true))
+        XCTAssertNil(preferences.withCurrentRevision(accountId: 1, revision: first.revision) { true })
+        XCTAssertEqual(preferences.withCurrentRevision(accountId: 2, revision: second.revision) { true }, true)
+        XCTAssertTrue(preferences.settings(accountId: 1)["localPremium"].bool)
+        XCTAssertTrue(preferences.filter(accountId: 1).shouldHide(text: "", peerId: 30, authorId: 10, incoming: true))
         let reloaded = RegramPreferences(defaults: defaults)
-        XCTAssertFalse(reloaded.settings(accountId: 1)["localPremium"].bool)
+        XCTAssertTrue(reloaded.settings(accountId: 1)["localPremium"].bool)
         XCTAssertTrue(reloaded.settings(accountId: 2)["localPremium"].bool)
         XCTAssertTrue(preferences.filter(accountId: 2).shouldHide(text: "", peerId: 30, authorId: 10, incoming: true))
     }

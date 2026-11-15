@@ -313,7 +313,7 @@ public class Sender: NSObject {
             |> deliverOnMainQueue
     }
     
-    public static func generateMedia(for container:MediaSenderContainer, account: Account, isSecretRelated: Bool, isCollage: Bool = false, isUniquelyReferencedTemporaryFile: Bool = true, customPreview: String? = nil, runQueue: Queue? = resourcesQueue, preferredRandomId: Int64? = nil) -> Signal<(Media,String), NoError> {
+    public static func generateMedia(for container:MediaSenderContainer, account: Account, isSecretRelated: Bool, isCollage: Bool = false, isUniquelyReferencedTemporaryFile: Bool = true, customPreview: String? = nil, runQueue: Queue? = resourcesQueue, preferredRandomId: Int64? = nil, photoDimension: CGFloat? = nil) -> Signal<(Media,String), NoError> {
         let signal = Signal<(Media,String), NoError> { (subscriber) in
             
             let path = container.path
@@ -379,7 +379,7 @@ public class Sender: NSObject {
                 } else if mimeType.hasPrefix("image/") && !mimeType.hasSuffix("gif"), let imageData = try? Data(contentsOf: URL(fileURLWithPath: path)) {
                     
                     let settings = RegramPreferences.shared.settings(accountId: account.peerId.toInt64())
-                    let dimension = CGFloat(RGMediaPolicy.photoMaximumDimension(native: Double(FastSettings.photoDimension), settings: settings, pasted: RGMediaPolicy.isPastedPhoto(path: container.path)))
+                    let dimension = photoDimension ?? CGFloat(RGMediaPolicy.photoMaximumDimension(sendsLargePhotos: FastSettings.sendLargePhotos, pasted: RGMediaPolicy.isPastedPhoto(path: container.path)))
                    
                     let options = NSMutableDictionary()
                     options.setValue(true as NSNumber, forKey: kCGImageSourceCreateThumbnailWithTransform as String)

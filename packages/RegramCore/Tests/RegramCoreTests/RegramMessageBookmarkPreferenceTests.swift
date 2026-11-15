@@ -12,7 +12,7 @@ final class RegramMessageBookmarkPreferenceTests: XCTestCase {
         XCTAssertTrue(RegramAccountSettings()[definition.key].bool)
     }
 
-    func testSwitchPersistsPerAccountWithoutChangingBookmarksOrTags() throws {
+    func testSharedSwitchPreservesEachAccountsBookmarksAndTags() throws {
         let suite = "RegramBookmarkPreferenceTests." + UUID().uuidString
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
@@ -24,7 +24,7 @@ final class RegramMessageBookmarkPreferenceTests: XCTestCase {
         let previous = store.bookmarks(accountId: 1)
         preferences.update(accountId: 1) { $0["messageBookmarksEnabled"] = .bool(false) }
         XCTAssertFalse(RegramPreferences(defaults: defaults).settings(accountId: 1)["messageBookmarksEnabled"].bool)
-        XCTAssertTrue(preferences.settings(accountId: 2)["messageBookmarksEnabled"].bool)
+        XCTAssertFalse(preferences.settings(accountId: 2)["messageBookmarksEnabled"].bool)
         XCTAssertEqual(RGMessageBookmarks(defaults: defaults).bookmarks(accountId: 1), previous)
         preferences.update(accountId: 1) { $0["messageBookmarksEnabled"] = .bool(true) }
         XCTAssertTrue(RegramPreferences(defaults: defaults).settings(accountId: 1)["messageBookmarksEnabled"].bool)

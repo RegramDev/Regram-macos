@@ -15,7 +15,8 @@ public func RegramContextMenuController(context: any AccountContextProtocol) -> 
     let disposables = DisposableSet()
     let promise = ValuePromise(RegramPreferences.shared.settings(accountId: accountId), ignoreRepeated: false)
     func visible(_ settings: RegramAccountSettings) -> [RGContextMenuItemId] {
-        RegramContextMenuConfiguration(settings: settings).order.filter { RegramMessageMenuInventory.shared.available(accountId: accountId).contains($0) && $0.canBeCustomized }
+        let available = RegramMessageMenuInventory.shared.available()
+        return RegramContextMenuConfiguration(settings: settings).order.filter { available.contains($0) }
     }
     func reorder(from: Int, to: Int) {
         RegramPreferences.shared.update(accountId: accountId) { settings in
@@ -68,8 +69,7 @@ public func RegramContextMenuController(context: any AccountContextProtocol) -> 
         }
     }
     disposables.add(regramPreferenceChanges(accountId: accountId).start(next: { promise.set($0) }))
-    let observer = NotificationCenter.default.addObserver(forName: RegramMessageMenuInventory.didChange, object: nil, queue: .main) { notification in
-        guard notification.object as? Int64 == accountId else { return }
+    let observer = NotificationCenter.default.addObserver(forName: RegramMessageMenuInventory.didChange, object: nil, queue: .main) { _ in
         promise.set(RegramPreferences.shared.settings(accountId: accountId))
     }
     controller.onDeinit = { NotificationCenter.default.removeObserver(observer); disposables.dispose() }

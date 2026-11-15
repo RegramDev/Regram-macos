@@ -38,7 +38,9 @@ public class InputPasteboardParser: NSObject {
     public class func getPasteboardUrls(_ pasteboard: NSPasteboard, context: any AccountContextProtocol) -> Signal<[URL], NoError> {
         let originalImages = RegramPreferences.shared.settings(accountId: context.peerId.toInt64())["clipboardOriginalImages"].bool
         if let original = RegramClipboardImages.snapshot(from: pasteboard), original.containsImage {
-            return .single((try? RegramClipboardImages.preparingPhotos(original, originalQuality: originalImages))?.urls.filter { fileSize($0.path).map { fileSizeLimitExceed(context: context, fileSize: $0) } ?? false } ?? [])
+            let valid = original.urls.filter { fileSize($0.path).map { fileSizeLimitExceed(context: context, fileSize: $0) } ?? false }
+            let snapshot = valid.count == original.urls.count ? original : RegramClipboardImages.snapshot(urls: valid)
+            return .single((try? RegramClipboardImages.preparingPhotos(snapshot, originalQuality: originalImages))?.urls ?? [])
         }
         let items = pasteboard.pasteboardItems
         
@@ -143,9 +145,10 @@ public class InputPasteboardParser: NSObject {
         let originalImages = RegramPreferences.shared.settings(accountId: chatInteraction.interactionContext.peerId.toInt64())["clipboardOriginalImages"].bool
         if let original = RegramClipboardImages.snapshot(from: pasteboard), original.containsImage {
             let valid = original.urls.filter { fileSize($0.path).map { fileSizeLimitExceed(context: chatInteraction.interactionContext, fileSize: $0) } ?? false }
-            guard valid.count == original.urls.count else { showFileLimit(context: chatInteraction.interactionContext, fileSize: nil); return false }
+            guard !valid.isEmpty else { showFileLimit(context: chatInteraction.interactionContext, fileSize: nil); return false }
             if let peer = chatInteraction.presentation.peer, let text = permissionText(from: peer, for: .banSendMedia) { alert(for: window, info: text); return false }
-            guard let photos = try? RegramClipboardImages.preparingPhotos(original, originalQuality: originalImages) else { alert(for: window, info: strings().unknownError); return false }
+            let snapshot = valid.count == original.urls.count ? original : RegramClipboardImages.snapshot(urls: valid)
+            guard let photos = try? RegramClipboardImages.preparingPhotos(snapshot, originalQuality: originalImages) else { alert(for: window, info: strings().unknownError); return false }
             if valid.count == 1, chatInteraction.presentation.interfaceState.editState?.canEditMedia == true {
                 let replacement = chatInteraction.beginMediaReplacement(entry: .clipboard, mode: .media, context: analyticsContext)
                 _ = (Sender.generateMedia(for: MediaSenderContainer(path: photos.urls[0].path, isFile: false), account: chatInteraction.interactionContext.account, isSecretRelated: chatInteraction.peerId.namespace == Namespaces.Peer.SecretChat) |> deliverOnMainQueue).start(next: { [weak chatInteraction] media, _ in

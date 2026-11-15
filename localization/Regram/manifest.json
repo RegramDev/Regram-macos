@@ -5,6 +5,23 @@
     "zh-Hans",
     "zh-Hant"
   ],
+  "macosExcludedKeys": [
+    "EraseData.Action",
+    "EraseData.Close",
+    "EraseData.Confirm",
+    "EraseData.ContainerUnavailable",
+    "EraseData.Done",
+    "EraseData.DoneNotice",
+    "EraseData.Errors",
+    "EraseData.ErrorsNotice",
+    "EraseData.Notice",
+    "EraseData.Progress",
+    "EraseData.Title",
+    "MessageScreenshot.Action",
+    "MessageScreenshot.Unavailable",
+    "MessageScreenshot.UnknownSender",
+    "menu.messageScreenshot"
+  ],
   "macosAliases": {
     "ios.Settings.Folders.AllChatsTitle": "Settings.Folders.AllChatsTitle",
     "ios.RG.BottomBarLayout.Width.full": "RG.BottomBarLayout.Width.full",

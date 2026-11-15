@@ -56,7 +56,7 @@ def main():
     factory = declaration(account_source, "private func accountMessageSettingsIcon(")
     navigation_source = ROOT / "Telegram-Mac/app/MainViewController.swift"
     navigation = declaration(navigation_source.read_text(), "private func rebuildNavigationTabs()")
-    navigation = navigation.split("rebuildingNavigation = true", 1)[1].split("previousIndex = target", 1)[0].replace("regramVisibleTabs = visible", "")
+    navigation = navigation.split("rebuildingNavigation = true", 1)[1].split("previousTabController = tabController.tab(at: target).controller", 1)[0].replace("regramVisibleTabs = visible", "")
     navigation_controller_source = ROOT / "packages/RegramUI/Sources/RegramUI/RegramNavigationController.swift"
     glyphs = re.findall(r"icon: accountMessageSettingsIcon\((.*?)\), type:", account_source)
     if len(glyphs) != 2:

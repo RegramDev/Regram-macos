@@ -1,6 +1,11 @@
-struct ChatTextInputState { let text: String }
+struct ChatTextInputState {
+    let text: String
+    var inputText: NSString { text as NSString }
+}
+func regramOutgoingInput(_ input: ChatTextInputState, context: AccountContext, peerId: PeerId) -> ChatTextInputState { input }
 struct FileSlowMode { let hasLocked: Bool }
-struct FileStars { let value: Int64 }
+struct FileStars: Equatable { let value: Int64 }
+func alert(for window: Int, header: String, info: String) { alert(for: window, info: info) }
 struct FileStarsState { let balance: FileStars }
 struct FileInterfaceState { var forwardMessageIds: [MessageId] = [] }
 struct FilePresentation {
@@ -96,6 +101,12 @@ enum Sender {
 final class FileTransaction {
     var handler: (() -> Void)?
     func set(handler: @escaping () -> Void) { FileProbe.check?(); self.handler = handler }
+    func execute() -> Bool {
+        guard let handler else { return false }
+        self.handler = nil
+        handler()
+        return true
+    }
 }
 enum FileConfirmResult { case basic, thrid }
 func verifyAlert(for window: Int, header: String, information: String, ok: String, option: String, optionIsSelected: Bool, successHandler: @escaping (FileConfirmResult) -> Void, cancelHandler: @escaping () -> Void, onDeinit: @escaping () -> Void) {
@@ -109,6 +120,7 @@ extension CommonStrings {
     func chatPayStarsConfirmMessagesOther(_ value: Int) -> String { String(value) }
     func chatPayStarsConfirmPayOther(_ value: Int) -> String { String(value) }
     func chatPayStarsConfirmText(_ peer: String, _ amount: String, _ amount2: String, _ count: String) -> String { "Pay" }
+    func chatInputErrorMessageTooLongOther(_ count: Int) -> String { "Caption exceeds the limit by \(count)" }
 }
 struct FileNavigationHooks {
     static let shared = FileNavigationHooks()

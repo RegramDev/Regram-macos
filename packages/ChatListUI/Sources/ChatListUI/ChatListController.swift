@@ -1425,12 +1425,27 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         default:
             var first: Bool = true
             filterDisposable.set(combineLatest(filterView, filterBadges).start(next: { [weak self] filters, badges in
+                var startupId: Int32?
+                if first {
+                    let accountId = context.peerId.toInt64()
+                    let folders = filters.list.compactMap { filter -> (id: Int32, title: String)? in
+                        if case let .filter(id, title, _, _) = filter { return (id, title.text) }
+                        return nil
+                    }
+                    let store = RegramPreferences.shared
+                    if !folders.isEmpty {
+                        store.update(accountId: accountId) {
+                            RegramChatListPolicy.migrateLegacyStartupFolder(settings: &$0, accountId: accountId, folders: folders)
+                        }
+                    }
+                    startupId = RegramChatListPolicy.startupFolderId(settings: store.settings(accountId: accountId), accountId: accountId, folders: folders)
+                }
                 self?.updateFilter( { current in
                     var current = current
                     current = current.withUpdatedTabs(filters.list)
                         .withUpdatedSidebar(filters.sidebar)
                         .withUpdatedShowTags(filters.showTags)
-                    if first, let startupId = RegramChatListPolicy.startupFolderId(settings: RegramPreferences.shared.settings(accountId: context.peerId.toInt64()), accountId: context.peerId.toInt64()), let startup = filters.list.first(where: { $0.id == (startupId == -1 ? 0 : startupId) }) {
+                    if first, let startupId, let startup = filters.list.first(where: { $0.id == (startupId == -1 ? 0 : startupId) }) {
                         current = current.withUpdatedFilter(startup)
                     } else if !first, let updated = filters.list.first(where: { ChatListUIHooks.shared.chatListFilterId($0) == ChatListUIHooks.shared.chatListFilterId(current.filter) }) {
                         current = current.withUpdatedFilter(updated)

@@ -7,13 +7,13 @@ final class RegramSettingCombinationTests: XCTestCase {
     private func alternate(_ setting: RegramSetting) -> RegramValue {
         switch setting.key {
         case "messageFilterRules": return .string(RGMessageFilter.encode([RGMessageFilterRule(pattern: "blocked")]))
-        case "chatPreferences": return .string("{\"101:2\":{\"formatting\":\"none\",\"panguSpacing\":false}}")
+        case "chatPreferences": return .string("{\"2\":{\"formatting\":\"none\",\"panguSpacing\":false}}")
         case "customDoHEndpoint": return .string("https://resolver.example.test/dns-query")
         case "linkPreviewXHost": return .string("fixupx.com")
         case "linkPreviewInstagramHost": return .string("example.test")
         case "fontImportedLatin", "fontImportedChinese": return .string(String(repeating: "a", count: 64))
         case "features.groupProfileSettingItems": return .string("admins,members,permissions")
-        case "features.startupFolders": return .dictionary(["101": "12", "202": "15"])
+        case "features.startupFolders": return RegramChatListPolicy.StartupFolder.named("Work").storedValue
         case "bottomBarLayout":
             return .dictionary(RegramBottomBarSettings(automaticWidth: false, hiddenItems: [.contacts, .calls, .search], showLabels: true, buttonWidthFillRatio: 75).storedValues)
         case "tabBarWidthPercent": return .integer(75)
@@ -21,7 +21,7 @@ final class RegramSettingCombinationTests: XCTestCase {
         case "contextMenuDisabledItems": return .strings(["translate", "bookmark"])
         case "sidebarOrder": return .strings(["settings", "chats", "contacts"])
         case "sidebarHiddenTabs": return .strings(["contacts"])
-        case "outgoingLanguageTranslation": return .dictionary(["v2:101:2": "ja", "v2:101:3": "off"])
+        case "outgoingLanguageTranslation": return .dictionary(["peer:2": "ja", "peer:3": "off"])
         case "localPremiumEmojiStatus": return .dictionary(["101": "42"])
         case "revokedMarkerColor": return .string("#123456")
         default: break
@@ -139,7 +139,7 @@ final class RegramSettingCombinationTests: XCTestCase {
                     XCTAssertEqual(RegramNetworkPolicy(settings: settings), network)
                     XCTAssertEqual(RGMediaPolicy.photoQuality(settings: settings), 0.72)
                     XCTAssertEqual(RGMediaPolicy.photoQuality(settings: settings, pasted: true), 1)
-                    XCTAssertEqual(RGMediaPolicy.photoMaximumDimension(native: 1280, settings: settings), bit(0) ? 2560 : 1280)
+                    XCTAssertEqual(RGMediaPolicy.photoMaximumDimension(sendsLargePhotos: bit(0)), bit(0) ? 2560 : 1280)
                     XCTAssertEqual(settings["native.enableVoipTcp"].bool, bit(5))
                     XCTAssertEqual(settings["native.showCallsTab"].bool, bit(2))
                     XCTAssertEqual(RegramBottomBarSettings(settings: settings).showLabels, bit(0))
@@ -155,7 +155,7 @@ final class RegramSettingCombinationTests: XCTestCase {
         print("NETWORK_MEDIA_NAVIGATION_COMBINATIONS cases=\(cases)")
     }
 
-    func testEveryPartialBackupSelectionPreservesUnselectedFeaturesAndAccountIsolation() throws {
+    func testEveryPartialBackupSelectionPreservesUnselectedFeaturesAndAppliesAcrossAccounts() throws {
         let suite = "RegramSettingCombinationTests." + UUID().uuidString
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
@@ -177,7 +177,7 @@ final class RegramSettingCombinationTests: XCTestCase {
             store.update(accountId: 101) { $0 = restored }
             let reopened = RegramPreferences(defaults: defaults).settings(accountId: 101)
             for key in restored.values.keys { XCTAssertEqual(reopened[key], restored[key], "\(mask): \(key)") }
-            XCTAssertEqual(store.settings(accountId: 202), target)
+            XCTAssertEqual(store.settings(accountId: 202), reopened)
             cases += 1
         }
         print("PARTIAL_BACKUP_COMBINATIONS categories=\(categories.count) cases=\(cases)")

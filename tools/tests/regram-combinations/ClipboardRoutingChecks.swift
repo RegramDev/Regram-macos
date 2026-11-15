@@ -19,14 +19,30 @@ enum ClipboardFixturePermission { case banSendMedia }
 struct ClipboardFixtureEdit { let canEditMedia = true }
 struct ClipboardFixtureInterface { var editState: ClipboardFixtureEdit? }
 struct ClipboardFixturePresentation { let peer: ClipboardFixturePeer? = nil; var interfaceState = ClipboardFixtureInterface() }
+enum ClipboardFixtureEntry { case clipboard }
+enum ClipboardFixtureMode { case media }
+enum ClipboardFixtureBlocker { case sizeLimit, fileUnavailable, permission }
+struct ClipboardFixtureLease { func end() {} }
+struct ClipboardFixtureAnalyticsContext {
+    func beginPresentation() -> ClipboardFixtureLease { ClipboardFixtureLease() }
+    func preservingPresentation<T>(_ value: T) -> T { value }
+}
+struct ClipboardFixtureJourney {
+    func fail(_ reason: ClipboardFixtureBlocker) {}
+    func blocked(_ reason: ClipboardFixtureBlocker) {}
+    func preparing() {}
+}
 final class ClipboardFixtureInteraction {
     let interactionContext = ClipboardFixtureContext()
     let peerId = PeerId(283392)
     var presentation = ClipboardFixturePresentation()
     var preview: (urls: [URL], asMedia: Bool)?
-    func beginMediaReplacement() -> Int { preconditionFailure("Unexpected media replacement") }
+    func captureAnalyticsContext() -> ClipboardFixtureAnalyticsContext { ClipboardFixtureAnalyticsContext() }
+    func makeMediaAnalyticsJourney(context: ClipboardFixtureAnalyticsContext, entry: ClipboardFixtureEntry, mode: ClipboardFixtureMode) -> ClipboardFixtureJourney? { nil }
+    func beginMediaReplacement(entry: ClipboardFixtureEntry, mode: ClipboardFixtureMode, context: ClipboardFixtureAnalyticsContext) -> Int { preconditionFailure("Unexpected media replacement") }
+    func rejectMediaReplacement(entry: ClipboardFixtureEntry, mode: ClipboardFixtureMode, context: ClipboardFixtureAnalyticsContext, reason: ClipboardFixtureBlocker) { preconditionFailure("Unexpected media replacement") }
     func applyMediaReplacement(_ media: Int, request: Int) { preconditionFailure("Unexpected media replacement") }
-    func showPreviewSender(_ urls: [URL], _ asMedia: Bool, _ caption: String?) { preview = (urls, asMedia) }
+    func showPreviewSender(_ urls: [URL], _ asMedia: Bool, _ caption: String?, analyticsContext: ClipboardFixtureAnalyticsContext, journey: ClipboardFixtureJourney? = nil) { preview = (urls, asMedia) }
 }
 enum ClipboardFixtureSender {
     static func generateMedia(for container: MediaSenderContainer, account: Int, isSecretRelated: Bool) -> Signal<(Int, Int), NoError> { preconditionFailure("No media generation or sends in this fixture") }
@@ -121,15 +137,26 @@ struct ClipboardRoutingChecks {
         try Data("Synthetic clipboard document".utf8).write(to: document)
         let picture = inputs.appendingPathComponent("Ordinary.download")
         try encoded(image(), type: "public.png")!.write(to: picture)
+        let oversized = inputs.appendingPathComponent("Oversized.bin")
+        try Data().write(to: oversized)
+        let file = try FileHandle(forWritingTo: oversized)
+        try file.truncate(atOffset: 51 * 1024 * 1024)
+        try file.close()
         for original in [false, true] {
-            for urls in [[document], [document, picture]] {
+            for urls in [[document], [document, picture], [oversized, document, picture]] {
                 let board = NSPasteboard(name: .init("RegramClipboardRoute." + UUID().uuidString))
                 defer { board.releaseGlobally() }
                 board.writeObjects(urls.map { $0 as NSURL })
                 fixturePreferences.update(accountId: 283392) { $0["clipboardOriginalImages"] = .bool(original) }
                 let interaction = ClipboardFixtureInteraction()
                 _ = InputPasteboardParser.proccess(pasteboard: board, chatInteraction: interaction, window: fixtureWindow)
-                check(interaction.preview?.urls.first == document && interaction.preview?.urls.count == urls.count, "Document/mixed paste preserves original document and attachment count")
+                let expectedCount = urls.filter { $0 != oversized }.count
+                check(interaction.preview?.urls.first == document && interaction.preview?.urls.count == expectedCount, "Document and mixed pastes preserve eligible attachments")
+                if urls.contains(oversized) {
+                    var additional: [URL]?
+                    _ = InputPasteboardParser.getPasteboardUrls(board, context: ClipboardFixtureContext()).start(next: { additional = $0 })
+                    check(additional?.first == document && additional?.count == expectedCount, "Additional paste preserves eligible attachments")
+                }
             }
             for (width, height) in [(32, 32), (3001, 97)] {
                 let board = NSPasteboard(name: .init("RegramClipboardRoute." + UUID().uuidString))

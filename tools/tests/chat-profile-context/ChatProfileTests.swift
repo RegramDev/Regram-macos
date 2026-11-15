@@ -7,6 +7,7 @@ struct MessageId: Equatable { let peerId: PeerId; let id: Int }
 class Peer { let id: PeerId; init(_ id: PeerId) { self.id = id } }
 final class TelegramUser: Peer {}
 struct Message {
+    static let newTopicThreadId: Int64 = 0
     struct ForwardInfo { let author: Peer? }
     let id: MessageId
     var author: Peer?
@@ -48,6 +49,7 @@ final class AccountContext: AccountContextProtocol {
     let engine = Engine()
     let peerId: PeerId = 1
     let bindings = Bindings()
+    let premiumLimits = (caption_length_limit_premium: 4096, caption_length_limit_default: 1024)
     var isPremium = false
 }
 final class Bindings {
@@ -55,11 +57,21 @@ final class Bindings {
     func rootNavigation() -> NavigationViewController { navigation }
 }
 class ViewController { var analyticsContext: AnalyticsContext? }
+final class ProfileModal {
+    private(set) var closed = false
+    func close() { closed = true }
+}
 final class NavigationViewController {
     var pushed: [ViewController] = []
+    var modal: ProfileModal?
     func push(_ controller: ViewController) { pushed.append(controller) }
 }
 typealias ThreadInfo = Int
+extension ThreadInfo {
+    init(message: ThreadData, isChannelPost: Bool, isMonoforumPost: Bool, isEmpty: Bool, contextHolder: Int) {
+        self.init(message.threadId)
+    }
+}
 typealias PeerExpiringStoryListContext = Int
 typealias PeerMediaCollectionMode = Int
 struct ThreadData { let peerId: PeerId; let threadId: Int64; var isMonoforumPost = false }
@@ -71,7 +83,7 @@ enum ChatLocation {
 enum ChatMode: Equatable {
     enum ThreadMode: Equatable { case topic(origin: MessageId) }
     case thread(mode: ThreadMode)
-    case history, saved, topic
+    case history, saved, topic, preview
     var isSavedMessagesThread: Bool { self == .saved }
     struct Custom { enum Kind { case searchHashtag, other }; let kind: Kind }
     var customChatContents: Custom? { nil }
@@ -352,6 +364,15 @@ final class ChatProfileTests: XCTestCase {
         let chat = ChatController(context, location: .thread(ThreadData(peerId: 2, threadId: -3, isMonoforumPost: true)))
         chat.openPeerInfoFromHeader()
         XCTAssertEqual(Probe.profiles.last?.peerId, -3); XCTAssertTrue(try XCTUnwrap(Probe.profiles.last).origin?.isExcluded == true)
+    }
+    func testPreviewHeaderClosesModalAndOpensTopicProfile() {
+        let chat = ChatController(context, location: .thread(ThreadData(peerId: 2, threadId: 14)), mode: .preview)
+        let modal = ProfileModal()
+        chat.navigationController?.modal = modal
+        chat.openPeerInfoFromHeader()
+        XCTAssertTrue(modal.closed)
+        XCTAssertEqual(Probe.profiles.last?.peerId, 2)
+        XCTAssertEqual(Probe.profiles.last?.thread, 14)
     }
     func testTeardownAndReleasedControllerCannotOpenProfile() {
         var chat: ChatController? = ChatController(context)

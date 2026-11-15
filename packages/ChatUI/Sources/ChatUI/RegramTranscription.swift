@@ -91,7 +91,7 @@ private func regramPerformTranscription(account: Account, message: Message, sett
     let accountId = account.peerId.toInt64()
     let external = settings["transcriptionBackend"].string == "openAICompatible"
     let configuration: RGSTTConfiguration?
-    do { configuration = external ? try regramSTTConfiguration(accountId: accountId, settings: settings) : nil }
+    do { configuration = external ? try regramSTTConfiguration(settings: settings) : nil }
     catch { return .fail(.configuration(error.localizedDescription)) }
     return regramDownloadAudio(account: account, message: message, file: file)
     |> mapToSignal { path in rgPrepareTranscriptionAudio(path: path) }

@@ -122,11 +122,13 @@ public enum RGMediaPolicy {
         pasted ? 1.0 : Double(min(100, max(0, settings["outgoingPhotoQuality"].integer))) / 100.0
     }
 
-    public static func photoMaximumDimension(native: Double, settings: RegramAccountSettings, pasted: Bool = false) -> Double {
-        max(native, settings["sendLargePhotos"].bool || pasted ? 2560.0 : native)
+    public static func photoMaximumDimension(sendsLargePhotos: Bool, pasted: Bool = false) -> Double {
+        sendsLargePhotos || pasted ? 2560 : 1280
     }
 
+    public static let stickerSizeRange: ClosedRange<Int64> = 0...200
+
     public static func stickerScale(settings: RegramAccountSettings) -> Double {
-        Double(min(200, max(0, settings["stickerSize"].integer))) / 100.0
+        Double(min(stickerSizeRange.upperBound, max(stickerSizeRange.lowerBound, settings["stickerSize"].integer))) / 100.0
     }
 }

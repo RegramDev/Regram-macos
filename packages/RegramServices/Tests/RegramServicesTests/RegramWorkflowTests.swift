@@ -84,11 +84,19 @@ final class RegramWorkflowTests: XCTestCase {
         XCTAssertEqual(result.last?.count, 800)
     }
 
-    func testOutgoingLanguageRequiresAnExactAccountAndChatKey() {
+    func testOutgoingLanguageSharesCloudChatsAndKeepsSecretChatsSeparate() {
+        let secret: Int64 = (3 << 32) | 2
         var settings = RegramAccountSettings()
-        settings["outgoingLanguageTranslation"] = .dictionary([RegramOutgoingTranslationPolicy.key(accountId: 1, peerId: 2): "ja", RegramOutgoingTranslationPolicy.key(accountId: 1, peerId: 3): "off", "default": "en"])
+        settings["outgoingLanguageTranslation"] = .dictionary([
+            RegramOutgoingTranslationPolicy.key(accountId: 1, peerId: 2): "ja",
+            RegramOutgoingTranslationPolicy.key(accountId: 1, peerId: 3): "off",
+            RegramOutgoingTranslationPolicy.key(accountId: 1, peerId: secret): "de",
+            "default": "en"
+        ])
         XCTAssertEqual(RegramOutgoingTranslationPolicy.language(settings: settings, accountId: 1, peerId: 2), "ja")
-        XCTAssertNil(RegramOutgoingTranslationPolicy.language(settings: settings, accountId: 9, peerId: 2))
+        XCTAssertEqual(RegramOutgoingTranslationPolicy.language(settings: settings, accountId: 9, peerId: 2), "ja")
+        XCTAssertEqual(RegramOutgoingTranslationPolicy.language(settings: settings, accountId: 1, peerId: secret), "de")
+        XCTAssertNil(RegramOutgoingTranslationPolicy.language(settings: settings, accountId: 9, peerId: secret))
         XCTAssertNil(RegramOutgoingTranslationPolicy.language(settings: settings, accountId: 1, peerId: 4))
         XCTAssertNil(RegramOutgoingTranslationPolicy.language(settings: settings, accountId: 1, peerId: 3))
         XCTAssertNil(RegramOutgoingTranslationPolicy.language(settings: RegramAccountSettings(), accountId: 1, peerId: 2))
@@ -108,7 +116,7 @@ final class RegramWorkflowTests: XCTestCase {
         XCTAssertEqual(RegramOutgoingTranslationPolicy.language(settings: settings, accountId: 1, peerId: user), "en")
         XCTAssertEqual(RegramOutgoingTranslationPolicy.language(settings: settings, accountId: 1, peerId: group), "ja")
         XCTAssertNil(RegramOutgoingTranslationPolicy.language(settings: settings, accountId: 1, peerId: channel))
-        XCTAssertNil(RegramOutgoingTranslationPolicy.language(settings: settings, accountId: 2, peerId: user))
+        XCTAssertEqual(RegramOutgoingTranslationPolicy.language(settings: settings, accountId: 2, peerId: user), "en")
         XCTAssertNil(RegramOutgoingTranslationPolicy.language(settings: settings, accountId: 1, peerId: 18))
         if case let .dictionary(values) = settings["outgoingLanguageTranslation"] {
             XCTAssertEqual(values["1:18"], "de")

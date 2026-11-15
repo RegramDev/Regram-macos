@@ -493,7 +493,6 @@ class SharedAccountContext {
                                 let accountId = removed.peerId.toInt64()
                                 rgUnregisterLocalPremiumAccountPeerId(removed.peerId)
                                 RegramQuickTranslationTasks.shared.clear(accountId: accountId)
-                                RegramMessageMenuInventory.shared.clear(accountId: accountId)
                                 RegramChatListPolicy.clear(accountId: accountId)
                                 RegramTemporaryReveal.shared.clear(accountId: accountId)
                                 RGAutomaticInlineBotDismissals.shared.clear(accountId: accountId)
@@ -505,8 +504,7 @@ class SharedAccountContext {
                                 RGLocalGiftAssets.removeAccount(account: localGiftsAccount)
                                 #if !SHARE
                                 RegramTranscriptionTasks.shared.cancelAccount(accountId)
-                                try? RegramFontStore.shared.removeAccount(accountId: accountId)
-                                try? RegramCredentials.shared.clear(accountId: accountId)
+                                try? RegramCredentials.shared.removeLegacyAccount(accountId)
                                 #endif
                                 RegramPreferences.shared.removeAccount(accountId)
                             }
@@ -522,6 +520,14 @@ class SharedAccountContext {
                     }
                     if primary == nil && !self.activeAccountsValue!.accounts.isEmpty {
                         primary = self.activeAccountsValue!.accounts.first?.1
+                    }
+                    if let primary {
+                        let accountId = primary.peerId.toInt64()
+                        RegramPreferences.shared.prepareSharedSettings(preferredAccountId: accountId)
+                        RegramPreferences.shared.migrateLegacyLargePhotos {
+                            FastSettings.sendLargePhotos(true)
+                        }
+                        RGLocalGiftsStore.shared.prepareSharedSettings(preferredAccount: RGLocalGiftsStore.accountKey(accountId: accountId, testingEnvironment: primary.testingEnvironment))
                     }
                     if primary !== self.activeAccountsValue!.primary {
                         hadUpdates = true

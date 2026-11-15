@@ -11,13 +11,9 @@ args = parser.parse_args()
 source = args.source.read_text()
 start = source.index('    public func saveAs(')
 body = source[start:source.index('    public func showMessage()', start)]
-start = body.index('if let strongSelf = self {') + len('if let strongSelf = self {')
-depth = 1
-end = start
-while depth:
-    depth += (body[end] == '{') - (body[end] == '}')
-    end += 1
-body = body[:start] + '\nstrongSelf.saved.append(path)\n' + body[end - 1:]
+start = body.index('                        if fast {')
+end = body.index('                    }\n                }))', start)
+body = body[:start] + '                        guard exportIsCurrent() else { return }\n                        strongSelf.saved.append(path)\n' + body[end:]
 fixture = Path(__file__).with_name('GallerySaveTests.swift').read_text().replace('__SAVE__', body)
 with tempfile.TemporaryDirectory(prefix='gallery-save-') as directory:
     directory = Path(directory)
@@ -28,4 +24,4 @@ let package = Package(name: "GallerySave", platforms: [.macOS(.v10_13)], depende
 ''')
     (directory / 'Tests').mkdir()
     (directory / 'Tests/GallerySaveTests.swift').write_text(fixture)
-    raise SystemExit(subprocess.run(['swift', 'test', '--package-path', str(directory), '--disable-sandbox', '--jobs', '4']).returncode)
+    raise SystemExit(subprocess.run(['swift', 'test', '--package-path', str(directory), '-c', 'release', '-Xswiftc', '-DSTABLE', '--disable-sandbox', '--jobs', '4']).returncode)

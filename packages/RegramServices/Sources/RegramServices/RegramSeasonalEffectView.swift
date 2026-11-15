@@ -17,7 +17,7 @@ public final class RegramSeasonalEffectView: NSView {
         layer?.masksToBounds = true
         autoresizingMask = [.width, .height]
         observers.append(NotificationCenter.default.addObserver(forName: RegramPreferences.didChange, object: nil, queue: .main) { [weak self] notification in
-            guard let self, notification.object as? Int64 == self.accountId else { return }
+            guard let self, RegramPreferences.applies(notification, to: self.accountId) else { return }
             self.refresh()
         })
         for name in [NSApplication.didBecomeActiveNotification, NSApplication.didResignActiveNotification] {

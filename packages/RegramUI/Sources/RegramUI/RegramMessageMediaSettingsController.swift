@@ -34,6 +34,7 @@ private struct RegramMessageMediaState: Equatable {
     var tab: String
     var folders: [ChatListFilter] = []
     var sendWithReturn = FastSettings.sendingType == .enter
+    var sendsLargePhotos = FastSettings.sendLargePhotos
 }
 
 private final class RegramMessageMediaArguments {
@@ -147,8 +148,7 @@ private func regramParityRows(_ page: String) -> [RegramParityRow] {
     case "recording": return [
         .header("Native.VoiceMessages"),
         .toggle("forceBuiltInMic", "Settings.forceBuiltInMic", inverted: false),
-        .notice("Settings.forceBuiltInMic.Notice"),
-        .toggle("disableGalleryCamera", "Settings.GalleryCamera", inverted: true)
+        .notice("Settings.forceBuiltInMic.Notice")
     ]
     default: return []
     }
@@ -231,26 +231,39 @@ private func regramMessageMediaEntries(_ state: RegramMessageMediaState, categor
         case let .notice(key):
             rows.append(.desc(sectionId: section, index: index, text: .plain(regramParityText(key)), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
         case let .toggle(key, title, inverted):
-            let current = key == "sendWithReturnKey" ? state.sendWithReturn : state.settings[key].bool
+            let current: Bool
+            switch key {
+            case "sendWithReturnKey": current = state.sendWithReturn
+            case "sendLargePhotos": current = state.sendsLargePhotos
+            default: current = state.settings[key].bool
+            }
             general(regramParityText(title), .switchable(inverted ? !current : current), action: { arguments.toggle(key) })
         case let .picker(key, title):
             if key == "features.chatListStartupFolderMode" {
                 let current = state.settings[key].string
-                let selectedFolder: String?
-                if case let .dictionary(values) = state.settings["features.startupFolders"] { selectedFolder = values[String(arguments.context.peerId.toInt64())] } else { selectedFolder = nil }
                 var selectedTitle = regramParityText("features.ChatListStartupFolder." + current)
+                let folders = state.folders.compactMap { filter -> (id: Int32, title: String)? in
+                    if case let .filter(id, title, _, _) = filter { return (id, title.text) }
+                    return nil
+                }
+                let selectedId = RegramChatListPolicy.startupFolderId(settings: state.settings, accountId: arguments.context.peerId.toInt64(), folders: folders)
+                if current == "specific", case let .named(title)? = RegramChatListPolicy.startupFolder(settings: state.settings) { selectedTitle = title }
                 var items = ["telegram", "last"].map { mode in ContextMenuItem(regramParityText("features.ChatListStartupFolder." + mode), handler: { arguments.set(key, .string(mode)) }, state: current == mode ? .on : .off, removeTail: false) }
                 for filter in state.folders {
                     let name: String
-                    switch filter { case .allChats: name = regramParityText("Native.AllChats"); case let .filter(_, title, _, _): name = title.text }
-                    let selected = current == "specific" && selectedFolder == String(filter.id == 0 ? -1 : filter.id)
+                    let folder: RegramChatListPolicy.StartupFolder
+                    switch filter {
+                    case .allChats:
+                        name = regramParityText("Native.AllChats")
+                        folder = .allChats
+                    case let .filter(_, title, _, _):
+                        name = title.text
+                        folder = .named(name)
+                    }
+                    let selected = current == "specific" && selectedId == (filter.id == 0 ? -1 : filter.id)
                     if selected { selectedTitle = name }
                     items.append(ContextMenuItem(name, handler: {
-                        var dictionary: [String: String] = [:]
-                        if case let .dictionary(values) = state.settings["features.startupFolders"] { dictionary = values }
-                        dictionary[String(arguments.context.peerId.toInt64())] = String(filter.id == 0 ? -1 : filter.id)
-                        arguments.set("features.startupFolders", .dictionary(dictionary))
-                        arguments.set(key, .string("specific"))
+                        arguments.set("features.startupFolders", folder.storedValue)
                     }, state: selected ? .on : .off, removeTail: false))
                 }
                 general(regramParityText(title), .contextSelector(selectedTitle, items))
@@ -261,9 +274,10 @@ private func regramMessageMediaEntries(_ state: RegramMessageMediaState, categor
                 general(regramParityText(title), .contextSelector(regramParityValueTitle(key, current), items))
             }
         case let .slider(key):
-            let value = min(100, max(0, state.settings[key].integer))
+            let range = key == "stickerSize" ? RGMediaPolicy.stickerSizeRange : 0...100
+            let value = min(range.upperBound, max(range.lowerBound, state.settings[key].integer))
             rows.append(.custom(sectionId: section, index: index, value: .none, identifier: identifier, equatable: InputDataEquatable(value), comparable: nil, item: { size, stableId in
-                regramSliderRowItem(size, stableId: stableId, title: regramParityText(key == "outgoingPhotoQuality" ? "Native.Quality" : "Settings.Stickers.Size"), value: Int(value), range: 0...100, changed: { arguments.set(key, .integer(Int64($0))) })
+                regramSliderRowItem(size, stableId: stableId, title: regramParityText(key == "outgoingPhotoQuality" ? "Native.Quality" : "Settings.Stickers.Size"), value: Int(value), range: Int(range.lowerBound)...Int(range.upperBound), changed: { arguments.set(key, .integer(Int64($0))) })
             }))
         case let .action(id, title):
             general(regramParityText(title), .next, action: { arguments.open(id) })
@@ -289,13 +303,21 @@ private func regramMessageMediaController(context: any AccountContextProtocol, c
     let disposables = DisposableSet()
     func update(_ transform: (inout RegramMessageMediaState) -> Void) { promise.set(state.modify { value in var value = value; transform(&value); return value }) }
     let arguments = RegramMessageMediaArguments(context: context, set: { key, value in
-        RegramPreferences.shared.update(accountId: accountId) { $0[key] = value }
+        RegramPreferences.shared.update(accountId: accountId) {
+            $0[key] = value
+            if key == "features.startupFolders" { $0["features.chatListStartupFolderMode"] = .string("specific") }
+        }
     }, toggle: { key in
         if key == "sendWithReturnKey" {
             let sendWithReturn = FastSettings.sendingType != .enter
             FastSettings.changeSendingType(sendWithReturn ? .enter : .cmdEnter)
-            RegramPreferences.shared.update(accountId: accountId) { $0[key] = .bool(sendWithReturn) }
             update { $0.sendWithReturn = sendWithReturn }
+            return
+        }
+        if key == "sendLargePhotos" {
+            let sendsLargePhotos = !FastSettings.sendLargePhotos
+            FastSettings.sendLargePhotos(sendsLargePhotos)
+            update { $0.sendsLargePhotos = sendsLargePhotos }
             return
         }
         RegramPreferences.shared.update(accountId: accountId) { $0[key] = .bool(!$0[key].bool) }
@@ -325,7 +347,10 @@ private func regramMessageMediaController(context: any AccountContextProtocol, c
     })
     disposables.add(regramPreferenceChanges(accountId: accountId).start(next: { settings in update { $0.settings = settings } }))
     let inputObserver = NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: UserDefaults.standard, queue: .main) { _ in
-        update { $0.sendWithReturn = FastSettings.sendingType == .enter }
+        update {
+            $0.sendWithReturn = FastSettings.sendingType == .enter
+            $0.sendsLargePhotos = FastSettings.sendLargePhotos
+        }
     }
     disposables.add(ActionDisposable { NotificationCenter.default.removeObserver(inputObserver) })
     disposables.add((context.engine.peers.updatedChatListFilters() |> deliverOnMainQueue).start(next: { folders in update { $0.folders = folders } }))

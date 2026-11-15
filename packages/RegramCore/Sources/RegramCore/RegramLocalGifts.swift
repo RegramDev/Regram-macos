@@ -84,6 +84,27 @@ public struct RGLocalGiftsState: Codable, Equatable {
     }
 }
 
+private extension RGLocalGiftsState {
+    var configuration: Self {
+        var value = self
+        value.copyRecords(from: Self())
+        return value
+    }
+
+    var records: Self {
+        var value = Self()
+        value.copyRecords(from: self)
+        return value
+    }
+
+    mutating func copyRecords(from state: Self) {
+        purchases = state.purchases
+        profileGiftId = state.profileGiftId
+        nameGiftId = state.nameGiftId
+        appearance = state.appearance
+    }
+}
+
 public enum RGLocalGiftsError: Error {
     case disabled, invalidAmount, insufficientStars, insufficientTon, limitReached, pinnedLimitReached, storage
 }
@@ -102,13 +123,16 @@ public final class RGLocalGiftsStore {
     public static let maximumGifts = 500
     public static let maximumPinnedGifts = 12
     public static let maximumRatingLevel: Int32 = 999
+    private static let storageKey = "regram.localGifts.v2"
+    private static let legacyPrefix = "regram.localGifts.v1."
+    private static let configurationKey = "configuration"
+    private static let lock = NSLock()
 
     public static func accountKey(accountId: Int64, testingEnvironment: Bool) -> String {
         (testingEnvironment ? "test:" : "live:") + String(accountId)
     }
     private let defaults: UserDefaults
     private let notifications: NotificationCenter
-    private let lock = NSLock()
     private var cached: [String: (data: Data, state: RGLocalGiftsState)] = [:]
 
     public init(defaults: UserDefaults = .standard, notifications: NotificationCenter = .default) {
@@ -116,14 +140,32 @@ public final class RGLocalGiftsStore {
         self.notifications = notifications
     }
 
-    private func key(_ account: String) -> String { "regram.localGifts.v1." + account }
+    private func storedStates(preferredAccount: String) throws -> [String: Data] {
+        if let current = defaults.object(forKey: Self.storageKey) {
+            guard let values = current as? [String: Data], values[Self.configurationKey] != nil else { throw RGLocalGiftsError.storage }
+            return values
+        }
+        let preferredKey = Self.legacyPrefix + preferredAccount
+        var configuration = defaults.data(forKey: preferredKey).flatMap { try? decode($0, key: preferredKey).configuration }
+        if configuration == nil {
+            for key in defaults.dictionaryRepresentation().keys.sorted() where key.hasPrefix(Self.legacyPrefix) && key != preferredKey {
+                if let data = defaults.data(forKey: key), let legacy = try? decode(data, key: key) {
+                    configuration = legacy.configuration
+                    break
+                }
+            }
+        }
+        let initial = [Self.configurationKey: try JSONEncoder().encode(configuration ?? RGLocalGiftsState())]
+        defaults.set(initial, forKey: Self.storageKey)
+        return initial
+    }
 
-    private func read(_ account: String) throws -> RGLocalGiftsState {
-        guard let data = defaults.data(forKey: key(account)) else {
-            cached.removeValue(forKey: account)
+    private func decode(_ data: Data?, key: String) throws -> RGLocalGiftsState {
+        guard let data else {
+            cached.removeValue(forKey: key)
             return RGLocalGiftsState()
         }
-        if let entry = cached[account], entry.data == data { return entry.state }
+        if let entry = cached[key], entry.data == data { return entry.state }
         guard data.count <= 16 * 1024 * 1024,
               let state = try? JSONDecoder().decode(RGLocalGiftsState.self, from: data),
               (0...Self.maximumBalance).contains(state.balance), (0...Self.maximumBalance).contains(state.tonBalance), state.purchases.count <= Self.maximumGifts,
@@ -136,31 +178,65 @@ public final class RGLocalGiftsStore {
               state.purchases.allSatisfy({ $0.price > 0 && $0.price <= Self.maximumBalance && !$0.gift.isEmpty && $0.gift.count <= 1024 * 1024 }) else {
             throw RGLocalGiftsError.storage
         }
-        cached[account] = (data, state)
+        cached[key] = (data, state)
         return state
     }
 
+    private func read(account: String, stored: [String: Data]) throws -> RGLocalGiftsState {
+        var state = try decode(stored[Self.configurationKey], key: Self.configurationKey)
+        let accountKey = "account:" + account
+        let data = stored[accountKey] ?? defaults.data(forKey: Self.legacyPrefix + account)
+        state.copyRecords(from: try decode(data, key: accountKey))
+        return state
+    }
+
+    public func prepareSharedSettings(preferredAccount: String) {
+        Self.lock.lock()
+        defer { Self.lock.unlock() }
+        _ = try? storedStates(preferredAccount: preferredAccount)
+    }
+
     public func state(account: String) -> RGLocalGiftsState {
-        lock.lock(); defer { lock.unlock() }
-        return (try? read(account)) ?? RGLocalGiftsState()
+        Self.lock.lock()
+        defer { Self.lock.unlock() }
+        guard let stored = try? storedStates(preferredAccount: account) else { return RGLocalGiftsState() }
+        return (try? read(account: account, stored: stored)) ?? RGLocalGiftsState()
     }
 
     @discardableResult private func update(account: String, _ change: (inout RGLocalGiftsState) throws -> Void) -> Result<RGLocalGiftsState, RGLocalGiftsError> {
-        lock.lock()
+        Self.lock.lock()
         let result: Result<RGLocalGiftsState, RGLocalGiftsError>
+        var configurationChanged = false
         do {
-            var state = try read(account)
+            var stored = try storedStates(preferredAccount: account)
+            let previous = try read(account: account, stored: stored)
+            var state = previous
             try change(&state)
-            let encoded = try JSONEncoder().encode(state)
-            guard encoded.count <= 16 * 1024 * 1024 else { throw RGLocalGiftsError.limitReached }
-            defaults.set(encoded, forKey: key(account))
-            cached[account] = (encoded, state)
+            if state != previous {
+                let encoder = JSONEncoder()
+                let configuration = state.configuration
+                if configuration != previous.configuration {
+                    stored[Self.configurationKey] = try encoder.encode(configuration)
+                    configurationChanged = true
+                }
+                let records = state.records
+                if records != previous.records {
+                    let recordData = try encoder.encode(records)
+                    guard recordData.count <= 16 * 1024 * 1024 else { throw RGLocalGiftsError.limitReached }
+                    stored["account:" + account] = recordData
+                }
+                defaults.set(stored, forKey: Self.storageKey)
+            }
             result = .success(state)
         } catch let error as RGLocalGiftsError { result = .failure(error) }
         catch { result = .failure(.storage) }
-        lock.unlock()
+        Self.lock.unlock()
         if case let .success(state) = result {
-            notifications.post(name: Self.didChange, object: account, userInfo: [Self.committedStateKey: state])
+            if configurationChanged {
+                notifications.post(name: Self.didChange, object: nil)
+            } else {
+                notifications.post(name: Self.didChange, object: account, userInfo: [Self.committedStateKey: state])
+            }
         }
         return result
     }
@@ -308,10 +384,15 @@ public final class RGLocalGiftsStore {
     }
 
     public func removeAccount(account: String) {
-        lock.lock()
-        defaults.removeObject(forKey: key(account))
-        cached.removeValue(forKey: account)
-        lock.unlock()
-        notifications.post(name: Self.didChange, object: account, userInfo: [Self.committedStateKey: RGLocalGiftsState()])
+        Self.lock.lock()
+        let accountKey = "account:" + account
+        let current = try? storedStates(preferredAccount: account)
+        defaults.removeObject(forKey: Self.legacyPrefix + account)
+        if var stored = current, stored.removeValue(forKey: accountKey) != nil {
+            defaults.set(stored, forKey: Self.storageKey)
+        }
+        cached.removeValue(forKey: accountKey)
+        Self.lock.unlock()
+        notifications.post(name: Self.didChange, object: account)
     }
 }

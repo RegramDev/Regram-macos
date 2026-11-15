@@ -35,6 +35,7 @@ def main():
     end = source.index("    @available(macOS 10.15, *)\n    private var selectorView", start)
     methods = source[start:end].replace("RegramPreferences.shared", "fixturePreferences")
     observer = declaration(source, "settingsObserver = NotificationCenter.default.addObserver").replace("RegramPreferences.shared", "fixturePreferences")
+    observer = observer.replace("RegramPreferences.applies(notification, to: accountId)", "(notification.object as? RegramPreferences) === fixturePreferences")
     fixture = (HERE / "LogicChecks.swift").read_text().replace("__GALLERY_METHODS__", methods).replace("__SETTINGS_OBSERVER__", observer)
     rgg = (ROOT / "packages/RegramServices/Sources/RegramServices/RGGTranslate.swift").read_text()
     sequence = ["let rgTranslateMaxChunkLength = 1200"] + [declaration(rgg, marker) for marker in ["func rgTranslateInChunks(", "public func gtranslateSplitTextBySentences(", "public func regramTranslateSequentially<", "func rgTranslateSequentially("]]

@@ -69,7 +69,7 @@ final class RegramFeatureIsolationTests: XCTestCase {
         let translation = RegramPreferences(defaults: defaults).settings(accountId: 42)
         XCTAssertNotEqual(translation.translationIdentity, transcription.translationIdentity)
         XCTAssertTrue(translation.hasSameTranscriptionConfiguration(as: transcription))
-        XCTAssertEqual(store.settings(accountId: 43), initial)
+        XCTAssertEqual(store.settings(accountId: 43), translation)
         XCTAssertEqual(translation["serviceConfigurationRevision"].integer, 0)
     }
 
@@ -80,7 +80,7 @@ final class RegramFeatureIsolationTests: XCTestCase {
         original["messageFilterDisabledPeerIds"] = .strings(["4"])
         original["panguSpacing"] = .bool(true)
         original["defaultOutgoingFormatting"] = .string("bold")
-        original["chatPreferences"] = .string("{\"1:2\":{\"formatting\":\"none\",\"panguSpacing\":false}}")
+        original["chatPreferences"] = .string("{\"2\":{\"formatting\":\"none\",\"panguSpacing\":false}}")
         let filterKeys: Set<String> = ["messageFilterRules", "blockedPeerIds", "messageFilterDisabledPeerIds", "chatPreferences", "panguSpacing", "defaultOutgoingFormatting"]
         for setting in RegramSetting.all where !filterKeys.contains(setting.key) {
             var changed = original

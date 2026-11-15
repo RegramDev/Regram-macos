@@ -66,13 +66,19 @@ final class RegramCoreTests: XCTestCase {
         XCTAssertThrowsError(try RegramSettingsBackup.decode(invalid))
     }
 
-    func testChatPreferencesKeepPackedIdentifiersAndAccountScope() throws {
+    func testChatPreferencesShareCloudIdentifiersAndKeepSecretChatsSeparate() throws {
         let peer: Int64 = 9007199254740993
-        let values = [RGChatPreferences.key(accountId: 1, peerId: peer): RGChatPreferences(formatting: "bold", panguSpacing: true)]
+        let secretPeer: Int64 = (3 << 32) | 102
+        let values = [
+            RGChatPreferences.key(accountId: 1, peerId: peer): RGChatPreferences(formatting: "bold", panguSpacing: true),
+            RGChatPreferences.key(accountId: 1, peerId: secretPeer): RGChatPreferences(formatting: "italic", panguSpacing: false)
+        ]
         var settings = RegramAccountSettings()
         settings["chatPreferences"] = .string(String(decoding: try JSONEncoder().encode(values), as: UTF8.self))
         XCTAssertEqual(settings.chatPreferences(accountId: 1, peerId: peer).formatting, "bold")
-        XCTAssertNil(settings.chatPreferences(accountId: 2, peerId: peer).formatting)
+        XCTAssertEqual(settings.chatPreferences(accountId: 2, peerId: peer).formatting, "bold")
+        XCTAssertEqual(settings.chatPreferences(accountId: 1, peerId: secretPeer).formatting, "italic")
+        XCTAssertNil(settings.chatPreferences(accountId: 2, peerId: secretPeer).formatting)
     }
 
     func testTransferPolicyPreservesSmallFilesAndAdaptiveScheduling() {
@@ -112,20 +118,52 @@ final class RegramCoreTests: XCTestCase {
         XCTAssertEqual(RGMessageFilter.matchResult(rule: RGMessageFilterRule(pattern: ".*", isRegex: true, isEnabled: false), text: "text"), .disabled)
     }
 
-    func testSettingsPersistAndRemainIsolatedBetweenAccounts() throws {
+    func testSettingsPersistAndResetAcrossAccounts() throws {
         let name = "RegramCoreTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
         defer { defaults.removePersistentDomain(forName: name) }
         let store = RegramPreferences(defaults: defaults)
         store.update(accountId: 10) { $0["panguSpacing"] = .bool(true) }
-        store.update(accountId: 20) { $0["defaultOutgoingFormatting"] = .string("bold") }
+        store.update(accountId: 20) { $0["defaultOutgoingFormatting"] = .string("bold"); $0["showMessageId"] = .bool(true) }
         let restored = RegramPreferences(defaults: defaults)
         XCTAssertTrue(restored.settings(accountId: 10)["panguSpacing"].bool)
-        XCTAssertFalse(restored.settings(accountId: 20)["panguSpacing"].bool)
+        XCTAssertTrue(restored.settings(accountId: 20)["panguSpacing"].bool)
         XCTAssertEqual(restored.settings(accountId: 20)["defaultOutgoingFormatting"].string, "bold")
         store.reset(accountId: 10, category: .input)
         XCTAssertFalse(store.settings(accountId: 10)["panguSpacing"].bool)
-        XCTAssertEqual(store.settings(accountId: 20)["defaultOutgoingFormatting"].string, "bold")
+        XCTAssertEqual(store.settings(accountId: 20)["defaultOutgoingFormatting"].string, "none")
+        XCTAssertTrue(store.settings(accountId: 20)["showMessageId"].bool)
+    }
+
+    func testSharedMigrationUsesPrimaryAccountAndPersistsAcrossSwitches() throws {
+        let name = "RegramSharedMigrationTests.\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        let first = RegramAccountSettings(values: ["transcriptionBackend": .string("apple"), "showMessageId": .bool(false)])
+        let peer: Int64 = (2 << 32) | 101
+        let secret: Int64 = (3 << 32) | 101
+        let primary = RegramAccountSettings(values: [
+            "showMessageId": .bool(true),
+            "chatPreferences": .string("{\"25:\(peer)\":{\"formatting\":\"bold\"},\"\(secret)\":{\"panguSpacing\":true}}"),
+            "outgoingLanguageTranslation": .dictionary(["v2:25:\(peer)": "ja", "v2:25:\(secret)": "en"])
+        ])
+        defaults.set(try JSONEncoder().encode(first), forKey: "Regram.Preferences.v1.10")
+        defaults.set(try JSONEncoder().encode(primary), forKey: "Regram.Preferences.v1.25")
+        let store = RegramPreferences(defaults: defaults)
+        store.prepareSharedSettings(preferredAccountId: 25)
+        let migrated = store.settings(accountId: 10)
+        XCTAssertEqual(store.legacySettingsAccountId, 25)
+        XCTAssertTrue(migrated["showMessageId"].bool)
+        XCTAssertEqual(migrated["transcriptionBackend"].string, "default")
+        XCTAssertEqual(migrated.chatPreferences(accountId: 10, peerId: peer).formatting, "bold")
+        XCTAssertEqual(migrated.chatPreferences(accountId: 25, peerId: secret).panguSpacing, true)
+        XCTAssertNil(migrated.chatPreferences(accountId: 10, peerId: secret).panguSpacing)
+        XCTAssertEqual(migrated["outgoingLanguageTranslation"], .dictionary(["peer:\(peer)": "ja", "v2:25:\(secret)": "en"]))
+        let reopened = RegramPreferences(defaults: defaults)
+        reopened.prepareSharedSettings(preferredAccountId: 10)
+        XCTAssertEqual(reopened.settings(accountId: 10), migrated)
+        XCTAssertEqual(reopened.settings(accountId: 30), migrated)
+        XCTAssertEqual(reopened.legacySettingsAccountId, 25)
     }
 
     func testBackupRejectsUnsupportedVersionAndDoesNotImportCredentials() throws {

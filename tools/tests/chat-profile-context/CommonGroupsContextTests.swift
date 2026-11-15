@@ -37,7 +37,13 @@ enum CommonScreen { case peerInfoGroupsInCommon, peerInfoMediaGroupsInCommon, pe
 enum CommonColor { case clear, listBackground }
 struct CommonTheme { struct Colors { let listBackground = CommonColor.listBackground }; let colors = Colors() }
 let theme = CommonTheme()
-struct CommonStrings { let peerInfoGroupsInCommon = "Groups in common" }
+struct CommonStrings {
+    let peerInfoGroupsInCommon = "Groups in common"
+    let stickerPackPreviewModalControllerDeleteSetHeader = "Delete sticker set"
+    let stickerPackPreviewModalControllerDeleteSetInfo = "Delete this sticker set?"
+    let chatSendPaymentConfirmationPriceChanged = "Price changed"
+    let chatSendPaymentConfirmationPriceChangedInfo = "Review the updated price."
+}
 func strings() -> CommonStrings { CommonStrings() }
 struct CommonPosition { enum Direction { case bottom, top }; let direction: Direction }
 final class CommonTable {

@@ -27,7 +27,6 @@ public enum RGContextMenuItemId: String, CaseIterable, Hashable {
     case editHistory
     case bookmark
     case summarize
-    case messageScreenshot
     case editSuggestedPostMessage
     case editSuggestedPostTime
     case editSuggestedPostPrice
@@ -69,7 +68,7 @@ public enum RGContextMenuItemId: String, CaseIterable, Hashable {
 
     public var canBeCustomized: Bool {
         switch self {
-        case .sendMoney, .sendLogs, .activateLink, .summarize, .messageScreenshot: return false
+        case .sendMoney, .sendLogs, .activateLink, .summarize: return false
         default: return true
         }
     }

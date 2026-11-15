@@ -6,6 +6,7 @@ import TelegramTheme
 import InputDataUI
 import GeneralRows
 import AlertsUI
+import InAppSettings
 import RegramCore
 import RegramSignals
 
@@ -28,6 +29,8 @@ public func RegramSettingsBackupController(context: any AccountContextProtocol, 
             var snapshot = RegramPreferences.shared.settings(accountId: accountId)
             snapshot["native.showContactsTab"] = .bool(native.contacts)
             snapshot["native.showCallsTab"] = .bool(native.calls)
+            snapshot["sendWithReturnKey"] = .bool(FastSettings.sendingType == .enter)
+            snapshot["sendLargePhotos"] = .bool(FastSettings.sendLargePhotos)
             var layout = RegramBottomBarSettings(settings: snapshot)
             layout.setVisible(.contacts, visible: native.contacts)
             layout.apply(to: &snapshot)
@@ -63,8 +66,22 @@ public func RegramSettingsBackupController(context: any AccountContextProtocol, 
     func restore(_ backup: RegramSettingsBackup?, categories: Set<RegramBackupCategory>) {
         verifyAlert(for: context.window, header: regramString(backup == nil ? "Backup.Reset" : "Backup.Restore"), information: regramString(backup == nil ? "Backup.Reset.Notice" : "Backup.Restore.Notice"), successHandler: { _ in
             let source = backup ?? RegramSettingsBackup(values: [:])
-            RegramPreferences.shared.update(accountId: accountId) { $0 = source.applying(to: $0, categories: categories, resetCategories: backup == nil ? categories : []) }
             let selected = source.selectedValues(categories: categories)
+            RegramPreferences.shared.update(accountId: accountId) { settings in
+                settings = source.applying(to: settings, categories: categories, resetCategories: backup == nil ? categories : [], legacyAccountId: accountId)
+                if categories.contains(.messages) { settings.values.removeValue(forKey: "sendWithReturnKey") }
+                if categories.contains(.media) { settings.values.removeValue(forKey: "sendLargePhotos") }
+            }
+            if case let .bool(sendWithReturn)? = selected["sendWithReturnKey"] {
+                FastSettings.changeSendingType(sendWithReturn ? .enter : .cmdEnter)
+            } else if backup == nil && categories.contains(.messages) {
+                FastSettings.changeSendingType(.enter)
+            }
+            if case let .bool(sendsLargePhotos)? = selected["sendLargePhotos"] {
+                FastSettings.sendLargePhotos(sendsLargePhotos)
+            } else if backup == nil && categories.contains(.media) {
+                FastSettings.sendLargePhotos(false)
+            }
             func completed() { showModalText(for: context.window, text: regramString("Backup.Done"), button: regramString("Common.RestartNow"), callback: { _ in RegramUIHooks.shared.restartApplication() }) }
             if backup == nil && categories.contains(.appearance) || ["bottomBarLayout", "native.showContactsTab", "native.showCallsTab", "hideTabBar", "showTabNames", "tabBarWidthPercent"].contains(where: { selected[$0] != nil }) {
                 let settings = RegramPreferences.shared.settings(accountId: accountId)

@@ -1,3 +1,5 @@
+"About.Attribution" = "Regram · 基於 Telegram for macOS\nCopyright © 2016 – %@ Telegram Messenger";
+"About.Description" = "基於 Telegram 的 macOS 用戶端，提供 Regram 的個人化與隱私功能。";
 "AccessDenied.Camera" = "Regram 需要取用相機才能拍攝照片和影片。\n\n請前往系統設定 > 隱私權與安全性 > 相機，並允許 Regram 取用。";
 "AccessDenied.Settings" = "設定";
 "AccessDenied.VideoMicrophone" = "Regram 需要取用麥克風才能錄製影片聲音。\n\n請前往系統設定 > 隱私權與安全性 > 麥克風，並允許 Regram 取用。";
@@ -229,7 +231,7 @@
 "Chat.NextUnreadTopicSwipeProgress" = "向上拉動，前往下一個話題";
 "Chat.RegDate" = "註冊日期";
 "ChatPreferences.Inherit" = "依照全域設定";
-"ChatPreferences.Notice" = "僅對目前帳號的所選對話生效，包含該對話的主題。傳送時明確選擇無格式仍有最高優先順序。";
+"ChatPreferences.Notice" = "這組設定適用於所選對話及其主題。同一個雲端對話在各帳號中共用設定。傳送時仍可手動選擇無格式。";
 "ChatPreferences.Off" = "關閉";
 "ChatPreferences.On" = "開啟";
 "ChatPreferences.Reset" = "恢復依照全域設定";
@@ -479,7 +481,7 @@
 "LocalGifts.InvalidAmount" = "請輸入範圍內有效的非負金額。";
 "LocalGifts.Limit" = "本機禮物已達到儲存上限（最多 500 份），請移除部分禮物後再試。";
 "LocalGifts.NativeHint" = "儲存後，到 Telegram 原有禮物頁面購買普通或收藏禮物。目錄和預覽正常連線載入，購買和餘額扣除僅在本機模擬。";
-"LocalGifts.Notice" = "購買使用獨立的本機星幣和 TON 餘額。禮物及裝扮僅在本機自己的個人資料頁展示。關閉後隱藏本機禮物和裝扮，保留紀錄。";
+"LocalGifts.Notice" = "這部 Mac 上的帳號共用模擬星幣和 TON 餘額。各帳號的本機禮物和裝扮顯示於各自的個人資料頁。";
 "LocalGifts.Owned" = "我的本機禮物";
 "LocalGifts.OwnedHint" = "本機購買不會傳送付款或贈送請求，無法在 Telegram 轉贈、出售、升級或兌換。";
 "LocalGifts.PinnedLimit" = "置頂禮物已達上限，請先取消其他禮物的置頂。";
@@ -495,7 +497,7 @@
 "LocalGifts.TonHint" = "用於本機收藏禮物購買及本機資料卡。最多 9 位小數，最高 9000000 TON，不連接錢包，也不發起轉帳。";
 "LocalPhone.CountryCode" = "區號";
 "LocalPhone.Enabled" = "啟用本機手機號顯示";
-"LocalPhone.Hint" = "僅修改本機自己個人資料頁和設定中的號碼顯示，不改變登入手機號和 Telegram 帳號。各帳號獨立儲存。";
+"LocalPhone.Hint" = "設定這部 Mac 上所有帳號在個人資料頁及設定中顯示的號碼。";
 "LocalPhone.Invalid" = "請填寫 1–3 位區號和手機號碼，合計 5–20 位數字。";
 "LocalPhone.Number" = "手機號碼";
 "LocalPhone.Save" = "儲存並啟用";
@@ -590,9 +592,6 @@
 "MessageFilter.Test.Title" = "規則試比對";
 "MessageFilter.Title" = "訊息過濾器";
 "MessageFilter.Transfer" = "匯出 / 匯入";
-"MessageScreenshot.Action" = "訊息截圖";
-"MessageScreenshot.Unavailable" = "部分選取的訊息無法取得或不允許匯出。";
-"MessageScreenshot.UnknownSender" = "未知傳送者";
 "MutualContact.Label" = "雙向聯絡人";
 "Native.All" = "全部";
 "Native.AllChats" = "所有聊天";
@@ -804,9 +803,11 @@
 "Revoked.Unavailable" = "曾無法從伺服器取得 · 已在本機保留";
 "RevokedMarker.Color" = "標記顏色";
 "RevokedMarker.DefaultText" = "已撤回";
+"RevokedMarker.DimMessages" = "半透明顯示已撤回訊息";
 "RevokedMarker.InvalidColor" = "請輸入 #RRGGBB，留空使用時間文字的顏色。";
 "RevokedMarker.Notice" = "自訂本機保留的已撤回訊息在時間旁的標記。文字留空使用預設標記，顏色留空跟隨主題；此設定不改變防撤回規則。";
 "RevokedMarker.Preview" = "預覽";
+"RevokedMarker.RequiresEnabled" = "開啟「保留被撤回的訊息」後，才能設定撤回標記與半透明效果。";
 "RevokedMarker.Saved" = "已儲存，目前顯示的已撤回訊息已更新標記。";
 "RevokedMarker.Style" = "標記樣式";
 "RevokedMarker.Style.icon" = "圖示";
@@ -855,7 +856,7 @@
 "Settings.ContentSettings" = "敏感內容設定";
 "Settings.ContextMenu" = "內容選單";
 "Settings.ContextMenu.Customize" = "自訂選單";
-"Settings.ContextMenu.Notice" = "關閉後隱藏，拖動可調整排序。這裡只列出 Regram 的常用操作，以及目前帳號實際出現過的其他選單項目。";
+"Settings.ContextMenu.Notice" = "關閉可隱藏操作，拖動可調整順序。清單包括常用操作以及曾在這部 Mac 上出現的可自訂操作。";
 "Settings.CustomColors.Header" = "帳號顏色";
 "Settings.CustomColors.Saturation" = "飽和度";
 "Settings.CustomColors.Saturation.Notice" = "將飽和度設為 0%% 以停用帳戶顏色";
@@ -993,6 +994,7 @@
 "Settings.Transcription.Backend.apple" = "Apple";
 "Settings.Transcription.Backend.default" = "Telegram";
 "Settings.Transcription.Backend.openAICompatible" = "自訂 API（OpenAI 格式）";
+"Settings.Transcription.ConfigurationNotice" = "選擇語音辨識服務。選用自訂 API 後可設定連線參數；切換服務會保留已儲存的設定。";
 "Settings.Transcription.Header" = "語音轉文字";
 "Settings.Translation.Backend" = "翻譯服務";
 "Settings.Translation.Backend.Notice" = "所選服務無法使用時，Regram 會嘗試使用 %@。";
@@ -1018,10 +1020,9 @@
 "Settings.showChannelBottomButton" = "頻道底部面板";
 "Settings.wideChannelPosts" = "在頻道中以更寬的樣式顯示訊息";
 "Share.RepostToStory" = "轉發\n至限時動態";
-"Showroom.Description" = "本機會員、禮物、評級、TON 資料卡與號碼顯示";
+"Showroom.Description" = "本機個人資料、禮物與餘額預覽";
 "Showroom.PremiumRefresh" = "已開啟的會員介面可在重新開啟 App 後重新整理。";
 "Showroom.Title" = "展示空間";
-"Showroom.Description" = "本機個人資料、禮物與餘額預覽";
 "StickerBackup.Action" = "匯出貼圖包備份";
 "StickerBackup.Failed" = "貼圖包備份失敗。請確認檔案可下載及裝置有足夠空間後重試。";
 "StickerSave.Failed" = "儲存失敗，請檢查相簿權限後重試。";
@@ -1505,7 +1506,7 @@
 "ios.Chat.JoinedDateTitle" = "已加入 %@";
 "ios.Chat.RegDate" = "註冊日期";
 "ios.ChatPreferences.Inherit" = "依照全域設定";
-"ios.ChatPreferences.Notice" = "僅對目前帳號的所選對話生效，包含該對話的主題。傳送時明確選擇無格式仍有最高優先順序。";
+"ios.ChatPreferences.Notice" = "這組設定適用於所選對話及其主題。同一個雲端對話在各帳號中共用設定。傳送時仍可手動選擇無格式。";
 "ios.ChatPreferences.Off" = "關閉";
 "ios.ChatPreferences.On" = "開啟";
 "ios.ChatPreferences.Reset" = "恢復依照全域設定";
@@ -1640,17 +1641,6 @@
 "ios.EditHistory.RevealPhoto" = "點擊顯示圖片";
 "ios.EditHistory.Title" = "編輯紀錄";
 "ios.EditHistory.ViewPhoto" = "檢視圖片";
-"ios.EraseData.Action" = "清除資料";
-"ios.EraseData.Close" = "關閉應用程式";
-"ios.EraseData.Confirm" = "確認清除";
-"ios.EraseData.ContainerUnavailable" = "無法存取資料容器。清除工作已保留，請重新開啟 Regram 重試。";
-"ios.EraseData.Done" = "資料已全部清除";
-"ios.EraseData.DoneNotice" = "關閉 Regram 後重新開啟，即可重新開始。";
-"ios.EraseData.Errors" = "清除完成，但有部分錯誤";
-"ios.EraseData.ErrorsNotice" = "未能刪除：%@";
-"ios.EraseData.Notice" = "登出所有帳號，刪除這台 Mac 上 Regram 的本機資料、快取與設定。清除後需要重新登入。";
-"ios.EraseData.Progress" = "正在清除資料… 請保持 Regram 開啟。";
-"ios.EraseData.Title" = "清除所有資料";
 "ios.Fonts.Areas" = "套用位置";
 "ios.Fonts.Areas.Notice" = "勾選的位置會立即更新。程式碼、圖示和大表情保留各自的字型。";
 "ios.Fonts.Cancel" = "取消下载";
@@ -1759,7 +1749,7 @@
 "ios.LocalGifts.InvalidAmount" = "請輸入範圍內有效的非負金額。";
 "ios.LocalGifts.Limit" = "本機禮物已達到儲存上限（最多 500 份），請移除部分禮物後再試。";
 "ios.LocalGifts.NativeHint" = "儲存後，到 Telegram 原有禮物頁面購買普通或收藏禮物。目錄和預覽正常連線載入，購買和餘額扣除僅在本機模擬。";
-"ios.LocalGifts.Notice" = "購買使用獨立的本機星幣和 TON 餘額。禮物及裝扮僅在本機自己的個人資料頁展示。關閉後隱藏本機禮物和裝扮，保留紀錄。";
+"ios.LocalGifts.Notice" = "這部 Mac 上的帳號共用模擬星幣和 TON 餘額。各帳號的本機禮物和裝扮顯示於各自的個人資料頁。";
 "ios.LocalGifts.Owned" = "我的本機禮物";
 "ios.LocalGifts.OwnedHint" = "本機購買不會傳送付款或贈送請求，無法在 Telegram 轉贈、出售、升級或兌換。";
 "ios.LocalGifts.PinnedLimit" = "置頂禮物已達上限，請先取消其他禮物的置頂。";
@@ -1775,7 +1765,7 @@
 "ios.LocalGifts.TonHint" = "用於本機收藏禮物購買及本機資料卡。最多 9 位小數，最高 9000000 TON，不連接錢包，也不發起轉帳。";
 "ios.LocalPhone.CountryCode" = "區號";
 "ios.LocalPhone.Enabled" = "啟用本機手機號顯示";
-"ios.LocalPhone.Hint" = "僅修改本機自己個人資料頁和設定中的號碼顯示，不改變登入手機號和 Telegram 帳號。各帳號獨立儲存。";
+"ios.LocalPhone.Hint" = "設定這部 Mac 上所有帳號在個人資料頁及設定中顯示的號碼。";
 "ios.LocalPhone.Invalid" = "請填寫 1–3 位區號和手機號碼，合計 5–20 位數字。";
 "ios.LocalPhone.Number" = "手機號碼";
 "ios.LocalPhone.Save" = "儲存並啟用";
@@ -1858,9 +1848,6 @@
 "ios.MessageFilter.Test.Title" = "規則試比對";
 "ios.MessageFilter.Title" = "訊息過濾器";
 "ios.MessageFilter.Transfer" = "匯出 / 匯入";
-"ios.MessageScreenshot.Action" = "訊息截圖";
-"ios.MessageScreenshot.Unavailable" = "部分選取的訊息無法取得或不允許匯出。";
-"ios.MessageScreenshot.UnknownSender" = "未知傳送者";
 "ios.MutualContact.Label" = "雙向聯絡人";
 "ios.Native.All" = "全部";
 "ios.Native.AllChats" = "所有聊天";
@@ -2119,7 +2106,7 @@
 "ios.Settings.ContentSettings" = "敏感內容設定";
 "ios.Settings.ContextMenu" = "內容選單";
 "ios.Settings.ContextMenu.Customize" = "自訂選單";
-"ios.Settings.ContextMenu.Notice" = "關閉後隱藏，拖動可調整排序。這裡只列出 Regram 的常用操作，以及目前帳號實際出現過的其他選單項目。";
+"ios.Settings.ContextMenu.Notice" = "關閉可隱藏操作，拖動可調整順序。清單包括常用操作以及曾在這部 Mac 上出現的可自訂操作。";
 "ios.Settings.CustomColors.Header" = "帳號顏色";
 "ios.Settings.CustomColors.Saturation" = "飽和度";
 "ios.Settings.CustomColors.Saturation.Notice" = "將飽和度設為 0%% 以停用帳戶顏色";
@@ -2483,7 +2470,6 @@
 "menu.hideSender" = "隱藏此傳送者";
 "menu.json" = "JSON";
 "menu.messageReplies" = "檢視回覆";
-"menu.messageScreenshot" = "匯出訊息截圖";
 "menu.pin" = "釘選";
 "menu.removeBookmark" = "移除書籤";
 "menu.repeatCopy" = "無引用複讀";
@@ -2620,7 +2606,7 @@
 "profile.registered" = "註冊年月";
 "profile.registeredEstimate" = "估算註冊時間";
 "profile.userId" = "使用者 ID";
-"protectedExport.notice" = "允許儲存受保護的雲端訊息，並在截圖中顯示其圖片和影片。秘密聊天、閱後即焚媒體及付費媒體仍受保護。";
+"protectedExport.notice" = "允許儲存受保護的雲端訊息，並讓其中的圖片和影片顯示在 macOS 系統截圖中。秘密聊天、閱後即焚媒體及付費媒體仍受保護。";
 "quickTranslate.action" = "快速翻譯";
 "quickTranslate.busy" = "請等待一個翻譯工作完成，或先取消進行中的工作。";
 "quickTranslate.cancel" = "取消翻譯";
@@ -2671,6 +2657,8 @@
 "service.transcription.description" = "辨識方式、自訂介面與語言";
 "service.translation" = "LLM 翻譯介面";
 "service.translation.description" = "介面位址、模型、金鑰與提示詞";
+"setting.alignOwnMessagesLeft" = "自己的訊息靠左顯示";
+"setting.alignOwnMessagesLeft.notice" = "在氣泡聊天中，將自己傳送的訊息也顯示在左側，保留訊息顏色和已讀狀態。";
 "setting.allowSavingProtectedContent" = "允許匯出受保護內容";
 "setting.antiAutoDelete" = "保留自動刪除訊息";
 "setting.antiRevoke" = "保留撤回訊息";
@@ -2724,6 +2712,7 @@
 "setting.quickTranslateButton" = "快速翻譯按鈕";
 "setting.recentChatsEnabled" = "記錄最近聊天";
 "setting.recentStickerLimit" = "最近貼圖數量";
+"setting.revokedMarkerDimMessages" = "半透明顯示已撤回訊息";
 "setting.saveEditHistory" = "儲存編輯紀錄";
 "setting.secondsInMessages" = "時間顯示秒數";
 "setting.sendLargePhotos" = "傳送大尺寸照片";
@@ -2847,11 +2836,3 @@
 "webTranslation.tooLarge" = "此網頁過大，無法翻譯。上限為 2000 個文字節點、500000 位元組。";
 "ImageTranslation.TooLarge" = "圖片中的文字過多，無法一次翻譯。請選取部分文字，或裁切圖片後重試。";
 "webTranslation.translate" = "翻譯";
-"Settings.Transcription.ConfigurationNotice" = "選擇語音辨識服務。選用自訂 API 後可設定連線參數；切換服務會保留已儲存的設定。";
-"About.Description" = "基於 Telegram 的 macOS 用戶端，提供 Regram 的個人化與隱私功能。";
-"About.Attribution" = "Regram · 基於 Telegram for macOS\nCopyright © 2016 – %@ Telegram Messenger";
-"RevokedMarker.DimMessages" = "半透明顯示已撤回訊息";
-"RevokedMarker.RequiresEnabled" = "開啟「保留被撤回的訊息」後，才能設定撤回標記與半透明效果。";
-"setting.revokedMarkerDimMessages" = "半透明顯示已撤回訊息";
-"setting.alignOwnMessagesLeft" = "自己的訊息靠左顯示";
-"setting.alignOwnMessagesLeft.notice" = "在氣泡聊天中，將自己傳送的訊息也顯示在左側，保留訊息顏色和已讀狀態。";

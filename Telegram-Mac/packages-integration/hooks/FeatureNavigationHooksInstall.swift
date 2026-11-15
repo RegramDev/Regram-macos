@@ -385,9 +385,6 @@ func installFeatureNavigationHooks() {
         return PreviewSenderController(urls: urls, chatInteraction: interaction, asMedia: asMedia, attributedString: attributedString, presentation: presentation, analyticsContext: analyticsContext)
     }
     hooks.regramSettingsIcon = { RegramSettingsArtwork.entry(dark: theme.colors.isDark) }
-    hooks.captureRegramMedia = { context, previewEnabled, completion in
-        showModal(with: RegramMediaCaptureController(context: context, previewEnabled: previewEnabled, completion: completion), for: context.window)
-    }
     hooks.presentRegramFolderAfterJoining = { context, peerId in RegramPresentFolderPickerAfterJoining(context: context, peerId: peerId) }
     hooks.makeRegramController = { context, page in
         let parts = page?.split(separator: "/", omittingEmptySubsequences: false).map(String.init) ?? []
