@@ -173,11 +173,15 @@ public final class RGAdSampleStore {
 
     public func draft(input: RGAdInput, messageKey: String, mediaKinds: [String], mediaIdentity: String) throws -> RGAdSample {
         let salt = try self.salt()
+        let id = try Self.sampleId(input: input, salt: salt, messageKey: messageKey, mediaIdentity: mediaIdentity)
+        return try draft(input: input, mediaKinds: mediaKinds, salt: salt, id: id)
+    }
+
+    private func draft(input: RGAdInput, mediaKinds: [String], salt: String, id: String) throws -> RGAdSample {
         let source = Self.sourceGroup(salt: salt, peerId: input.peerId ?? 0)
         let sanitized = RGAdInput(
             text: input.text, entities: input.entities, buttons: input.buttons, hasMedia: input.hasMedia, previewTarget: input.previewTarget
         )
-        let id = try Self.sampleId(input: input, salt: salt, messageKey: messageKey, mediaIdentity: mediaIdentity)
         let file = directory.appendingPathComponent(id + ".json")
         if FileManager.default.fileExists(atPath: file.path) { return try read(file) }
         let sample = RGAdSample(
@@ -235,9 +239,10 @@ public final class RGAdSampleStore {
     ) throws {
         guard projection.disposition != .keep else { return }
         do {
-            let id = try Self.sampleId(input: input, salt: salt(), messageKey: messageKey, mediaIdentity: mediaIdentity)
+            let salt = try salt()
+            let id = try Self.sampleId(input: input, salt: salt, messageKey: messageKey, mediaIdentity: mediaIdentity)
             if storedIds?.contains(id) == true { return }
-            var sample = try draft(input: input, messageKey: messageKey, mediaKinds: mediaKinds, mediaIdentity: mediaIdentity)
+            var sample = try draft(input: input, mediaKinds: mediaKinds, salt: salt, id: id)
             guard sample.reviewedAt == nil, sample.detection == nil else { return }
             sample.detection = RGAdDetection(
                 recordedAt: Date().timeIntervalSince1970, policyRevision: RGAdPolicy.revision,

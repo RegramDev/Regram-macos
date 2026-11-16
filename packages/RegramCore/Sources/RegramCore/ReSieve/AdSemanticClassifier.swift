@@ -25,6 +25,7 @@ public struct RGAdSemanticResult {
 @available(macOS 10.15, *)
 public final class RGAdSemanticClassifier {
     public static let shared = RGAdSemanticClassifier()
+    private static let contentThreshold = 0.2
     private struct Manifest: Decodable {
         let version: Int
         let sequenceLength: Int
@@ -39,11 +40,16 @@ public final class RGAdSemanticClassifier {
         let mask: MLMultiArray
         let features: MLDictionaryFeatureProvider
     }
+    private struct Score {
+        let probability: Double
+        let isExact: Bool
+    }
     private let lock = NSLock()
     private let resourceDirectory: URL?
     private var loaded: Loaded?
+    private var acceleratedModel: MLModel?
     private var retryAfter: TimeInterval = 0
-    private var scores = RGAdBoundedCache<String, Double>(countLimit: 2048, costLimit: 2 * 1024 * 1024)
+    private var scores = RGAdBoundedCache<String, Score>(countLimit: 2048, costLimit: 2 * 1024 * 1024)
 
     public init(resourceDirectory: URL? = nil) { self.resourceDirectory = resourceDirectory }
 
@@ -93,16 +99,52 @@ public final class RGAdSemanticClassifier {
         ])
         let value = Loaded(model: model, tokenizer: tokenizer, threshold: manifest.threshold, ids: ids, mask: mask, features: features)
         loaded = value
+        loadAcceleratedModel(at: modelURL, for: model)
         return value
     }
 
-    private func probability(_ text: String, using value: Loaded, minimumLength: Int = 4) throws -> Double? {
-        let key = RGAdTokenizer.normalize(text)
+    private func loadAcceleratedModel(at url: URL, for fallback: MLModel) {
+        #if arch(arm64)
+            guard #available(macOS 13, *) else { return }
+            DispatchQueue.global(qos: .utility).async { [weak self, weak fallback] in
+                guard let fallback else { return }
+                let configuration = MLModelConfiguration()
+                configuration.computeUnits = .cpuAndNeuralEngine
+                guard let model = try? MLModel(contentsOf: url, configuration: configuration), let self else { return }
+                self.lock.lock()
+                defer { self.lock.unlock() }
+                if self.loaded?.model === fallback { self.acceleratedModel = model }
+            }
+        #endif
+    }
+
+    private func confidence(from model: MLModel, features: MLDictionaryFeatureProvider) throws -> Double {
+        let output = try model.prediction(from: features)
+        guard let probabilities = output.featureValue(for: "probabilities")?.multiArrayValue, probabilities.count == 2 else {
+            throw RGAdFilterError.invalidPrediction
+        }
+        let score = probabilities[1].doubleValue
+        guard score.isFinite, (0...1).contains(score) else { throw RGAdFilterError.invalidPrediction }
+        return score
+    }
+
+    private func acceleratedContent(_ features: MLDictionaryFeatureProvider) -> Bool {
+        guard let model = acceleratedModel else { return false }
+        do {
+            return try confidence(from: model, features: features) <= 0.1
+        } catch {
+            acceleratedModel = nil
+            return false
+        }
+    }
+
+    private func probability(of key: String, using value: Loaded, minimumLength: Int = 4, forClassification: Bool = false) throws -> Double? {
         guard key.count >= minimumLength else { return nil }
-        if let cached = scores[key] { return cached }
+        if let cached = scores[key], forClassification || cached.isExact { return cached.probability }
         guard let windows = value.tokenizer.windows(key), windows.count <= 8 else { return nil }
         var minimum = 1.0
-        for window in windows {
+        var isExact = true
+        for (windowIndex, window) in windows.enumerated() {
             guard window.count == value.ids.count, value.mask.count == value.ids.count else { throw RGAdFilterError.invalidPrediction }
             let ids = value.ids.dataPointer.assumingMemoryBound(to: Int32.self)
             let mask = value.mask.dataPointer.assumingMemoryBound(to: Int32.self)
@@ -110,15 +152,18 @@ public final class RGAdSemanticClassifier {
                 ids[index] = token
                 mask[index] = token == 0 ? 0 : 1
             }
-            let output = try value.model.prediction(from: value.features)
-            guard let probabilities = output.featureValue(for: "probabilities")?.multiArrayValue, probabilities.count == 2 else {
-                throw RGAdFilterError.invalidPrediction
+            if forClassification, acceleratedContent(value.features) {
+                minimum = Self.contentThreshold
+                isExact = false
+                break
             }
-            let score = probabilities[1].doubleValue
-            guard score.isFinite, (0...1).contains(score) else { throw RGAdFilterError.invalidPrediction }
-            minimum = min(minimum, score)
+            minimum = min(minimum, try confidence(from: value.model, features: value.features))
+            if forClassification, minimum <= Self.contentThreshold, windowIndex + 1 < windows.count {
+                isExact = false
+                break
+            }
         }
-        scores.insert(minimum, for: key, cost: key.utf8.count * 2 + 128)
+        scores.insert(Score(probability: minimum, isExact: isExact), for: key, cost: key.utf8.count * 2 + 128)
         return minimum
     }
 
@@ -127,18 +172,19 @@ public final class RGAdSemanticClassifier {
         defer { lock.unlock() }
         scores.removeAll()
         loaded = nil
+        acceleratedModel = nil
     }
 
     public func probability(_ text: String) throws -> Double? {
         lock.lock()
         defer { lock.unlock() }
-        return try probability(text, using: load())
+        return try probability(of: RGAdTokenizer.normalize(text), using: load())
     }
 
     public func prepareModel() -> Bool {
         lock.lock()
         defer { lock.unlock() }
-        do { return try probability("本机模型运行检测", using: load()) != nil } catch {
+        do { return try probability(of: RGAdTokenizer.normalize("本机模型运行检测"), using: load()) != nil } catch {
             if ProcessInfo.processInfo.systemUptime >= retryAfter { retryAfter = ProcessInfo.processInfo.systemUptime + 60 }
             return false
         }
@@ -149,8 +195,15 @@ public final class RGAdSemanticClassifier {
             input.buttons.count <= 128, input.buttons.flatMap({ $0 }).count <= 128,
             input.buttons.flatMap({ $0 }).allSatisfy({ $0.title.utf16.count <= 1024 })
         else { return RGAdSemanticResult() }
-        func supportsLanguage(_ text: String) -> Bool {
+        var normalizedTexts: [String: String] = [:]
+        func normalize(_ text: String) -> String {
+            if let normalized = normalizedTexts[text] { return normalized }
             let normalized = RGAdTokenizer.normalize(text)
+            if normalizedTexts.count < 128 { normalizedTexts[text] = normalized }
+            return normalized
+        }
+        func supportsLanguage(_ text: String) -> Bool {
+            let normalized = normalize(text)
             let language = NLLanguageRecognizer.dominantLanguage(for: normalized)
             if language == .simplifiedChinese || language == .traditionalChinese { return true }
             if language == .japanese || language == .korean
@@ -175,6 +228,9 @@ public final class RGAdSemanticClassifier {
         defer { lock.unlock() }
         do {
             let value = try load()
+            func classificationScore(_ text: String, minimumLength: Int = 4) throws -> Double? {
+                try probability(of: normalize(text), using: value, minimumLength: minimumLength, forClassification: true)
+            }
             let source = input.text as NSString
             func hasSemanticWords(_ range: RGAdRange) -> Bool {
                 let destinations = input.entities.filter { entity in
@@ -190,7 +246,7 @@ public final class RGAdSemanticClassifier {
                     cursor = max(cursor, entity.range.upper)
                 }
                 if cursor < range.upper { text += source.substring(with: NSRange(location: cursor, length: range.upper - cursor)) }
-                return RGAdTokenizer.normalize(text).unicodeScalars.contains(where: { CharacterSet.alphanumerics.contains($0) })
+                return normalize(text).unicodeScalars.contains(where: { CharacterSet.alphanumerics.contains($0) })
             }
             var predictions: [RGAdPrediction] = []
             var promotionalQuotes: [RGAdRange] = []
@@ -204,14 +260,14 @@ public final class RGAdSemanticClassifier {
             guard paragraphs.count <= 128 else { return RGAdSemanticResult() }
             var hasContent = !wholeLanguageSupported
             let deadline = ProcessInfo.processInfo.systemUptime + 2
-            let substantive = paragraphs.filter { RGAdTokenizer.normalize(source.substring(with: $0.nsRange)).count >= 4 }
+            let substantive = paragraphs.filter { normalize(source.substring(with: $0.nsRange)).count >= 4 }
             let interactive = input.buttons.flatMap { $0 }.filter { $0.target == nil }.count >= 2
             let disclosedProse = input.entities.contains(where: { $0.kind == .code }) && !RGAdDisclosure.ranges(input).isEmpty
             var blockScores: [RGAdRange: Double] = [:]
             for block in blocks {
                 guard ProcessInfo.processInfo.systemUptime <= deadline else { return RGAdSemanticResult(completed: false) }
                 if !wholeLanguageSupported && !supportsLanguage(source.substring(with: block.nsRange)) { continue }
-                if let score = try probability(source.substring(with: block.nsRange), using: value) { blockScores[block] = score }
+                if let score = try classificationScore(source.substring(with: block.nsRange)) { blockScores[block] = score }
             }
             if wholeLanguageSupported, blocks.count == 1, let block = blocks.first,
                 let score = blockScores[block], score >= max(0.999, value.threshold),
@@ -224,10 +280,10 @@ public final class RGAdSemanticClassifier {
                     predictions: [RGAdPrediction(range: RGAdRange(0, source.length), confidence: score)],
                     buttonIds: Set(input.buttons.flatMap({ $0 }).map(\.id)), threshold: value.threshold, entireMessage: true)
             }
-            if blockScores.count >= 2, blockScores.values.allSatisfy({ $0 <= 0.2 }) { hasContent = true }
+            if blockScores.count >= 2, blockScores.values.allSatisfy({ $0 <= Self.contentThreshold }) { hasContent = true }
             let introductoryQuote: RGAdRange? = {
-                guard blocks.count >= 2, let first = blocks.first, (blockScores[first] ?? 1) <= 0.2,
-                    RGAdTokenizer.normalize(source.substring(with: first.nsRange)).unicodeScalars.filter({
+                guard blocks.count >= 2, let first = blocks.first, (blockScores[first] ?? 1) <= Self.contentThreshold,
+                    normalize(source.substring(with: first.nsRange)).unicodeScalars.filter({
                         (0x3400...0x9fff).contains($0.value)
                     }).count >= 12,
                     !input.entities.contains(where: { [.quote, .code].contains($0.kind) && $0.range.intersects(first) }),
@@ -253,21 +309,21 @@ public final class RGAdSemanticClassifier {
                 let text = source.substring(with: range.nsRange)
                 if !hasSemanticWords(range) { continue }
                 if !wholeLanguageSupported && !supportsLanguage(text) { continue }
-                let score = try probability(text, using: value, minimumLength: navigation.contains(range) ? 2 : 4)
+                let score = try classificationScore(text, minimumLength: navigation.contains(range) ? 2 : 4)
                 let quoted = input.entities.contains { $0.kind == .quote && $0.range.intersects(range) }
                 var contextualLead = true
                 if range == substantive.first, substantive.count >= 3, let score, score >= value.threshold {
                     let lead = RGAdRange(range.lower, blocks.count >= 2 ? blocks[1].upper : substantive[1].upper)
-                    contextualLead = (try probability(source.substring(with: lead.nsRange), using: value) ?? 0) >= value.threshold
+                    contextualLead = (try classificationScore(source.substring(with: lead.nsRange)) ?? 0) >= value.threshold
                     if !contextualLead, score >= max(0.99, value.threshold),
                         let reference = input.entities.first(where: { entity in
                             entity.kind == .link && range.contains(entity.range)
-                                && RGAdTokenizer.normalize(source.substring(with: entity.range.nsRange)) == RGAdTokenizer.normalize(text)
+                                && normalize(source.substring(with: entity.range.nsRange)) == normalize(text)
                         }), let target = RGAdFilter.normalizedTarget(reference.value)
                     {
                         for button in input.buttons.flatMap({ $0 }) where RGAdFilter.normalizedTarget(button.target) == target {
                             guard ProcessInfo.processInfo.systemUptime <= deadline else { break }
-                            if (try probability(button.title, using: value) ?? 0) >= max(0.99, value.threshold) {
+                            if (try classificationScore(button.title) ?? 0) >= max(0.99, value.threshold) {
                                 contextualLead = true
                                 break
                             }
@@ -277,30 +333,30 @@ public final class RGAdSemanticClassifier {
                 let blockIndex = blocks.firstIndex(where: { $0.contains(range) })
                 let contextualBlock = blockIndex.flatMap { blockScores[blocks[$0]] } ?? 0
                 var contextualNeighbors = true
-                let length = RGAdTokenizer.normalize(text).unicodeScalars.filter({ CharacterSet.alphanumerics.contains($0) }).count
+                let length = normalize(text).unicodeScalars.filter({ CharacterSet.alphanumerics.contains($0) }).count
                 if let score, score >= value.threshold, blocks.count > 1, let blockIndex,
                     !input.entities.contains(where: { [.link, .mention].contains($0.kind) && $0.range.intersects(range) })
                 {
                     let neighbors = RGAdRange(blocks[max(0, blockIndex - 1)].lower, blocks[min(blocks.count - 1, blockIndex + 1)].upper)
-                    contextualNeighbors = (try probability(source.substring(with: neighbors.nsRange), using: value) ?? 0) >= value.threshold
-                    if length < 48, (try probability(input.text, using: value) ?? 0) <= 0.2 { contextualNeighbors = false }
+                    contextualNeighbors = (try classificationScore(source.substring(with: neighbors.nsRange)) ?? 0) >= value.threshold
+                    if length < 48, (try classificationScore(input.text) ?? 0) <= Self.contentThreshold { contextualNeighbors = false }
                 }
-                if let score, score >= value.threshold, (4...48).contains(length), length >= 12 || contextualBlock <= 0.2 || score < 0.99,
+                if let score, score >= value.threshold, (4...48).contains(length), length >= 12 || contextualBlock <= Self.contentThreshold || score < 0.99,
                     !navigation.contains(range), blocks.count > 1, let blockIndex,
                     let reference = input.entities.first(where: { entity in
                         entity.kind == .link && range.contains(entity.range)
                             && RGAdFilter.normalizedTarget(source.substring(with: entity.range.nsRange)) == nil
-                            && RGAdTokenizer.normalize(source.substring(with: entity.range.nsRange)) == RGAdTokenizer.normalize(text)
-                    }), (try probability(input.text, using: value) ?? 1) <= 0.2
+                            && normalize(source.substring(with: entity.range.nsRange)) == normalize(text)
+                    }), (try classificationScore(input.text) ?? 1) <= Self.contentThreshold
                 {
                     let neighbors = RGAdRange(blocks[max(0, blockIndex - 1)].lower, blocks[min(blocks.count - 1, blockIndex + 1)].upper)
-                    if (try probability(source.substring(with: neighbors.nsRange), using: value) ?? 1) <= 0.2 {
+                    if (try classificationScore(source.substring(with: neighbors.nsRange)) ?? 1) <= Self.contentThreshold {
                         let target = RGAdFilter.normalizedTarget(reference.value)
                         var promotionalAction = false
                         for button in input.buttons.flatMap({ $0 })
                         where target != nil && RGAdFilter.normalizedTarget(button.target) == target {
                             guard ProcessInfo.processInfo.systemUptime <= deadline else { break }
-                            if let actionScore = try probability(button.title, using: value), actionScore >= 0.5 {
+                            if let actionScore = try classificationScore(button.title), actionScore >= 0.5 {
                                 promotionalAction = true
                                 if actionScore >= max(0.99, value.threshold), contextualBlock >= max(0.99, value.threshold) {
                                     contextualLead = true
@@ -320,30 +376,30 @@ public final class RGAdSemanticClassifier {
                 }
                 if score == nil && length >= 8 {
                     hasContent = true
-                } else if (score ?? 1) <= 0.2, length >= 64 {
-                    if let blockIndex, (blockScores[blocks[blockIndex]] ?? 1) <= 0.2 {
+                } else if (score ?? 1) <= Self.contentThreshold, length >= 64 {
+                    if let blockIndex, (blockScores[blocks[blockIndex]] ?? 1) <= Self.contentThreshold {
                         let neighbors = RGAdRange(blocks[max(0, blockIndex - 1)].lower, blocks[min(blocks.count - 1, blockIndex + 1)].upper)
-                        if (try probability(source.substring(with: neighbors.nsRange), using: value) ?? 0) <= 0.2 {
+                        if (try classificationScore(source.substring(with: neighbors.nsRange)) ?? 0) <= Self.contentThreshold {
                             var belongsToOffer = false
                             if ProcessInfo.processInfo.systemUptime <= deadline,
                                 let offer = blocks.prefix(blockIndex).last(where: { (blockScores[$0] ?? 0) >= max(0.99, value.threshold) }),
-                                (try probability(input.text, using: value) ?? 0) >= max(0.99, value.threshold)
+                                (try classificationScore(input.text) ?? 0) >= max(0.99, value.threshold)
                             {
                                 let context =
                                     source.substring(with: offer.nsRange) + "\n\n" + source.substring(with: blocks[blockIndex].nsRange)
-                                belongsToOffer = (try probability(context, using: value) ?? 0) >= max(0.99, value.threshold)
+                                belongsToOffer = (try classificationScore(context) ?? 0) >= max(0.99, value.threshold)
                             }
                             if !belongsToOffer { hasContent = true }
                         }
                     }
                 }
-                if interactive, (score ?? 1) <= 0.2, length >= 8,
-                    contextualBlock <= 0.2 || input.entities.contains(where: { $0.kind == .link && range.contains($0.range) })
+                if interactive, (score ?? 1) <= Self.contentThreshold, length >= 8,
+                    contextualBlock <= Self.contentThreshold || input.entities.contains(where: { $0.kind == .link && range.contains($0.range) })
                 {
                     hasContent = true
                 }
-                if range == substantive.first, (score ?? 1) <= 0.2, length >= 12,
-                    let blockIndex, contextualBlock <= 0.2, blocks.indices.contains(blockIndex + 1)
+                if range == substantive.first, (score ?? 1) <= Self.contentThreshold, length >= 12,
+                    let blockIndex, contextualBlock <= Self.contentThreshold, blocks.indices.contains(blockIndex + 1)
                 {
                     let reference = blocks[blockIndex + 1]
                     if !hasSemanticWords(reference) {
@@ -376,13 +432,13 @@ public final class RGAdSemanticClassifier {
                     input.entities.contains(where: { [.link, .mention].contains($0.kind) && block.contains($0.range) })
                 else { continue }
                 let units = paragraphs.filter {
-                    block.contains($0) && hasSemanticWords($0) && RGAdTokenizer.normalize(source.substring(with: $0.nsRange)).count >= 4
+                    block.contains($0) && hasSemanticWords($0) && normalize(source.substring(with: $0.nsRange)).count >= 4
                 }
                 guard units.count >= 2, !units.contains(where: { navigation.contains($0) }) else { continue }
                 var minimum = score
                 for unit in units {
                     guard ProcessInfo.processInfo.systemUptime <= deadline,
-                        let part = try probability(source.substring(with: unit.nsRange), using: value)
+                        let part = try classificationScore(source.substring(with: unit.nsRange))
                     else {
                         minimum = 0
                         break
@@ -396,15 +452,15 @@ public final class RGAdSemanticClassifier {
                 for (index, range) in units.enumerated() {
                     guard ProcessInfo.processInfo.systemUptime <= deadline else { break }
                     let text = source.substring(with: range.nsRange)
-                    guard (2...3).contains(RGAdTokenizer.normalize(text).count),
-                        let shortScore = try probability(text, using: value, minimumLength: 2), shortScore >= 0.99
+                    guard (2...3).contains(normalize(text).count),
+                        let shortScore = try classificationScore(text, minimumLength: 2), shortScore >= 0.99
                     else { continue }
                     for neighborIndex in [index - 1, index + 1] where units.indices.contains(neighborIndex) {
                         let neighbor = units[neighborIndex]
                         guard let known = predictions.first(where: { $0.range.contains(neighbor) && $0.confidence >= value.threshold })
                         else { continue }
                         let combined = RGAdRange(min(range.lower, neighbor.lower), max(range.upper, neighbor.upper))
-                        if let score = try probability(source.substring(with: combined.nsRange), using: value), score >= value.threshold {
+                        if let score = try classificationScore(source.substring(with: combined.nsRange)), score >= value.threshold {
                             predictions.append(RGAdPrediction(range: combined, confidence: min(score, known.confidence)))
                         }
                     }
@@ -421,13 +477,13 @@ public final class RGAdSemanticClassifier {
                 }
                 guard commercialMenu.count >= 2 else { continue }
                 let units = paragraphs.filter {
-                    block.contains($0) && hasSemanticWords($0) && RGAdTokenizer.normalize(source.substring(with: $0.nsRange)).count >= 4
+                    block.contains($0) && hasSemanticWords($0) && normalize(source.substring(with: $0.nsRange)).count >= 4
                 }
                 guard !units.isEmpty, !units.contains(where: { navigation.contains($0) }) else { continue }
                 var minimum = score
                 for unit in units {
                     guard ProcessInfo.processInfo.systemUptime <= deadline,
-                        let part = try probability(source.substring(with: unit.nsRange), using: value)
+                        let part = try classificationScore(source.substring(with: unit.nsRange))
                     else {
                         minimum = 0
                         break
@@ -439,7 +495,7 @@ public final class RGAdSemanticClassifier {
                     let joint =
                         source.substring(with: block.nsRange) + "\n"
                         + commercialMenu.map { source.substring(with: $0.nsRange) }.joined(separator: " ")
-                    if let contextual = try probability(joint, using: value), contextual >= max(0.99, value.threshold) {
+                    if let contextual = try classificationScore(joint), contextual >= max(0.99, value.threshold) {
                         predictions.append(RGAdPrediction(range: block, confidence: min(minimum, contextual)))
                     }
                 }
@@ -456,13 +512,13 @@ public final class RGAdSemanticClassifier {
                     }).count >= 2
                 else { continue }
                 let units = paragraphs.filter {
-                    block.contains($0) && hasSemanticWords($0) && RGAdTokenizer.normalize(source.substring(with: $0.nsRange)).count >= 4
+                    block.contains($0) && hasSemanticWords($0) && normalize(source.substring(with: $0.nsRange)).count >= 4
                 }
                 guard units.count >= 2 else { continue }
                 var allCommercial = true
                 for unit in units {
                     guard ProcessInfo.processInfo.systemUptime <= deadline,
-                        (try probability(source.substring(with: unit.nsRange), using: value) ?? 0) >= value.threshold
+                        (try classificationScore(source.substring(with: unit.nsRange)) ?? 0) >= value.threshold
                     else {
                         allCommercial = false
                         break
@@ -479,7 +535,7 @@ public final class RGAdSemanticClassifier {
                     "上文：" + String(context.trimmingCharacters(in: .whitespacesAndNewlines).suffix(32))
                     + "\n引用：" + quote + "\n后续入口：" + String(commercialMenu.prefix(16))
                 if allCommercial, ProcessInfo.processInfo.systemUptime <= deadline,
-                    let contextual = try probability(framed, using: value), contextual >= max(0.99, value.threshold)
+                    let contextual = try classificationScore(framed), contextual >= max(0.99, value.threshold)
                 {
                     predictions.append(RGAdPrediction(range: block, confidence: min(score, contextual)))
                     promotionalQuotes.append(block)
@@ -501,7 +557,7 @@ public final class RGAdSemanticClassifier {
                         break
                     }
                     let text = source.substring(with: candidate.nsRange)
-                    if !RGAdTokenizer.normalize(text).unicodeScalars.contains(where: { CharacterSet.alphanumerics.contains($0) }) {
+                    if !normalize(text).unicodeScalars.contains(where: { CharacterSet.alphanumerics.contains($0) }) {
                         continue
                     }
                     if !hasSemanticWords(candidate) { continue }
@@ -509,14 +565,14 @@ public final class RGAdSemanticClassifier {
                         complete = false
                         break
                     }
-                    guard let score = try probability(text, using: value), score >= value.threshold else {
+                    guard let score = try classificationScore(text), score >= value.threshold else {
                         complete = false
                         break
                     }
                     scores.append(score)
                     footerTexts.append(text)
                 }
-                if complete, !scores.isEmpty, let score = try probability(footerTexts.joined(separator: "\n"), using: value),
+                if complete, !scores.isEmpty, let score = try classificationScore(footerTexts.joined(separator: "\n")),
                     score >= value.threshold
                 {
                     predictions.append(RGAdPrediction(range: footer, confidence: min(score, scores.min() ?? score)))
@@ -528,9 +584,9 @@ public final class RGAdSemanticClassifier {
             var projectionThreshold = value.threshold
             let hasBodyBeyondNavigation = navigation.isEmpty || substantive.contains(where: { !navigation.contains($0) })
             if !hasContent, !substantive.isEmpty, hasBodyBeyondNavigation, ProcessInfo.processInfo.systemUptime <= deadline {
-                let whole = try probability(input.text, using: value) ?? 0
+                let whole = try classificationScore(input.text) ?? 0
                 let meaningfulBlocks = blocks.filter {
-                    hasSemanticWords($0) && RGAdTokenizer.normalize(source.substring(with: $0.nsRange)).count >= 4
+                    hasSemanticWords($0) && normalize(source.substring(with: $0.nsRange)).count >= 4
                 }
                 if whole >= 0.99, meaningfulBlocks.count >= 2,
                     meaningfulBlocks.allSatisfy({ (blockScores[$0] ?? 0) >= 0.99 }),
@@ -539,11 +595,11 @@ public final class RGAdSemanticClassifier {
                     projectionThreshold = min(value.threshold, 0.99)
                 }
                 if whole >= max(0.99, projectionThreshold), ProcessInfo.processInfo.systemUptime <= deadline {
-                    let prefixBlocks = blocks.prefix { (blockScores[$0] ?? 1) <= 0.2 && hasSemanticWords($0) }
+                    let prefixBlocks = blocks.prefix { (blockScores[$0] ?? 1) <= Self.contentThreshold && hasSemanticWords($0) }
                     if prefixBlocks.count >= 3, let first = prefixBlocks.first, let last = prefixBlocks.last {
                         let prefix = source.substring(with: RGAdRange(first.lower, last.upper).nsRange)
-                        if RGAdTokenizer.normalize(prefix).unicodeScalars.filter({ CharacterSet.alphanumerics.contains($0) }).count >= 24 {
-                            normalIntroduction = (try probability(prefix, using: value) ?? 1) <= 0.2
+                        if normalize(prefix).unicodeScalars.filter({ CharacterSet.alphanumerics.contains($0) }).count >= 24 {
+                            normalIntroduction = (try classificationScore(prefix) ?? 1) <= Self.contentThreshold
                         }
                     }
                     if !normalIntroduction, ProcessInfo.processInfo.systemUptime <= deadline {
@@ -557,21 +613,21 @@ public final class RGAdSemanticClassifier {
                 if entireMessage {
                     buttons.insert(button.id)
                 } else if RGAdFilter.normalizedTarget(button.target) != nil, ProcessInfo.processInfo.systemUptime <= deadline,
-                    supportsLanguage(button.title), let score = try probability(button.title, using: value), score >= value.threshold
+                    supportsLanguage(button.title), let score = try classificationScore(button.title), score >= value.threshold
                 {
                     buttons.insert(button.id)
                 }
             }
             let actions = input.buttons.flatMap { $0 }
             if !entireMessage, !normalIntroduction, !actions.isEmpty, actions.count <= 4,
-                (4...64).contains(RGAdTokenizer.normalize(input.text).count),
+                (4...64).contains(normalize(input.text).count),
                 !input.entities.contains(where: { [.code, .quote].contains($0.kind) }),
                 actions.allSatisfy({ RGAdFilter.normalizedTarget($0.target) != nil && buttons.contains($0.id) }),
                 ProcessInfo.processInfo.systemUptime <= deadline,
-                (try probability(input.text, using: value) ?? 0) >= 0.5
+                (try classificationScore(input.text) ?? 0) >= 0.5
             {
                 let combined = input.text + "\n" + actions.map(\.title).joined(separator: "\n")
-                if let score = try probability(combined, using: value), score >= max(0.99, value.threshold) {
+                if let score = try classificationScore(combined), score >= max(0.99, value.threshold) {
                     predictions.append(RGAdPrediction(range: RGAdRange(0, source.length), confidence: score))
                     entireMessage = true
                 }

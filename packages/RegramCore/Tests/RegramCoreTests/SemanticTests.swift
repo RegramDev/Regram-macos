@@ -81,6 +81,20 @@ final class SemanticTests: XCTestCase {
         XCTAssertTrue(result.completed)
         XCTAssertEqual(try RGAdPolicy.project(ad, semantic: result).disposition, .hide)
     }
+
+    func testClassificationCachePreservesExactMultiWindowProbability() throws {
+        let text = String(repeating: "工程团队正在检查更新包的完整性，并整理下一次发布的记录。", count: 12)
+        XCTAssertGreaterThan(try XCTUnwrap(tokenizer().windows(text)).count, 1)
+        let expected = try XCTUnwrap(RGAdSemanticClassifier().probability(text))
+        XCTAssertLessThan(expected, 0.2)
+
+        let classifier = RGAdSemanticClassifier()
+        let semantic = classifier.predict(RGAdInput(text: text))
+        XCTAssertTrue(semantic.completed)
+        XCTAssertTrue(semantic.predictions.isEmpty)
+        XCTAssertEqual(try classifier.probability(text), expected)
+    }
+
     func testOverlappingBareDestinationEntitiesPreserveNormalSharing() throws {
         let classifier = RGAdSemanticClassifier.shared
         XCTAssertTrue(classifier.prepareModel())
