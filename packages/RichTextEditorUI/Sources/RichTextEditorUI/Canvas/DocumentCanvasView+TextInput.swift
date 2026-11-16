@@ -253,6 +253,26 @@ extension DocumentCanvasView: NSTextInputClient {
         inputContext?.discardMarkedText()
     }
 
+    func cancelMarkedText() {
+        guard !isUpdatingInputComposition, let composition = inputComposition else { return }
+        inputComposition = nil
+        composition.undoManager?.removeAllActions(withTarget: composition.undoTarget)
+        setModelBlocks(composition.blocks, width: effectiveWidth)
+        anchor = composition.anchor
+        head = composition.head
+        pendingFormatToggles = composition.pendingFormat
+        inputContext?.discardMarkedText()
+        refreshInputComposition()
+    }
+
+    override func doCommand(by selector: Selector) {
+        if selector == #selector(cancelOperation(_:)), hasMarkedText() {
+            cancelMarkedText()
+            return
+        }
+        super.doCommand(by: selector)
+    }
+
     private func inputReplacementRange(_ range: NSRange) -> NSRange {
         let requested = range.location == NSNotFound ? (inputComposition?.range ?? self.selectedRange()) : range
         return normalizedInputRange(requested)

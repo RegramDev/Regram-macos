@@ -433,7 +433,7 @@ public class ChatRowItem: TableRowItem {
     
     public var isSticker: Bool {
         let file = message?.anyMedia as? TelegramMediaFile
-        return file?.isStaticSticker == true || file?.isAnimatedSticker == true  || file?.isVideoSticker == true
+        return file?.isChatStaticSticker == true || file?.isAnimatedSticker == true  || file?.isVideoSticker == true
     }
 
     public var hidesStickerTimestamp: Bool {
@@ -979,10 +979,9 @@ public class ChatRowItem: TableRowItem {
         if let message = message {
             switch chatInteraction.mode {
             case .pinned:
-                let navigation = chatInteraction.interactionContext.bindings.rootNavigation()
-                let controller = navigation.previousController as? ChatInterfaceController
+                let controller = chatInteraction.pinnedMessagesOpener
                 controller?.chatInteraction.focusPinnedMessageId(message.id)
-                navigation.back()
+                controller?.navigationController?.back()
             default:
                 for attr in message.attributes {
                     if let attr = attr as? SourceReferenceMessageAttribute {
@@ -1486,7 +1485,7 @@ public class ChatRowItem: TableRowItem {
             }
             
             if let file = media as? TelegramMediaFile {
-                if file.isStaticSticker {
+                if file.isChatStaticSticker {
                     return false
                 }
                 if file.isVideoSticker {
@@ -2050,7 +2049,7 @@ public class ChatRowItem: TableRowItem {
             
             if renderType == .bubble, let message = captionMessage, let media = message.anyMedia {
                 if let file = media as? TelegramMediaFile {
-                    if file.isStaticSticker || file.isAnimatedSticker || file.isVideoSticker  {
+                    if file.isChatStaticSticker || file.isAnimatedSticker || file.isVideoSticker  {
                         return renderType == .bubble
                     }
                     if file.isInstantVideo {
@@ -3101,7 +3100,7 @@ public class ChatRowItem: TableRowItem {
                         return ChatVideoMessageItem(initialSize, interaction, interaction.interactionContext,entry, theme: theme)
                     } else if file.isVideo && !file.isAnimated {
                         return ChatMediaItem(initialSize, interaction, interaction.interactionContext, entry, theme: theme)
-                    } else if file.isStaticSticker {
+                    } else if file.isChatStaticSticker {
                         return ChatMediaItem(initialSize, interaction, interaction.interactionContext, entry, theme: theme)
                     } else if file.isVoice {
                         return ChatVoiceRowItem(initialSize,interaction, interaction.interactionContext, entry, theme: theme)

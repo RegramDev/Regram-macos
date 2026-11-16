@@ -89,7 +89,7 @@ func navigateToChat(navigation: NavigationViewController?, context: AccountConte
         defer { delivery?.end() }
         let current = navigation.controller as? ChatController
         
-        if current?.chatLocation == location, additional {
+        if current?.chatLocation == location, additional, current?.mode == .history || current?.mode.threadMode != nil {
             if let analyticsContext { current?.inheritAnalyticsContext(analyticsContext) }
             current?.scrollup(force: true)
             current?.chatInteraction.invokeInitialAction(action: initialAction)
