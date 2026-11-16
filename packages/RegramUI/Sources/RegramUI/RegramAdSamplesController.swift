@@ -107,34 +107,55 @@ func RegramAdSamplesController(context: any AccountContextProtocol) -> InputData
                 page.text(error)
             } else if let samples = state.samples {
                 let ready = samples.filter(\.isTrainingReady).count
-                page.text(String(format: regramString("ReSieve.SampleCount"), samples.count, ready))
+                if !samples.isEmpty {
+                    page.text(String(format: regramString("ReSieve.SampleCount"), samples.count, ready))
+                }
                 if samples.count >= RGAdSampleStore.maximumSamples {
                     page.text(regramString("ReSieve.Capacity"))
                 } else if state.recordingFailed {
                     page.text(regramString("ReSieve.StorageError"))
                 }
-                if !samples.isEmpty {
+                if samples.isEmpty {
+                    let emptyText = regramString("ReSieve.EmptySamples")
+                    page.custom("empty", equatable: InputDataEquatable(emptyText)) { size, stableId in
+                        RegramEmptyRowItem(size, stableId: stableId, height: 112, text: emptyText, symbolName: "tray")
+                    }
+                } else {
                     page.row("export", title: regramString("ReSieve.ExportAll"), action: { export(trainingOnly: false) })
                     page.row(
                         "exportReviewed", title: regramString("ReSieve.ExportReviewed"), enabled: ready > 0,
                         action: { export(trainingOnly: true) })
                     page.section()
-                }
-                for sample in samples.prefix(state.limit) {
-                    let firstLine = sample.input.text.split(whereSeparator: \.isNewline).first.map { String($0.prefix(120)) }
-                    let title = firstLine ?? sample.input.buttons.first?.first?.title ?? regramString("ReSieve.Media")
-                    let status = sample.reviewedAt == nil ? "ReSieve.Pending" : "ReSieve.Reviewed"
-                    page.row(
-                        sample.id, title: title, type: .next, description: regramString(status),
-                        action: {
-                            context.bindings.rootNavigation().push(regramAdSampleEditor(context: context, original: nil, sample: sample))
-                        })
-                }
-                if samples.count > state.limit {
-                    page.row("more", title: regramString("ReSieve.More"), action: { update { $0.limit += 100 } })
+                    for sample in samples.prefix(state.limit) {
+                        let firstLine = sample.input.text.split(whereSeparator: \.isNewline).first.map { String($0.prefix(120)) }
+                        let title = firstLine ?? sample.input.buttons.first?.first?.title ?? regramString("ReSieve.Media")
+                        var status = regramString(sample.reviewedAt == nil ? "ReSieve.Pending" : "ReSieve.Reviewed")
+                        if let detection = sample.detection {
+                            let outcome: String
+                            if detection.hidMessage {
+                                outcome = "ReSieve.HiddenMessage"
+                            } else if !detection.removedRanges.isEmpty {
+                                outcome = "ReSieve.TrimmedText"
+                            } else {
+                                outcome = "ReSieve.HiddenButtons"
+                            }
+                            status = regramString(outcome) + " · " + status
+                        }
+                        page.row(
+                            sample.id, title: title, type: .next, description: status,
+                            action: {
+                                context.bindings.rootNavigation().push(regramAdSampleEditor(context: context, original: nil, sample: sample))
+                            })
+                    }
+                    if samples.count > state.limit {
+                        page.row("more", title: regramString("ReSieve.More"), action: { update { $0.limit += 100 } })
+                    }
                 }
             } else {
-                page.text(regramString("ReSieve.Loading"))
+                let loadingText = regramString("ReSieve.Loading")
+                page.custom("loading", equatable: InputDataEquatable(loadingText)) { size, stableId in
+                    RegramEmptyRowItem(size, stableId: stableId, height: 112, isLoading: true, text: loadingText)
+                }
             }
             return InputDataSignalValue(entries: page.entries)
         }

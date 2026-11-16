@@ -564,7 +564,7 @@
 "MessageFilter.PerChat.Notice" = "為目前對話設定訊息過濾。";
 "MessageFilter.PerChat.Title" = "此對話的過濾設定";
 "MessageFilter.Regex" = "正規表達式";
-"MessageFilter.Regex.Notice" = "比對不區分大小寫。正規表達式使用 ICU 語法，無法新增無效的表達式。";
+"MessageFilter.Regex.Notice" = "正規表達式使用 ICU 語法。請輸入有效的表達式以新增規則。";
 "MessageFilter.Rule.AllChats" = "所有對話";
 "MessageFilter.Rule.Delete" = "刪除";
 "MessageFilter.Rule.Disable" = "停用規則";
@@ -2839,6 +2839,8 @@
 
 "ReSieve.Title" = "ReSieve 智慧廣告過濾";
 "ReSieve.Enable" = "智慧廣告過濾";
+"ReSieve.Enabled" = "已開啟";
+"ReSieve.Disabled" = "已關閉";
 "ReSieve.Model" = "本機模型";
 "ReSieve.Ready" = "已就緒";
 "ReSieve.Checking" = "正在檢查…";
@@ -2846,9 +2848,13 @@
 "ReSieve.Notice" = "ReSieve 在本機辨識群組和頻道裡的中文廣告，保留原訊息，並將辨識到的廣告儲存為本機待確認樣本。";
 "ReSieve.PerChat" = "總開關開啟時，可選擇是否在這個聊天中使用 ReSieve。";
 "ReSieve.Samples" = "本機樣本";
-"ReSieve.SampleCount" = "%ld 則樣本 · %ld 則已確認且無待定項";
+"ReSieve.EmptySamples" = "目前沒有廣告樣本";
+"ReSieve.SampleCount" = "%ld 則樣本 · %ld 則可匯出為訓練樣本";
 "ReSieve.Pending" = "待確認";
 "ReSieve.Reviewed" = "已確認";
+"ReSieve.HiddenMessage" = "已隱藏整則訊息";
+"ReSieve.TrimmedText" = "已裁切廣告文字";
+"ReSieve.HiddenButtons" = "已移除廣告按鈕";
 "ReSieve.More" = "顯示更多樣本";
 "ReSieve.Loading" = "正在載入樣本…";
 "ReSieve.Capacity" = "本機樣本已達上限，刪除已有樣本後可繼續記錄。";

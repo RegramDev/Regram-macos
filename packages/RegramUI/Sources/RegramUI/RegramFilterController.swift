@@ -49,17 +49,19 @@ public func RegramFilterController(context: any AccountContextProtocol, focusSet
         let rule = RGMessageFilterRule(pattern: value.pattern.trimmingCharacters(in: .whitespacesAndNewlines), isRegex: value.regex)
         var adPage = RegramPageBuilder(page: "messageFilter")
         adPage.section()
-        adPage.row("reSieve", title: regramString("ReSieve.Title"), type: .nextContext(regramString(settings["reSieveEnabled"].bool ? "ChatPreferences.On" : "ChatPreferences.Off")), action: {
+        let reSieveStatus = regramString(settings["reSieveEnabled"].bool ? "ReSieve.Enabled" : "ReSieve.Disabled")
+        adPage.row("reSieve", title: regramString("ReSieve.Title"), type: .nextContext(reSieveStatus), action: {
             if #available(macOS 12, *) {
                 context.bindings.rootNavigation().push(RegramAdSamplesController(context: context))
             }
         })
+        let subtitle = regramString("MessageFilter.SubTitle") + (value.regex ? "\n" + regramString("MessageFilter.Regex.Notice") : "")
         var rows: [InputDataEntry] = adPage.entries + [
             .sectionId(1, type: .normal),
             .input(sectionId: 2, index: 0, value: .string(value.pattern), error: nil, identifier: patternId, mode: .plain, data: .init(viewType: .firstItem), placeholder: nil, inputPlaceholder: regramString(value.regex ? "MessageFilter.InputPlaceholderRegex" : "MessageFilter.InputPlaceholder"), filter: { $0 }, limit: 8192),
             .general(sectionId: 2, index: 1, value: .none, error: nil, identifier: InputDataIdentifier("messageFilter.regex"), data: .init(name: regramString("MessageFilter.Regex"), color: theme.colors.text, type: .switchable(value.regex), viewType: .innerItem, action: { update { $0.regex.toggle() } })),
             .general(sectionId: 2, index: 2, value: .none, error: nil, identifier: InputDataIdentifier("messageFilter.add"), data: .init(name: regramString("MessageFilter.Add"), color: theme.colors.accent, type: .none, viewType: .lastItem, enabled: rule.isValid && !settings.filterRules.contains(where: { $0.hasSameDefinition(as: rule) }), action: add)),
-            .desc(sectionId: 2, index: 3, text: .plain(regramString("MessageFilter.SubTitle") + "\n\n" + regramString("MessageFilter.Regex.Notice")), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)),
+            .desc(sectionId: 2, index: 3, text: .plain(subtitle), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)),
             .sectionId(2, type: .normal)
         ]
         let tools = {
@@ -90,7 +92,9 @@ public func RegramFilterController(context: any AccountContextProtocol, focusSet
                     ContextMenuItem(regramString("MessageFilter.Rule.Delete"), handler: { remove(rule.id) })
                 ]
             }
-            rows.append(.general(sectionId: 3, index: Int32(index + 5), value: .none, error: nil, identifier: InputDataIdentifier("filter_rule_" + rule.id), data: .init(name: rule.pattern, color: rule.isEnabled ? theme.colors.text : theme.colors.grayText, type: value.editing ? .context(regramString("MessageFilter.Rule.Delete")) : .next, viewType: rules.count == 1 ? .singleItem : index == 0 ? .firstItem : index + 1 == rules.count ? .lastItem : .innerItem, description: details.joined(separator: " · "), action: {
+            let preview = rule.pattern.prefix(120).prefix(while: { !$0.isNewline })
+            let title = preview.endIndex == rule.pattern.endIndex ? rule.pattern : "\(preview)…"
+            rows.append(.general(sectionId: 3, index: Int32(index + 5), value: .none, error: nil, identifier: InputDataIdentifier("filter_rule_" + rule.id), data: .init(name: title, color: rule.isEnabled ? theme.colors.text : theme.colors.grayText, type: value.editing ? .context(regramString("MessageFilter.Rule.Delete")) : .next, viewType: rules.count == 1 ? .singleItem : index == 0 ? .firstItem : index + 1 == rules.count ? .lastItem : .innerItem, description: details.joined(separator: " · "), action: {
                 if draft.with({ $0.editing }) { remove(rule.id) }
                 else if let rule = currentRules().first(where: { $0.id == rule.id }) { context.bindings.rootNavigation().push(RegramRuleController(context: context, rule: rule)) }
             }, menuItems: menu)))

@@ -564,7 +564,7 @@
 "MessageFilter.PerChat.Notice" = "When off, the message filter is ignored in this chat.";
 "MessageFilter.PerChat.Title" = "Message Filter";
 "MessageFilter.Regex" = "Regular expression";
-"MessageFilter.Regex.Notice" = "Matching is case-insensitive. Regular expressions use ICU syntax; an invalid pattern cannot be added.";
+"MessageFilter.Regex.Notice" = "Regular expressions use ICU syntax. Enter a valid pattern to add a rule.";
 "MessageFilter.Rule.AllChats" = "All chats";
 "MessageFilter.Rule.Delete" = "Delete";
 "MessageFilter.Rule.Disable" = "Disable Rule";
@@ -2839,6 +2839,8 @@
 
 "ReSieve.Title" = "ReSieve Ad Filtering";
 "ReSieve.Enable" = "Smart ad filtering";
+"ReSieve.Enabled" = "On";
+"ReSieve.Disabled" = "Off";
 "ReSieve.Model" = "On-device model";
 "ReSieve.Ready" = "Ready";
 "ReSieve.Checking" = "Checking…";
@@ -2846,9 +2848,13 @@
 "ReSieve.Notice" = "ReSieve filters Chinese ads in groups and channels on this Mac. It preserves the original messages and stores detected ads as local samples for review.";
 "ReSieve.PerChat" = "Choose whether ReSieve filters ads in this chat while smart ad filtering is enabled.";
 "ReSieve.Samples" = "Local samples";
+"ReSieve.EmptySamples" = "No ad samples yet";
 "ReSieve.SampleCount" = "%ld samples · %ld ready for export";
 "ReSieve.Pending" = "Needs review";
 "ReSieve.Reviewed" = "Reviewed";
+"ReSieve.HiddenMessage" = "Message hidden";
+"ReSieve.TrimmedText" = "Ad text removed";
+"ReSieve.HiddenButtons" = "Ad buttons removed";
 "ReSieve.More" = "Show more samples";
 "ReSieve.Loading" = "Loading samples…";
 "ReSieve.Capacity" = "The local sample limit has been reached. Delete a sample to make room.";

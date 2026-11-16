@@ -6,13 +6,15 @@ import TelegramTheme
 final class RegramEmptyRowItem: GeneralRowItem {
     let text: String
     let isLoading: Bool
+    let symbolName: String
     let buttonAction: SearchEmptyRowItem.Action?
     let minimumHeight: CGFloat
     var textHeight: CGFloat = 0
 
-    init(_ size: NSSize, stableId: AnyHashable, height: CGFloat = 180, isLoading: Bool = false, text: String = "", action: SearchEmptyRowItem.Action? = nil) {
+    init(_ size: NSSize, stableId: AnyHashable, height: CGFloat = 180, isLoading: Bool = false, text: String = "", action: SearchEmptyRowItem.Action? = nil, symbolName: String = "magnifyingglass") {
         self.text = text
         self.isLoading = isLoading
+        self.symbolName = symbolName
         self.buttonAction = action
         self.minimumHeight = height
         super.init(size, height: height, stableId: stableId, viewType: .singleItem)
@@ -38,7 +40,6 @@ private final class RegramEmptyRowView: RegramNativeRowView {
     required init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         for view in [symbol, label, spinner, button] { addSubview(view) }
-        symbol.image = NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: nil)
         symbol.contentTintColor = .secondaryLabelColor
         label.font = .systemFont(ofSize: 13)
         label.alignment = .center
@@ -65,6 +66,7 @@ private final class RegramEmptyRowView: RegramNativeRowView {
         appearance = theme.appearance
         label.stringValue = item.text
         label.textColor = theme.colors.grayText
+        symbol.image = item.isLoading ? nil : NSImage(systemSymbolName: item.symbolName, accessibilityDescription: nil)
         symbol.isHidden = item.isLoading
         spinner.isHidden = !item.isLoading
         if item.isLoading { spinner.startAnimation(nil) } else { spinner.stopAnimation(nil) }

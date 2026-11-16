@@ -33,6 +33,8 @@ func regramNativeTextHeight(_ text: NSAttributedString, width: CGFloat) -> CGFlo
     ceil(text.boundingRect(with: NSSize(width: max(1, width - 4), height: .greatestFiniteMagnitude), options: [.usesLineFragmentOrigin, .usesFontLeading]).height) + 2
 }
 
+private let regramNativeChevronInset: CGFloat = 20
+
 final class RegramNativeRowItem: GeneralRowItem {
     private let sourceTheme: TelegramPresentationTheme
     let data: InputDataGeneralData
@@ -117,6 +119,7 @@ final class RegramNativeRowItem: GeneralRowItem {
         let iconWidth: CGFloat = data.icon == nil ? 0 : 36
         let available = max(1, contentWidth - iconWidth)
         let textWidth = ceil(NSAttributedString(string: contextText, attributes: [.font: NSFont.systemFont(ofSize: 13)]).size().width)
+        let valueWidth = textWidth + 6
         var accessoryWidth: CGFloat = 0
         var accessoryHeight: CGFloat = 26
         switch data.type {
@@ -124,9 +127,9 @@ final class RegramNativeRowItem: GeneralRowItem {
         case .selectable, .selectableLeft: accessoryWidth = 20
         case .contextSelector: accessoryWidth = min(240, max(100, textWidth + 34))
         case .next, .nextImage: accessoryWidth = 16
-        case .nextContext: accessoryWidth = min(220, textWidth + 24)
+        case .nextContext: accessoryWidth = min(220, valueWidth + regramNativeChevronInset)
         case .context, .contextColored, .twoLinesContext, .imageContext, .badge, .button:
-            accessoryWidth = min(240, textWidth + (hasAction ? 28 : 0))
+            accessoryWidth = min(240, hasAction ? textWidth + 28 : valueWidth)
         case .loading: accessoryWidth = isStandaloneAction ? 0 : 18
         case .none: accessoryWidth = 0
         default: accessoryWidth = 22
@@ -380,12 +383,20 @@ private final class RegramNativeSettingsRowView: RegramNativeRowView, NSMenuDele
         title.frame = item.titleFrame
         detail.frame = item.detailFrame
         accessories[.icon]?.frame = item.iconFrame
-        for kind in [Accessory.toggle, .check, .popup, .button, .value] { accessories[kind]?.frame = item.accessoryFrame }
+        for kind in [Accessory.check, .popup, .button] { accessories[kind]?.frame = item.accessoryFrame }
         if item.isSelection { accessories[.check]?.frame = NSRect(x: item.titleFrame.minX, y: item.titleFrame.minY - 2, width: containerView.bounds.width - item.titleFrame.minX - 16, height: item.titleFrame.height + 4) }
         accessories[.toggle]?.frame = NSRect(x: item.accessoryFrame.minX, y: floor((containerView.bounds.height - 22) / 2), width: 38, height: 22)
-        if item.isNavigation, let value = accessories[.value] { value.frame.size.width = max(0, value.frame.width - 20) }
+        if let label = accessories[.value] as? NSTextField, !label.isHidden {
+            var frame = item.accessoryFrame
+            if item.isNavigation { frame.size.width = max(0, frame.width - regramNativeChevronInset) }
+            let textBounds = NSRect(x: 0, y: 0, width: frame.width, height: frame.height)
+            let textHeight = ceil(label.cell?.cellSize(forBounds: textBounds).height ?? 0)
+            frame.size.height = min(frame.height, max(19, textHeight + 2))
+            frame.origin.y = floor(item.accessoryFrame.midY - frame.height / 2)
+            label.frame = frame
+        }
         accessories[.navigation]?.frame = containerView.bounds
-        accessories[.chevron]?.frame = NSRect(x: containerView.bounds.width - 28, y: floor((containerView.bounds.height - 12) / 2), width: 8, height: 12)
+        accessories[.chevron]?.frame = NSRect(x: containerView.bounds.width - 28, y: floor(item.accessoryFrame.midY - 6), width: 8, height: 12)
         accessories[.spinner]?.frame = item.isStandaloneAction ? NSRect(x: 16, y: 15, width: 16, height: 16) : NSRect(x: item.accessoryFrame.minX, y: floor((containerView.bounds.height - 16) / 2), width: 16, height: 16)
     }
 

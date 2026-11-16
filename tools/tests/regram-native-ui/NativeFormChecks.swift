@@ -157,7 +157,10 @@ extension NativeUIChecks {
             .init(name: "语音识别服务", color: theme.colors.text, type: .contextSelector("自动选择", menu), viewType: .lastItem),
             .init(name: "Include message settings in this backup", color: theme.colors.text, type: .selectable(true), viewType: .singleItem, description: "Choose the categories you want to include.", action: {}),
             .init(name: "测试连接", color: theme.colors.accent, type: .loading, viewType: .singleItem, action: {}),
-            .init(name: "删除本地数据…", color: theme.colors.redUI, type: .none, viewType: .singleItem, enabled: false, action: {})
+            .init(name: "删除本地数据…", color: theme.colors.redUI, type: .none, viewType: .singleItem, enabled: false, action: {}),
+            .init(name: "ReSieve 智能广告过滤", color: theme.colors.text, type: .nextContext("已开启"), viewType: .singleItem, action: {}),
+            .init(name: "本机模型", color: theme.colors.text, type: .context("已就绪"), viewType: .singleItem),
+            .init(name: "Model variants", color: theme.colors.text, type: .twoLinesContext("On-device model", "Ready"), viewType: .singleItem)
         ]
         var views = fixtures.enumerated().map { formRow($0.element, id: "geometry.\($0.offset)", width: width) }
         views.append(makeView(RegramNativeInputItem(NSSize(width: width, height: 80), stableId: "geometry.field", text: "https://example.com/v1", mode: .plain, data: .init(viewType: .singleItem), label: "服务地址", placeholder: "https://", error: nil, limit: 2048, filter: { $0 }, updated: {}), width: width))
@@ -177,6 +180,15 @@ extension NativeUIChecks {
                 if let label = control as? NSTextField, !label.isEditable, label.maximumNumberOfLines == 0, label.lineBreakMode == .byWordWrapping, !label.stringValue.isEmpty {
                     let needed = label.cell!.cellSize(forBounds: NSRect(x: 0, y: 0, width: label.frame.width, height: 10000)).height
                     check(label.frame.height >= needed, "\(palette)/\(width) native label has enough space for every wrapped line: \(label.stringValue)")
+                }
+                if let label = control as? NSTextField, label.alignment == .right, let item = view.item as? RegramNativeRowItem {
+                    let needed = label.cell!.cellSize(forBounds: NSRect(x: 0, y: 0, width: 10000, height: 10000))
+                    check(label.frame.width >= ceil(needed.width), "\(palette)/\(width) context value fits with AppKit text insets")
+                    check(label.frame.height >= needed.height && label.frame.height <= needed.height + 3, "\(palette)/\(width) context label frame follows its text height")
+                    check(abs(label.frame.midY - item.accessoryFrame.midY) <= 1, "\(palette)/\(width) context value is centered in its accessory frame")
+                    if item.isNavigation, let arrow = view.containerView.subviews.first(where: { $0 is NSImageView && !$0.isHidden }) {
+                        check(abs(arrow.frame.midY - label.frame.midY) <= 1 && label.frame.maxX < arrow.frame.minX, "\(palette)/\(width) context value and chevron align without overlap")
+                    }
                 }
             }
             check(view.containerView.layer?.cornerRadius == min(14, view.containerView.bounds.height / 2), "\(palette)/\(width) settings groups use consistent rounded corners")
