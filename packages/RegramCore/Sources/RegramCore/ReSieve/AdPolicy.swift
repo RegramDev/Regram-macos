@@ -116,7 +116,13 @@ public enum RGAdPolicy {
         ) throws -> RGAdProjection {
             let initial = try project(input, sourceGroup: sourceGroup, sampleId: sampleId)
             if initial.disposition == .hide || review(input, sourceGroup: sourceGroup, sampleId: sampleId) != nil { return initial }
-            return try project(input, sourceGroup: sourceGroup, semantic: classify(input), sampleId: sampleId)
+            let semantic = classify(input)
+            if semantic.predictions.isEmpty, semantic.buttonIds.isEmpty, !semantic.entireMessage, semantic.promotionalQuotes.isEmpty,
+                (0...1).contains(semantic.threshold)
+            {
+                return initial
+            }
+            return try project(input, sourceGroup: sourceGroup, semantic: semantic, sampleId: sampleId)
         }
 
         public func project(

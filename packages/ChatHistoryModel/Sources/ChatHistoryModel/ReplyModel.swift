@@ -69,7 +69,7 @@ public class ReplyModel: ChatAccessoryModel {
             let preferences = regramPreferenceChanges(accountId: accountPeerId.toInt64(), keys: ["reSieveEnabled", "reSieveDisabledPeerIds"])
             let initial = replyMessage.map { session.replyPreview($0, accountPeerId: accountPeerId, scope: scope.scope) }
             make(with: initial, display: false)
-            nodeReady.set(combineLatest(messageViewSignal, session.changes, preferences) |> deliverOnMainQueue
+            nodeReady.set(combineLatest(messageViewSignal, session.changes(for: scope.scope), preferences) |> deliverOnMainQueue
             |> map { message, _, _ -> Message? in
                 guard let message else { return nil }
                 scope.prepare([message], accountPeerId: accountPeerId)

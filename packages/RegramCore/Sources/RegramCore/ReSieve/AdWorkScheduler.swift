@@ -43,6 +43,7 @@ public final class RGAdWorkScheduler {
     private var conditions = RGAdWorkConditions()
     private var jobs: [Job] = []
     private var scheduled: DispatchWorkItem?
+    private var scheduledForInteractiveWork = false
     private var readyAt: TimeInterval = 0
     private var prioritySteps = 0
     public init(queue: DispatchQueue) { self.queue = queue }
@@ -68,6 +69,8 @@ public final class RGAdWorkScheduler {
         if jobs.isEmpty {
             scheduled?.cancel()
             scheduled = nil
+        } else {
+            schedule()
         }
     }
 
@@ -80,10 +83,20 @@ public final class RGAdWorkScheduler {
     }
 
     private func schedule() {
-        guard !conditions.paused, !jobs.isEmpty, scheduled == nil else { return }
-        let work = DispatchWorkItem { [weak self] in self?.pump() }
+        guard !conditions.paused, !jobs.isEmpty else { return }
+        let interactive = !conditions.lowPower && conditions.thermal < 2 && jobs.contains { $0.priority > 0 }
+        if let scheduled {
+            guard scheduledForInteractiveWork != interactive else { return }
+            scheduled.cancel()
+        }
+        let work = DispatchWorkItem(qos: interactive ? .userInitiated : .utility, flags: .enforceQoS) { [weak self] in self?.pump() }
         scheduled = work
-        queue.asyncAfter(deadline: .now() + max(0, readyAt - ProcessInfo.processInfo.systemUptime), execute: work)
+        scheduledForInteractiveWork = interactive
+        if interactive {
+            queue.async(execute: work)
+        } else {
+            queue.asyncAfter(deadline: .now() + max(0, readyAt - ProcessInfo.processInfo.systemUptime), execute: work)
+        }
     }
 
     private func pump() {

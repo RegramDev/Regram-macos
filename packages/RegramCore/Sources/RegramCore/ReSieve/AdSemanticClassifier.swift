@@ -53,6 +53,7 @@ public final class RGAdSemanticClassifier {
             return FileManager.default.fileExists(atPath: url.path) ? url : nil
         }
         #if SWIFT_PACKAGE
+            if let url = Bundle.module.url(forResource: name, withExtension: ext) { return url }
             if let url = Bundle.module.url(forResource: name, withExtension: ext, subdirectory: "ReSieveModel") { return url }
         #endif
         return Bundle.main.url(forResource: name, withExtension: ext)

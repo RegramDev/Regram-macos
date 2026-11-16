@@ -151,11 +151,12 @@ public final class RegramAdFilterSession {
 
     private static let didChange = Notification.Name("Regram.ReSieve.DidChange")
 
-    public var changes: Signal<Void, NoError> {
+    public func changes(for scope: Scope) -> Signal<Void, NoError> {
         Signal { [self] subscriber in
             let observer = NotificationCenter.default.addObserver(forName: Self.didChange, object: nil, queue: nil) {
                 [weak self] notification in
                 guard let self, notification.object as? RegramAdFilterSession === self else { return }
+                if let scopes = notification.userInfo?["scopes"] as? Set<Scope>, !scopes.contains(scope) { return }
                 subscriber.putNext(())
             }
             subscriber.putNext(())
@@ -252,7 +253,8 @@ public final class RegramAdFilterSession {
     private var cacheEpoch: UInt64 = 0
     private var refreshWork: DispatchWorkItem?
     private var refreshDeadline: TimeInterval = 0
-    private var lastRefresh: TimeInterval = 0
+    private var refreshScopes = Set<Scope>()
+    private var refreshAllScopes = false
     private var retryNeeded = false
     private var retryScheduled = false
     private var foreground = true
@@ -338,21 +340,35 @@ public final class RegramAdFilterSession {
         lock.unlock()
         scheduler.discardCancelled()
     }
-    private func changed(urgent: Bool = false) {
-        let now = ProcessInfo.processInfo.systemUptime
-        let delay = urgent ? max(0.02, lastRefresh + 0.2 - now) : 1.0
-        let deadline = now + delay
+    private func changed(_ scope: Scope? = nil) {
+        let delay = scope.map { priority($0) == 0 ? 0.05 : 0.024 } ?? 0.024
+        let deadline = ProcessInfo.processInfo.systemUptime + delay
+        lock.lock()
+        defer { lock.unlock() }
+        if let scope {
+            refreshScopes.insert(scope)
+        } else {
+            refreshAllScopes = true
+        }
         if refreshWork != nil && refreshDeadline <= deadline { return }
         refreshWork?.cancel()
         refreshDeadline = deadline
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
+            self.lock.lock()
+            guard self.refreshDeadline == deadline else {
+                self.lock.unlock()
+                return
+            }
             self.refreshWork = nil
-            self.lastRefresh = ProcessInfo.processInfo.systemUptime
-            DispatchQueue.main.async { NotificationCenter.default.post(name: Self.didChange, object: self) }
+            let userInfo: [AnyHashable: Any]? = self.refreshAllScopes ? nil : ["scopes": self.refreshScopes]
+            self.refreshScopes.removeAll()
+            self.refreshAllScopes = false
+            self.lock.unlock()
+            NotificationCenter.default.post(name: Self.didChange, object: self, userInfo: userInfo)
         }
         refreshWork = work
-        queue.asyncAfter(deadline: .now() + delay, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
     public func perform<T>(
@@ -493,6 +509,7 @@ public final class RegramAdFilterSession {
         }
         lock.unlock()
         let value: Cached
+        var detection: RGAdProjection?
         if let reuse {
             value = reuse
         } else {
@@ -504,8 +521,8 @@ public final class RegramAdFilterSession {
                 group = RGAdSampleStore.sourceGroup(salt: salt, peerId: message.id.peerId.toInt64())
                 sourceGroups[message.id.peerId] = group
             }
-            let sampleId = try? RGAdSampleStore.sampleId(
-                input: input, salt: salt, messageKey: rgAdSampleKey(message), mediaIdentity: mediaIdentity)
+            let sampleId = input.hasMedia ? try? RGAdSampleStore.sampleId(
+                input: input, salt: salt, messageKey: rgAdSampleKey(message), mediaIdentity: mediaIdentity) : nil
             var completed = true
             let result: RGAdProjection?
             do {
@@ -526,11 +543,7 @@ public final class RegramAdFilterSession {
                 guard projected != nil else { return }
                 if let old, old.input == input, old.mediaIdentity == mediaIdentity, old.projection == projected { return }
             }
-            if let projected, !salt.isEmpty {
-                try? store.recordDetection(
-                    input: input, messageKey: rgAdSampleKey(message), mediaKinds: rgAdMediaKinds(message), mediaIdentity: mediaIdentity,
-                    projection: projected)
-            }
+            detection = projected
             revision &+= 1
             value = Cached(
                 input: input, mediaIdentity: mediaIdentity, projection: projected, revision: revision,
@@ -548,7 +561,12 @@ public final class RegramAdFilterSession {
         sharedCache.insert(value, for: message.id, cost: value.estimatedMemoryCost)
         lock.unlock()
         if old !== value && (old?.projection != nil || value.projection != nil) {
-            changed(urgent: priority(scope) == 2 || batch.cursor == 0)
+            changed(scope)
+        }
+        if let detection, !salt.isEmpty {
+            try? store.recordDetection(
+                input: input, messageKey: rgAdSampleKey(message), mediaKinds: rgAdMediaKinds(message), mediaIdentity: mediaIdentity,
+                projection: detection)
         }
     }
 
@@ -564,7 +582,7 @@ public final class RegramAdFilterSession {
             order[batch.scope] = order[batch.scope]?.filter { batch.inputs[$0] != nil }
             lock.unlock()
             let hidden = hiddenMessageIds(in: batch.messages, accountPeerId: batch.account, scope: batch.scope)
-            if hidden != batch.previousHidden { changed(urgent: priority(batch.scope) > 0) }
+            if hidden != batch.previousHidden { changed(batch.scope) }
             for message in batch.messages
             where hidden.contains(message.id) && !shouldHide(message, accountPeerId: batch.account, scope: batch.scope) {
                 if !salt.isEmpty, let input = batch.inputs[message.id] {

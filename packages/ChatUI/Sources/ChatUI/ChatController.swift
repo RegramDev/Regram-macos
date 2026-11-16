@@ -4308,7 +4308,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         let historyRenderGate = self.historyRenderGate
         let reSieve = RegramAdFilterSession.get(context.account)
         let historyAdScope = RegramAdFilterWorkScope(session: reSieve, scope: .history(UUID()))
-        let renderingHistory = chatHistoryRenderingUpdates(combineLatest(historyViewUpdate, regramContentPreferenceChanges(accountId: context.peerId.toInt64()), regramQuickTranslationChanges(accountId: context.peerId.toInt64()), reSieve.changes) |> map { update, _, _, _ in update }, visibility: self.visibility.get(), gate: historyRenderGate)
+        let renderingHistory = chatHistoryRenderingUpdates(combineLatest(historyViewUpdate, regramContentPreferenceChanges(accountId: context.peerId.toInt64()), regramQuickTranslationChanges(accountId: context.peerId.toInt64()), reSieve.changes(for: historyAdScope.scope)) |> map { update, _, _, _ in update }, visibility: self.visibility.get(), gate: historyRenderGate)
         let historyPeer = self.historyPeer
         let historyViewTransition = combineLatest(queue: queue,
                                                   renderingHistory,
@@ -8955,8 +8955,8 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         let dismissedPinnedIds = self.dismissedPinnedIds.get()
         let ready = self.ready.get()
         let filterAccountId = context.peerId.toInt64()
-        let messageFilterChanges = combineLatest(regramMessageFilterChanges(accountId: filterAccountId), regramPreferenceChanges(accountId: filterAccountId, keys: ["reSieveEnabled", "reSieveDisabledPeerIds"]), reSieve.changes)
         let pinnedAdScope = RegramAdFilterWorkScope(session: reSieve, scope: .pinned(UUID()))
+        let messageFilterChanges = combineLatest(regramMessageFilterChanges(accountId: filterAccountId), regramPreferenceChanges(accountId: filterAccountId, keys: ["reSieveEnabled", "reSieveDisabledPeerIds"]), reSieve.changes(for: pinnedAdScope.scope))
 
         func preparePinnedAds(_ messages: [Message]) -> Set<MessageId> {
             pinnedAdScope.prepare(messages, accountPeerId: context.peerId)

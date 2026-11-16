@@ -91,6 +91,34 @@ final class AdWorkTests: XCTestCase {
         }
     }
 
+    func testInteractiveWorkPreemptsScheduledBackgroundRecovery() {
+        let queue = DispatchQueue(label: "ad-interactive-work-test")
+        let scheduler = RGAdWorkScheduler(queue: queue)
+        let checked = expectation(description: "interactive step before background recovery")
+        var backgroundSteps = 0
+        var interactiveRan = false
+        queue.async {
+            scheduler.updateConditions(RGAdWorkConditions(thermal: 1))
+            scheduler.enqueue(cancelled: { false }, step: {
+                backgroundSteps += 1
+                if backgroundSteps > 1 { return true }
+                Thread.sleep(forTimeInterval: 0.12)
+                queue.async {
+                    scheduler.enqueue(priority: 1, cancelled: { false }, step: {
+                        interactiveRan = true
+                        return true
+                    }, onCancel: {})
+                    queue.asyncAfter(deadline: .now() + .milliseconds(40)) {
+                        XCTAssertTrue(interactiveRan)
+                        checked.fulfill()
+                    }
+                }
+                return false
+            }, onCancel: {})
+        }
+        wait(for: [checked], timeout: 2)
+    }
+
     func testBackgroundAndCriticalHeatPauseThenResumeWithoutDroppingWork() {
         let queue = DispatchQueue(label: "ad-pause-test")
         let scheduler = RGAdWorkScheduler(queue: queue)

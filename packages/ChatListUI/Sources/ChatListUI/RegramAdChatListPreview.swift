@@ -51,7 +51,7 @@ final class RegramAdChatListPreview {
     private let refresh = ValuePromise<UInt64>(0, ignoreRepeated: true)
 
     var changes: Signal<Void, NoError> {
-        combineLatest(session.changes, refresh.get()) |> map { _, _ in () }
+        combineLatest(session.changes(for: topScope.scope), refresh.get()) |> map { _, _ in () }
     }
 
     init(account: Account, accountPeerId: PeerId, queue: Queue) {
