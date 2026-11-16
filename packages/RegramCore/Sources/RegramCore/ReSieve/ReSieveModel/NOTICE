@@ -1,0 +1,15 @@
+ReSieve
+Copyright 2026 RegramDev
+
+Adapted from MiniRBT-H256 by HIT and iFLYTEK Research (hfl/minirbt-h256).
+Base license: Apache-2.0
+Base revision: 446e1b4012b10946f479563005700c54c9db3f7c
+Upstream: https://huggingface.co/hfl/minirbt-h256
+License: https://github.com/iflytek/MiniRBT/blob/main/LICENSE
+
+RegramDev changes: supervised promotional-intent adaptation, classification
+head, and FP16 Core ML export.
+
+Dataset references and their separate license status appear in
+metadata/provenance.json. This license does not grant rights to the raw
+datasets. No corpus, private message, account data or annotation is included.

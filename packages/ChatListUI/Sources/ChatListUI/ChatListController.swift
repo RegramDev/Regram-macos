@@ -825,6 +825,7 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
         let transitionQueue = self.transitionQueue
         let regramPreviewCoordinator = RegramChatListPreviewCoordinator(account: context.account, accountId: context.peerId.toInt64(), queue: transitionQueue)
         self.regramPreviewCoordinator = regramPreviewCoordinator
+        let reSievePreview = RegramAdChatListPreview(account: context.account, accountPeerId: context.peerId, queue: transitionQueue)
         let first = Atomic<(hasEarlier: Bool, hasLater: Bool)>(value: (hasEarlier: false, hasLater: false))
         let scrollUp:Atomic<Bool> = self.first
         let groupId = self.mode.groupId
@@ -1055,10 +1056,11 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
             guard enabled else { return .single(nil) }
             return chatListViewForLocation(chatListLocation: .chatList(groupId: .root), location: .Initial(1, nil), filter: .allChats, account: context.account) |> map { $0.list.groupItems.first(where: { $0.id == .archive }) }
         }
-        let regramAppearance = combineLatest(appearanceSignal, regramFilterChanges, regramRemarkChanges(accountId: context.peerId.toInt64()), regramPreviewCoordinator.changes.get()) |> map { appearance, _, _, _ in
+        let keywordAppearance = combineLatest(appearanceSignal, regramFilterChanges, regramRemarkChanges(accountId: context.peerId.toInt64()), regramPreviewCoordinator.changes.get()) |> map { appearance, _, _, _ in
             _ = regramRefreshRevision.modify { $0 &+ 1 }
             return appearance
         }
+        let regramAppearance = combineLatest(keywordAppearance, reSievePreview.changes) |> map { appearance, _ in appearance }
         let selectionState = self.stateValue
         let list:Signal<ChatListRenderedTransition, NoError> = combineLatest(queue: transitionQueue, chatHistoryView, regramAppearance, stateUpdater |> map(ChatListStateProjection.init) |> distinctUntilChanged, appNotificationSettings(accountManager: context.sharedContext.accountManager), additionalSettings(accountManager: context.sharedContext.accountManager), storyState, suspiciousSession, suggestions, birthdays, myBirthday, subState, appConfiguration, context.giftAuctionsManager.state, PendingChatRemovals.get(context).hiddenPeerIds, regramArchiveGroup) |> filter { value in
             let filterData = value.0.1
@@ -1264,7 +1266,8 @@ public class ChatListController<Context: AccountContextProtocol> : PeersListCont
             
             mapped.append(.space)
 
-            let presentation = regramPreviewCoordinator.update(mapped, filterRevision: regramFilterRevision.with { $0 }, pagingFloor: regramChatListPagingFloor(update.list))
+            let keywordPresentation = regramPreviewCoordinator.update(mapped, filterRevision: regramFilterRevision.with { $0 }, pagingFloor: regramChatListPagingFloor(update.list))
+            let presentation = reSievePreview.update(keywordPresentation)
             let entries = presentation.entries.sorted().map { entry -> AppearanceWrapperEntry<UIChatListEntry> in
                 return AppearanceWrapperEntry(entry: entry, appearance: appearance)
             }

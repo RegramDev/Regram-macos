@@ -136,6 +136,8 @@ final class AccountContext {
     var bindings: AccountContextBindings!
 }
 
+struct AnalyticsContext {}
+
 __INTERFACE_CONTROLLER__
 
 final class ChatInteraction {
@@ -195,6 +197,8 @@ class ChatController: ViewController, ChatInterfaceController {
     let mode: ChatMode
     let chatInteraction: ChatInteraction
     private var isLoaded = false
+
+    func inheritAnalyticsContext(_ inherited: AnalyticsContext) {}
 
     init(context: AccountContext, chatLocation: ChatLocation, mode: ChatMode = .history, focusTarget: ChatFocusTarget? = nil) {
         self.context = context

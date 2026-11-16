@@ -696,12 +696,15 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                 let textRange = messageTextRange(of: selectedRange, in: layout.attributedString, message: message)
                 if (textRange?.length ?? selectedString.length) > quote_length_max {
                     alert(for: context.window, info: strings().chatMessageContextQuoteLimitExceed)
-                } else if let textRange {
-                    let quoteText = message.text.nsstring.substring(with: textRange)
-                    let trimmed = trimStringWithEntities(string: quoteText, entities: messageTextEntitiesInRange(entities: message.textEntities?.entities ?? [], range: textRange, onlyQuoteable: true), maxLength: Int(quote_length_max))
+                } else if let textRange, let originalRange = rgAdOriginalRange(message, range: textRange) {
+                    let original = rgAdOriginalMessage(message)
+                    let quoteText = original.text.nsstring.substring(with: originalRange)
+                    let trimmed = trimStringWithEntities(string: quoteText, entities: messageTextEntitiesInRange(entities: original.textEntities?.entities ?? [], range: originalRange, onlyQuoteable: true), maxLength: Int(quote_length_max))
                     let leading = quoteText.utf16.prefix(while: { $0 == 0x20 || $0 == 0x0A }).count
-                    let quote = EngineMessageReplyQuote(text: trimmed.string, offset: textRange.location + leading, entities: trimmed.entities, media: message.media.first)
+                    let quote = EngineMessageReplyQuote(text: trimmed.string, offset: originalRange.location + leading, entities: trimmed.entities, media: message.media.first)
                     chatInteraction.setupReplyMessage(message, .init(messageId: message.id, quote: trimmed.string.isEmpty ? nil : quote, innerSubject: nil))
+                } else if rgAdOriginalMessage(message).text != message.text {
+                    chatInteraction.setupReplyMessage(message, .init(messageId: message.id, quote: nil, innerSubject: nil))
                 } else {
                     let attributed = enititesAttributedStringForText(selectedString).trimmed
                     let entities = messageTextEntitiesInRange(entities: ChatTextInputState(attributedText: attributed, selectionRange: 0..<0).messageTextEntities(), range: attributed.range, onlyQuoteable: true)

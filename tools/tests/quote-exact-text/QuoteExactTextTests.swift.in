@@ -121,10 +121,24 @@ final class Message {
     let text: String
     let textEntities: TextEntitiesMessageAttribute?
     let media: [Int] = []
-    init(_ text: String, _ entities: [MessageTextEntity]) {
+    let attributes: [Any]
+    init(_ text: String, _ entities: [MessageTextEntity], original: Message? = nil, cuts: [RGAdRange] = []) {
         self.text = text
         self.textEntities = entities.isEmpty ? nil : TextEntitiesMessageAttribute(entities: entities)
+        self.attributes = original.map { [RGAdOriginalAttribute(source: $0, removedRanges: cuts, bodyLength: text.utf16.count)] } ?? []
     }
+}
+
+struct RGAdRange {
+    let lower: Int
+    let upper: Int
+    init(_ lower: Int, _ upper: Int) { self.lower = lower; self.upper = upper }
+}
+
+struct RGAdOriginalAttribute {
+    let source: Message?
+    let removedRanges: [RGAdRange]
+    let bodyLength: Int
 }
 
 struct EngineMessageReplyQuote {
@@ -242,6 +256,7 @@ final class FoldingTextLayout {
 }
 
 __MESSAGE_TEXT_RANGE__
+__AD_MAPPING__
 
 func quote(_ layout: TextViewLayout, _ message: Message) -> EngineMessageReplyQuote? {
     captured = nil
@@ -540,6 +555,8 @@ do {
     let result = quote(longLayout, Message(long, []))
     check("limit: a quote over quote_length_max alerts", alerted && result == nil, "no alert for 1025 characters")
 }
+
+__AD_CHECKS__
 
 print("\(total - failed)/\(total) checks passed")
 exit(failed == 0 ? 0 : 1)

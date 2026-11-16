@@ -191,6 +191,7 @@ public func regramShouldHideMessage(_ message: Message, accountId: Int64, tempor
 }
 
 public func regramShouldHideMessage(_ message: Message, accountId: Int64, filter: RegramFilterSnapshot, revision: Int64) -> Bool {
+    let message = rgAdOriginalMessage(message)
     if !message.rgIsRevoked && (filter.isEmpty || message.flags.intersection(.IsIncomingMask).isEmpty) { return false }
     let payload = RegramMessageFilterPayload(message)
     return payload.shouldHide(accountId: accountId, filter: filter, revision: revision)

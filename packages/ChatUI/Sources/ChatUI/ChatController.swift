@@ -178,11 +178,13 @@ final class ChatHistoryView {
     let filteredEntries: [ChatWrappedEntry]
     let theme: TelegramPresentationTheme
     let filteredOutCount: Int
-    init(originalView:MessageHistoryView?, filteredEntries: [ChatWrappedEntry], theme: TelegramPresentationTheme, filteredOutCount: Int = 0) {
+    let adHiddenIds: Set<MessageId>
+    init(originalView:MessageHistoryView?, filteredEntries: [ChatWrappedEntry], theme: TelegramPresentationTheme, filteredOutCount: Int = 0, adHiddenIds: Set<MessageId> = []) {
         self.originalView = originalView
         self.filteredEntries = filteredEntries
         self.theme = theme
         self.filteredOutCount = filteredOutCount
+        self.adHiddenIds = adHiddenIds
     }
     
     deinit {
@@ -4304,7 +4306,9 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
 
         let previousHistoryViewUpdateId = Atomic<Int?>(value: nil)
         let historyRenderGate = self.historyRenderGate
-        let renderingHistory = chatHistoryRenderingUpdates(combineLatest(historyViewUpdate, combineLatest(regramContentPreferenceChanges(accountId: context.peerId.toInt64()), regramQuickTranslationChanges(accountId: context.peerId.toInt64()))) |> map { update, _ in update }, visibility: self.visibility.get(), gate: historyRenderGate)
+        let reSieve = RegramAdFilterSession.get(context.account)
+        let historyAdScope = RegramAdFilterWorkScope(session: reSieve, scope: .history(UUID()))
+        let renderingHistory = chatHistoryRenderingUpdates(combineLatest(historyViewUpdate, regramContentPreferenceChanges(accountId: context.peerId.toInt64()), regramQuickTranslationChanges(accountId: context.peerId.toInt64()), reSieve.changes) |> map { update, _, _, _ in update }, visibility: self.visibility.get(), gate: historyRenderGate)
         let historyPeer = self.historyPeer
         let historyViewTransition = combineLatest(queue: queue,
                                                   renderingHistory,
@@ -4434,6 +4438,11 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                         topMessages = nil
                     }
                     
+                    let adSources = (topMessages ?? []) + msgEntries.map(\.message)
+                    historyAdScope.prepare(adSources, accountPeerId: context.peerId)
+                    let adHiddenIds = reSieve.hiddenMessageIds(in: adSources, accountPeerId: context.peerId, scope: historyAdScope.scope)
+                    let adDisplay: (Message) -> Message = { reSieve.display($0, accountPeerId: context.peerId, scope: historyAdScope.scope) }
+
                     var ads:(fixed: Message?, opportunistic: [Message]) = (fixed: nil, opportunistic: [])
                    
                     
@@ -4453,9 +4462,11 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                         includeJoin = false
                     }
                     
-                    let entries = messageEntries(msgEntries, location: chatLocation, maxReadIndex: view.isAnchorOnlyWhileLoading ? nil : maxReadIndex, dayGrouping: customChatContents == nil, renderType: chatTheme.bubbled ? .bubble : .list, includeBottom: true, timeDifference: timeDifference, ranks: ranks, pollAnswersLoading: pollAnswersLoading, threadLoading: threadLoading, groupingPhotos: true, autoplayMedia: initialData.autoplayMedia, searchState: searchState, animatedEmojiStickers: bigEmojiEnabled ? animatedEmojiStickers : [:], topFixedMessages: topMessages, customChannelDiscussionReadState: customChannelDiscussionReadState, customThreadOutgoingReadState: customThreadOutgoingReadState, addRepliesHeader: peerId == repliesPeerId && view.earlierId == nil, addWelcomeMessagesHeader: customChatContents?.kind == .welcomeMessages, updatingMedia: updatingMedia, adMessage: ads.fixed, dynamicAdMessages: ads.opportunistic, chatTheme: chatTheme, reactions: reactions, transribeState: uiState.transribe, topicCreatorId: uiState.topicCreatorId, mediaRevealed: uiState.mediaRevealed, translate: uiState.translate, storyState: uiState.storyState, peerStoryStats: view.peerStoryStats, cachedData: peerView?.cachedData, peer: peer, holeLater: view.holeLater, holeEarlier: view.holeEarlier, recommendedChannels: recommendedChannels, includeJoin: includeJoin, earlierId: view.earlierId, laterId: view.laterId, automaticDownload: initialData.autodownloadSettings, savedMessageTags: savedMessageTags, contentSettings: context.contentSettings, codeSyntaxData: uiState.codeSyntaxes, messageEffects: messageEffects, factCheckRevealed: uiState.factCheck, solutionRevealed: uiState.solutionRevealed, quoteRevealed: uiState.quoteRevealed, detailsExpanded: uiState.detailsExpanded, peerStatus: uiState.peerStatus, commonGroups: uiState.commonGroups, monoforumState: uiState.monoforumState, accountPeerId: context.peerId, contentConfig: context.contentConfig, walletFiatRate: uiState.walletFiatRate).map { ChatWrappedEntry(appearance: AppearanceWrapperEntry(entry: $0, appearance: appearance), tag: view.tag) }
-                    let hiddenCount = msgEntries.reduce(0) { $0 + (regramShouldHideMessage($1.message, accountId: context.peerId.toInt64()) ? 1 : 0) }
-                    proccesedView = ChatHistoryView(originalView: view, filteredEntries: entries, theme: chatTheme, filteredOutCount: hiddenCount)
+                    let entries = messageEntries(msgEntries, location: chatLocation, maxReadIndex: view.isAnchorOnlyWhileLoading ? nil : maxReadIndex, dayGrouping: customChatContents == nil, renderType: chatTheme.bubbled ? .bubble : .list, includeBottom: true, timeDifference: timeDifference, ranks: ranks, pollAnswersLoading: pollAnswersLoading, threadLoading: threadLoading, groupingPhotos: true, autoplayMedia: initialData.autoplayMedia, searchState: searchState, animatedEmojiStickers: bigEmojiEnabled ? animatedEmojiStickers : [:], topFixedMessages: topMessages, customChannelDiscussionReadState: customChannelDiscussionReadState, customThreadOutgoingReadState: customThreadOutgoingReadState, addRepliesHeader: peerId == repliesPeerId && view.earlierId == nil, addWelcomeMessagesHeader: customChatContents?.kind == .welcomeMessages, updatingMedia: updatingMedia, adMessage: ads.fixed, dynamicAdMessages: ads.opportunistic, chatTheme: chatTheme, reactions: reactions, transribeState: uiState.transribe, topicCreatorId: uiState.topicCreatorId, mediaRevealed: uiState.mediaRevealed, translate: uiState.translate, storyState: uiState.storyState, peerStoryStats: view.peerStoryStats, cachedData: peerView?.cachedData, peer: peer, holeLater: view.holeLater, holeEarlier: view.holeEarlier, recommendedChannels: recommendedChannels, includeJoin: includeJoin, earlierId: view.earlierId, laterId: view.laterId, automaticDownload: initialData.autodownloadSettings, savedMessageTags: savedMessageTags, contentSettings: context.contentSettings, codeSyntaxData: uiState.codeSyntaxes, messageEffects: messageEffects, factCheckRevealed: uiState.factCheck, solutionRevealed: uiState.solutionRevealed, quoteRevealed: uiState.quoteRevealed, detailsExpanded: uiState.detailsExpanded, peerStatus: uiState.peerStatus, commonGroups: uiState.commonGroups, monoforumState: uiState.monoforumState, accountPeerId: context.peerId, contentConfig: context.contentConfig, walletFiatRate: uiState.walletFiatRate, regramAdHiddenIds: adHiddenIds, regramAdDisplay: adDisplay).map { ChatWrappedEntry(appearance: AppearanceWrapperEntry(entry: $0, appearance: appearance), tag: view.tag) }
+                    let hiddenCount = msgEntries.reduce(0) { count, entry in
+                        count + (adHiddenIds.contains(entry.message.id) || regramShouldHideMessage(entry.message, accountId: context.peerId.toInt64()) ? 1 : 0)
+                    }
+                    proccesedView = ChatHistoryView(originalView: view, filteredEntries: entries, theme: chatTheme, filteredOutCount: hiddenCount, adHiddenIds: adHiddenIds)
                 }
             } else {
                 proccesedView = ChatHistoryView(originalView: nil, filteredEntries: [], theme: chatTheme)
@@ -8944,7 +8955,17 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         let dismissedPinnedIds = self.dismissedPinnedIds.get()
         let ready = self.ready.get()
         let filterAccountId = context.peerId.toInt64()
-        let messageFilterChanges = regramMessageFilterChanges(accountId: filterAccountId)
+        let messageFilterChanges = combineLatest(regramMessageFilterChanges(accountId: filterAccountId), regramPreferenceChanges(accountId: filterAccountId, keys: ["reSieveEnabled", "reSieveDisabledPeerIds"]), reSieve.changes)
+        let pinnedAdScope = RegramAdFilterWorkScope(session: reSieve, scope: .pinned(UUID()))
+
+        func preparePinnedAds(_ messages: [Message]) -> Set<MessageId> {
+            pinnedAdScope.prepare(messages, accountPeerId: context.peerId)
+            return reSieve.hiddenMessageIds(in: messages, accountPeerId: context.peerId, scope: pinnedAdScope.scope)
+        }
+
+        func displayPinnedMessage(_ message: Message) -> Message {
+            reSieve.display(message, accountPeerId: context.peerId, scope: pinnedAdScope.scope)
+        }
         
         let getPinned:()-> Signal<ChatPinnedMessage?, NoError> = {
            
@@ -8968,10 +8989,11 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                     case .Loading:
                         break
                     case let .HistoryView(view, _, _, _):
+                        let hiddenAds = preparePinnedAds(view.entries.map(\.message))
                         let visibleIndices = view.entries.indices.filter { index in
                             let message = view.entries[index].message
                             let isInLocation = chatLocation.threadId == nil || chatLocation.threadId == message.threadId || message.threadId == filterAccountId
-                            return isInLocation && !regramShouldHideMessage(message, accountId: filterAccountId)
+                            return isInLocation && !hiddenAds.contains(message.id) && !regramShouldHideMessage(message, accountId: filterAccountId)
                         }
                         let lastVisibleIndex = visibleIndices.last
                         for i in visibleIndices {
@@ -8994,7 +9016,7 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                                 matches = true
                             }
                             if matches {
-                                message = ChatPinnedMessage(messageId: entry.message.id, message: entry.message, others: view.entries.map { $0.message.id }, isLatest: i == view.entries.count - 1, index: view.entries.count - 1 - i, totalCount: view.entries.count)
+                                message = ChatPinnedMessage(messageId: entry.message.id, message: displayPinnedMessage(entry.message), others: view.entries.map { $0.message.id }, isLatest: i == view.entries.count - 1, index: view.entries.count - 1 - i, totalCount: view.entries.count)
                             }
                         }
                         break
@@ -9026,14 +9048,15 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                 })
                 |> restartIfError
             
-            topPinnedMessage = replyHistory
-                |> map { update -> ChatPinnedMessage? in
+            topPinnedMessage = combineLatest(replyHistory, messageFilterChanges)
+                |> map { update, _ -> ChatPinnedMessage? in
                     switch update {
                     case .Loading:
                         break
                     case let .HistoryView(view, _, _, _):
-                        if let first = view.entries.first {
-                            return ChatPinnedMessage(messageId: first.message.id, message: first.message, others: view.entries.map { $0.message.id }, isLatest: true, index: 0, totalCount: view.entries.count)
+                        let hiddenAds = preparePinnedAds(view.entries.map(\.message))
+                        if let first = view.entries.first(where: { !hiddenAds.contains($0.message.id) }) {
+                            return ChatPinnedMessage(messageId: first.message.id, message: displayPinnedMessage(first.message), others: view.entries.map { $0.message.id }, isLatest: true, index: 0, totalCount: view.entries.count)
                         }
                     }
                     return nil
@@ -9042,8 +9065,8 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
         case .thread:
             if mode.isThreadMode, case let .thread(data) = chatLocation() {
                 topPinnedMessage = combineLatest(context.account.postbox.messageView(data.effectiveTopId), messageFilterChanges) |> map { view, _ in
-                    if let message = view.message, !regramShouldHideMessage(message, accountId: filterAccountId) {
-                        return ChatPinnedMessage(messageId: message.id, message: message, others: [message.id], isLatest: true, index: 0, totalCount: 1)
+                    if let message = view.message, !preparePinnedAds([message]).contains(message.id), !regramShouldHideMessage(message, accountId: filterAccountId) {
+                        return ChatPinnedMessage(messageId: message.id, message: displayPinnedMessage(message), others: [message.id], isLatest: true, index: 0, totalCount: 1)
                     } else {
                         return nil
                     }
@@ -10243,9 +10266,11 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
                     strongSelf.reactionsMessageProcessingManager.add(messageIdsWithReactions)
                 }
                 
-                let history = strongSelf.historyView?.originalView
-                let atLatest = history?.laterId == nil && history?.holeLater == false && (tableView.documentSize.height <= tableView.frame.height || strongSelf.genericView.scroll.rect.minY == tableView.frame.height)
-                let readIndex = regramReadIndexIncludingFilteredTail(messages: history?.entries.map(\.message) ?? [], visibleReadIndex: message.map(MessageIndex.init), atLatest: atLatest, isHidden: { regramShouldHideMessage($0, accountId: context.peerId.toInt64()) })
+                let rendered = strongSelf.historyView
+                let history = rendered?.originalView
+                let atLatest = history?.laterId == nil && history?.holeLater == false && history?.isLoading == false && (tableView.documentSize.height <= tableView.frame.height || strongSelf.genericView.scroll.rect.minY == tableView.frame.height)
+                let adHiddenIds = strongSelf.canReadFilteredHistory ? rendered?.adHiddenIds ?? [] : []
+                let readIndex = regramReadIndexIncludingFilteredTail(messages: history?.entries.map(\.message) ?? [], visibleReadIndex: message.map(MessageIndex.init), atLatest: atLatest, isHidden: { adHiddenIds.contains($0.id) || regramShouldHideMessage($0, accountId: context.peerId.toInt64()) })
                 if let readIndex { strongSelf.updateMaxVisibleReadIncomingMessageIndex(readIndex) }
 
                 if let pinned = strongSelf.chatInteraction.presentation.pinnedMessageId, let message = pinned.message, !message.text.isEmpty {
@@ -10994,8 +11019,8 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
             }
         }
         if containsMessages { regramEmptyWindowSteps = 0; return }
-        if canReadFilteredHistory, let view = processedView.originalView, view.laterId == nil, !view.holeLater,
-           let index = regramReadIndexIncludingFilteredTail(messages: view.entries.map(\.message), visibleReadIndex: nil, atLatest: true, isHidden: { regramShouldHideMessage($0, accountId: context.peerId.toInt64()) }) {
+        if canReadFilteredHistory, let view = processedView.originalView, view.laterId == nil, !view.holeLater, !view.isLoading,
+           let index = regramReadIndexIncludingFilteredTail(messages: view.entries.map(\.message), visibleReadIndex: nil, atLatest: true, isHidden: { processedView.adHiddenIds.contains($0.id) || regramShouldHideMessage($0, accountId: context.peerId.toInt64()) }) {
             updateMaxVisibleReadIncomingMessageIndex(index)
         }
         guard processedView.filteredOutCount > 0, regramEmptyWindowSteps < 6,
@@ -12529,8 +12554,8 @@ open class ChatController<Context: AccountContextProtocol>: TelegramGenericViewC
     }
 
     private func updateMaxVisibleReadIncomingMessageIndex(_ index: MessageIndex) {
-        if canReadFilteredHistory, let view = historyView?.originalView {
-            let ids = regramFilteredMentionIdsToRead(messages: view.entries.map(\.message), peerId: chatLocation.peerId, threadId: chatLocation.threadId, readThrough: index, isHidden: { regramShouldHideMessage($0, accountId: context.peerId.toInt64()) })
+        if canReadFilteredHistory, let rendered = historyView, let view = rendered.originalView {
+            let ids = regramFilteredMentionIdsToRead(messages: view.entries.map(\.message), peerId: chatLocation.peerId, threadId: chatLocation.threadId, readThrough: index, isHidden: { rendered.adHiddenIds.contains($0.id) || regramShouldHideMessage($0, accountId: context.peerId.toInt64()) })
             if !ids.isEmpty { context.account.viewTracker.updateMarkMentionsSeenForMessageIds(messageIds: ids) }
         }
         self.maxVisibleIncomingMessageIndex.set(index)

@@ -88,6 +88,10 @@ public final class TelegramUser: Peer {
     public var botInfo: Bool? = nil
 }
 public final class RGRevokedMessageAttribute: MessageAttribute {}
+final class RGAdOriginalAttribute: MessageAttribute {
+    let source: Message?
+    init(source: Message) { self.source = source }
+}
 
 public struct Message: Equatable {
     public var id: MessageId

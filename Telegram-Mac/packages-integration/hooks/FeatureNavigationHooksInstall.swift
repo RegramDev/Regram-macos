@@ -409,6 +409,9 @@ func installFeatureNavigationHooks() {
     }
     hooks.makeRegramMessageController = { context, message in RegramEditHistoryController(context: context, message: message) }
     hooks.makeRegramFilterImportController = { context, data in RegramFilterImportController(context: context, data: data) }
+    if #available(macOS 12, *) {
+        hooks.makeRegramAdSampleController = { context, message in RegramAdSampleController(context: context, message: message) }
+    }
     hooks.makeRegramWebTranslationController = { context, url in RegramWebTranslationController(context: context, url: url) }
     var regramHooks = RegramUIHooks()
     #if !APP_STORE

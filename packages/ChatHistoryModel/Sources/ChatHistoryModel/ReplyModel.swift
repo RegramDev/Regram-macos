@@ -14,6 +14,7 @@ import MessageUtils
 import MessageTextUtils
 import LocalAnimations
 import InlineStickerLayer
+import RegramSignals
 
 public class ReplyModel: ChatAccessoryModel {
 
@@ -32,7 +33,12 @@ public class ReplyModel: ChatAccessoryModel {
     private let translate: ChatLiveTranslateContext.State.Result?
     private let forceClassic: Bool
     private(set) var pollIcon: CGImage?
-    private let quote: EngineMessageReplyQuote?
+    private let originalQuote: EngineMessageReplyQuote?
+    private var quote: EngineMessageReplyQuote? {
+        guard let originalQuote else { return nil }
+        if let replyMessage, !rgAdQuoteIsVisible(originalQuote, in: replyMessage) { return nil }
+        return originalQuote
+    }
     private let innerSubject: EngineMessageReplyInnerSubject?
     public init(message: Message?, replyMessageId:MessageId, context: any AccountContextProtocol, replyMessage:Message? = nil, quote: EngineMessageReplyQuote? = nil, innerSubject: EngineMessageReplyInnerSubject? = nil, isPinned: Bool = false, autodownload: Bool = false, presentation: ChatAccessoryPresentation? = nil, headerAsName: Bool = false, customHeader: String? = nil, drawLine: Bool = true, makesizeCallback: (()->Void)? = nil, dismissReply: (()->Void)? = nil, translate: ChatLiveTranslateContext.State.Result? = nil, forceClassic: Bool = false) {
         self.parent = message
@@ -45,7 +51,7 @@ public class ReplyModel: ChatAccessoryModel {
         self.customHeader = customHeader
         self.translate = translate
         self.forceClassic = forceClassic
-        self.quote = quote
+        self.originalQuote = quote
         self.innerSubject = innerSubject
         super.init(context: context, presentation: presentation, drawLine: drawLine)
         
@@ -54,6 +60,29 @@ public class ReplyModel: ChatAccessoryModel {
         |> map {
             $0.message
         } |> deliverOnMainQueue
+
+        if #available(macOS 12, *), forceClassic,
+           replyMessageId.peerId.namespace == Namespaces.Peer.CloudChannel || replyMessageId.peerId.namespace == Namespaces.Peer.CloudGroup {
+            let accountPeerId = context.peerId
+            let session = RegramAdFilterSession.get(context.account)
+            let scope = RegramAdFilterWorkScope(session: session, scope: .pinned(UUID()))
+            let preferences = regramPreferenceChanges(accountId: accountPeerId.toInt64(), keys: ["reSieveEnabled", "reSieveDisabledPeerIds"])
+            let initial = replyMessage.map { session.replyPreview($0, accountPeerId: accountPeerId, scope: scope.scope) }
+            make(with: initial, display: false)
+            nodeReady.set(combineLatest(messageViewSignal, session.changes, preferences) |> deliverOnMainQueue
+            |> map { message, _, _ -> Message? in
+                guard let message else { return nil }
+                scope.prepare([message], accountPeerId: accountPeerId)
+                return session.replyPreview(message, accountPeerId: accountPeerId, scope: scope.scope)
+            }
+            |> distinctUntilChanged(isEqual: ==)
+            |> map { [weak self] message -> Bool in
+                self?.make(with: message, isLoading: false, display: true)
+                if message == nil { dismissReply?() }
+                return message != nil
+            })
+            return
+        }
         
         if let replyMessage = replyMessage {
             make(with :replyMessage, display: false)

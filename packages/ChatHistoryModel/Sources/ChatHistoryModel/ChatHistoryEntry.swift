@@ -657,7 +657,7 @@ public func <(lhs: ChatHistoryEntry, rhs: ChatHistoryEntry) -> Bool {
 
 private var index = 0
 
-public func messageEntries(_ messagesEntries: [MessageHistoryEntry], location: ChatLocation? = nil, maxReadIndex:MessageIndex? = nil, includeHoles: Bool = true, dayGrouping: Bool = false, renderType: ChatItemRenderType = .list, includeBottom:Bool = false, timeDifference: TimeInterval = 0, ranks:CachedChannelAdminRanks? = nil, pollAnswersLoading: [MessageId : ChatPollStateData] = [:], threadLoading: MessageId? = nil, groupingPhotos: Bool = false, autoplayMedia: AutoplayMediaPreferences? = nil, searchState: SearchMessagesResultState? = nil, animatedEmojiStickers: [String: StickerPackItem] = [:], topFixedMessages: [Message]? = nil, customChannelDiscussionReadState: MessageId? = nil, customThreadOutgoingReadState: MessageId? = nil, addRepliesHeader: Bool = false, addWelcomeMessagesHeader: Bool = false, addTopThreadInset: CGFloat? = nil, updatingMedia: [MessageId: ChatUpdatingMessageMedia] = [:], adMessage:Message? = nil, dynamicAdMessages: [Message] = [], chatTheme: TelegramPresentationTheme = theme, reactions: AvailableReactions? = nil, transribeState: [MessageId : TranscribeAudioState] = [:], topicCreatorId: PeerId? = nil, mediaRevealed: Set<MessageId> = Set(), translate: ChatLiveTranslateContext.State? = nil, storyState: PeerExpiringStoryListContext.State? = nil, peerStoryStats: [PeerId : PeerStoryStats] = [:], cachedData: CachedPeerData? = nil, peer: Peer? = nil, holeLater: Bool = false, holeEarlier: Bool = false, recommendedChannels: RecommendedChannels? = nil, includeJoin: Bool = false, earlierId: MessageIndex? = nil, laterId: MessageIndex? = nil, automaticDownload: AutomaticMediaDownloadSettings = .defaultSettings, savedMessageTags: SavedMessageTags? = nil, contentSettings: ContentSettings? = nil, codeSyntaxData: [CodeSyntaxKey : CodeSyntaxResult] = [:], messageEffects: AvailableMessageEffects? = nil, factCheckRevealed: Set<MessageId> = Set(), solutionRevealed: Set<MessageId> = Set(), quoteRevealed: Set<QuoteMessageIndex> = Set(), detailsExpanded: Set<DetailsMessageIndex> = Set(), peerStatus: PeerStatusSettings? = nil, commonGroups: GroupsInCommonState? = nil, monoforumState: MonoforumUIState? = nil, accountPeerId: PeerId? = nil, contentConfig: ContentSettingsConfiguration = .default, walletFiatRate: WalletFiatRateProjection? = nil) -> [ChatHistoryEntry] {
+public func messageEntries(_ messagesEntries: [MessageHistoryEntry], location: ChatLocation? = nil, maxReadIndex:MessageIndex? = nil, includeHoles: Bool = true, dayGrouping: Bool = false, renderType: ChatItemRenderType = .list, includeBottom:Bool = false, timeDifference: TimeInterval = 0, ranks:CachedChannelAdminRanks? = nil, pollAnswersLoading: [MessageId : ChatPollStateData] = [:], threadLoading: MessageId? = nil, groupingPhotos: Bool = false, autoplayMedia: AutoplayMediaPreferences? = nil, searchState: SearchMessagesResultState? = nil, animatedEmojiStickers: [String: StickerPackItem] = [:], topFixedMessages: [Message]? = nil, customChannelDiscussionReadState: MessageId? = nil, customThreadOutgoingReadState: MessageId? = nil, addRepliesHeader: Bool = false, addWelcomeMessagesHeader: Bool = false, addTopThreadInset: CGFloat? = nil, updatingMedia: [MessageId: ChatUpdatingMessageMedia] = [:], adMessage:Message? = nil, dynamicAdMessages: [Message] = [], chatTheme: TelegramPresentationTheme = theme, reactions: AvailableReactions? = nil, transribeState: [MessageId : TranscribeAudioState] = [:], topicCreatorId: PeerId? = nil, mediaRevealed: Set<MessageId> = Set(), translate: ChatLiveTranslateContext.State? = nil, storyState: PeerExpiringStoryListContext.State? = nil, peerStoryStats: [PeerId : PeerStoryStats] = [:], cachedData: CachedPeerData? = nil, peer: Peer? = nil, holeLater: Bool = false, holeEarlier: Bool = false, recommendedChannels: RecommendedChannels? = nil, includeJoin: Bool = false, earlierId: MessageIndex? = nil, laterId: MessageIndex? = nil, automaticDownload: AutomaticMediaDownloadSettings = .defaultSettings, savedMessageTags: SavedMessageTags? = nil, contentSettings: ContentSettings? = nil, codeSyntaxData: [CodeSyntaxKey : CodeSyntaxResult] = [:], messageEffects: AvailableMessageEffects? = nil, factCheckRevealed: Set<MessageId> = Set(), solutionRevealed: Set<MessageId> = Set(), quoteRevealed: Set<QuoteMessageIndex> = Set(), detailsExpanded: Set<DetailsMessageIndex> = Set(), peerStatus: PeerStatusSettings? = nil, commonGroups: GroupsInCommonState? = nil, monoforumState: MonoforumUIState? = nil, accountPeerId: PeerId? = nil, contentConfig: ContentSettingsConfiguration = .default, walletFiatRate: WalletFiatRateProjection? = nil, regramAdHiddenIds: Set<MessageId> = [], regramAdDisplay: (Message) -> Message = { $0 }) -> [ChatHistoryEntry] {
     var entries: [ChatHistoryEntry] = []
     let regramRevision = accountPeerId.map { RegramPreferences.shared.revision(accountId: $0.toInt64()) &+ RegramQuickTranslationTasks.shared.revision(accountId: $0.toInt64()) } ?? 0
     let regramSettings = accountPeerId.map { RegramPreferences.shared.settings(accountId: $0.toInt64()) } ?? RegramAccountSettings()
@@ -666,7 +666,7 @@ public func messageEntries(_ messagesEntries: [MessageHistoryEntry], location: C
     let dynamicAdMessages = regramSettings["disableAllAds"].bool ? [] : dynamicAdMessages
     let topFixedMessages = topFixedMessages?.filter { message in
         guard let accountPeerId else { return true }
-        return !regramShouldHideMessage(message, accountId: accountPeerId.toInt64())
+        return !regramAdHiddenIds.contains(message.id) && !regramShouldHideMessage(message, accountId: accountPeerId.toInt64())
     }
 
 
@@ -680,7 +680,7 @@ public func messageEntries(_ messagesEntries: [MessageHistoryEntry], location: C
     let originalCount = messagesEntries.count
     if let accountPeerId {
         let accountId = accountPeerId.toInt64()
-        messagesEntries.removeAll { regramShouldHideMessage($0.message, accountId: accountId) }
+        messagesEntries.removeAll { regramAdHiddenIds.contains($0.message.id) || regramShouldHideMessage($0.message, accountId: accountId) }
     }
     let maxReadIndex = maxReadIndex.flatMap { index -> MessageIndex? in
         if messagesEntries.count < originalCount, !messagesEntries.contains(where: { !$0.message.flags.intersection(.IsIncomingMask).isEmpty && $0.message.index > index }) { return nil }
@@ -945,7 +945,7 @@ public func messageEntries(_ messagesEntries: [MessageHistoryEntry], location: C
     }
 
     for (i, entry) in messagesEntries.enumerated() {
-        var message = entry.message.withAppliedEphemeralReplacementMessage()
+        var message = regramAdDisplay(entry.message).withAppliedEphemeralReplacementMessage()
         
     
         if message.media.isEmpty {
@@ -1254,15 +1254,18 @@ public func messageEntries(_ messagesEntries: [MessageHistoryEntry], location: C
         
         var messageTranslate: ChatLiveTranslateContext.State.Result?
         var replyTranslate: ChatLiveTranslateContext.State.Result?
-        if let translate = translate {
-            messageTranslate = translate.translationResult(for: message, accountPeerId: accountPeerId, matchingTranslation: regramTranslation.matches(message))
-            if let reply = message.replyAttribute, let replyMessage = message.associatedMessages[reply.messageId] {
+        let adTextWasFiltered = rgAdTextWasFiltered(message)
+        if let translate {
+            if !adTextWasFiltered {
+                messageTranslate = translate.translationResult(for: message, accountPeerId: accountPeerId, matchingTranslation: regramTranslation.matches(message))
+            }
+            if let reply = message.replyAttribute, let replyMessage = message.associatedMessages[reply.messageId], !rgAdTextWasFiltered(replyMessage) {
                 replyTranslate = translate.replyTranslationResult(for: replyMessage, matchingTranslation: regramTranslation.matches(replyMessage))
             }
         }
 
         let canDisplayTranslation = accountPeerId.map { message.effectivelyIncoming($0) } ?? true
-        if let accountPeerId, canDisplayTranslation {
+        if let accountPeerId, canDisplayTranslation, !adTextWasFiltered {
             let key = RGBookmarkMessageId(peerId: message.id.peerId.toInt64(), namespace: message.id.namespace, id: message.id.id)
             if let task = RegramQuickTranslationTasks.shared.task(accountId: accountPeerId.toInt64(), messageId: key) {
                 messageTranslate = .loading(toLang: task.language)
@@ -1285,7 +1288,7 @@ public func messageEntries(_ messagesEntries: [MessageHistoryEntry], location: C
 
         let transcriptionTranslate = translate?.transcriptionTranslationResult(for: message, accountPeerId: accountPeerId)
 
-        let summarize = translate?.summarizeResult[.Key(id: message.id)]
+        let summarize = adTextWasFiltered ? nil : translate?.summarizeResult[.Key(id: message.id)]
 
         let entryCodeSyntax = codeSyntaxByMessage[message.id] ?? [:]
 

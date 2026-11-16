@@ -218,10 +218,14 @@ let filteredPin = visiblePin(pinnedHistory, chatLocation: chatLocation, topVisib
 expect(filteredPin?.messageId == visiblePinMessage.id && filteredPin?.others == [visiblePinMessage.id, hiddenPin.id], "pinned header falls back to a visible pin and keeps pin metadata")
 let allHiddenPins = PinnedHistoryView(entries: [MessageHistoryEntry(message: hiddenPin)])
 expect(visiblePin(allHiddenPins, chatLocation: chatLocation, topVisibleMessageRange: nil, dismissed: .init(), filterAccountId: accountId) == nil, "pinned header omits an entirely filtered set")
-expect(visiblePin(pinnedHistory, chatLocation: chatLocation, topVisibleMessageRange: nil, dismissed: .init(), filterAccountId: accountId + 1000)?.messageId == hiddenPin.id, "another account keeps its own pin visibility")
+expect(visiblePin(pinnedHistory, chatLocation: chatLocation, topVisibleMessageRange: nil, dismissed: .init(), filterAccountId: accountId + 1000)?.messageId == visiblePinMessage.id, "accounts share keyword filtering preferences")
+let projectedPin = hiddenPin.withUpdatedText("visible").withUpdatedAttributes([RGAdOriginalAttribute(source: hiddenPin)])
+expect(regramShouldHideMessage(projectedPin, accountId: accountId), "keyword filtering checks the original text of a ReSieve preview")
+expect(visiblePin(pinnedHistory, chatLocation: chatLocation, topVisibleMessageRange: nil, dismissed: .init(), filterAccountId: accountId, preparePinnedAds: { _ in [visiblePinMessage.id] }) == nil, "ReSieve and keyword rules both apply to the pinned header")
 reveal.setRevealed(true, accountId: accountId, peerId: peer.toInt64())
 expect(visibleGroup(archived, filterAccountId: accountId) == archived, "temporary reveal restores archive previews")
 expect(visiblePin(pinnedHistory, chatLocation: chatLocation, topVisibleMessageRange: nil, dismissed: .init(), filterAccountId: accountId)?.messageId == hiddenPin.id, "temporary reveal restores the latest pin")
+expect(visiblePin(pinnedHistory, chatLocation: chatLocation, topVisibleMessageRange: nil, dismissed: .init(), filterAccountId: accountId + 1000)?.messageId == visiblePinMessage.id, "temporary reveal remains scoped to the current account")
 expect(regramShouldHideMessage(hiddenPin, accountId: accountId, temporaryReveal: false), "visibility checks can ignore temporary reveal")
 reveal.setRevealed(false, accountId: accountId, peerId: peer.toInt64())
 expect(visibleGroup(archived, filterAccountId: accountId) == filteredArchive, "archive filtering resumes after temporary reveal")
@@ -781,11 +785,13 @@ mixed.dispose(); drainCoordinator()
 
 expect(TestCounters.shared.count("text.postbox") == 0 && TestCounters.shared.count("matches.postbox") == 0, "preview and unread classification never expand text or match regex inside Postbox transactions")
 let captureAccountId: Int64 = 77219
+preferences.reset(accountId: captureAccountId)
 let initialCapture = preferences.captureFilter(accountId: captureAccountId)
-expect(initialCapture.revision == 0 && initialCapture.filter.isEmpty, "initial capture returns the matching empty filter and zero revision")
+let captureBaselineRevision = initialCapture.revision
+expect(initialCapture.filter.isEmpty, "reset produces an empty filter at the current shared revision")
 preferences.update(accountId: captureAccountId) { $0.filterRules = [RGMessageFilterRule(pattern: "odd")] }
 let firstCapture = preferences.captureFilter(accountId: captureAccountId)
-expect(firstCapture.revision == 1 && firstCapture.filter.shouldHide(text: "odd", peerId: peer.toInt64(), authorId: nil, incoming: true), "capture pairs a changed rule with its incremented revision")
+expect(firstCapture.revision == captureBaselineRevision + 1 && firstCapture.filter.shouldHide(text: "odd", peerId: peer.toInt64(), authorId: nil, incoming: true), "capture pairs a changed rule with its incremented revision")
 expect(preferences.filter(accountId: captureAccountId).shouldHide(text: "odd", peerId: peer.toInt64(), authorId: nil, incoming: true), "filter compatibility entry uses captured filter")
 let captureMismatched = Atomic(value: false)
 let captureWorkers = DispatchGroup()
@@ -800,7 +806,7 @@ for operation in 0..<4 {
             for _ in 0..<2000 {
                 let captured = preferences.captureFilter(accountId: captureAccountId)
                 let hidden = captured.filter.shouldHide(text: "odd", peerId: peer.toInt64(), authorId: nil, incoming: true)
-                if hidden != (captured.revision % 2 == 1) { _ = captureMismatched.swap(true) }
+                if hidden != ((captured.revision - captureBaselineRevision) % 2 == 1) { _ = captureMismatched.swap(true) }
                 _ = regramShouldHideMessage(message(700, text: "odd"), accountId: captureAccountId)
             }
         }
@@ -810,9 +816,9 @@ for operation in 0..<4 {
 expect(captureWorkers.wait(timeout: .now() + 15) == .success && !captureMismatched.with { $0 }, "concurrent rule writes cannot split captured revision and filter")
 expect(TestCounters.shared.count("captureStores") > 0 && TestCounters.shared.count("captureMismatch") == 0, "legacy entry never stores a decision under another rule revision")
 let finalCapture = preferences.captureFilter(accountId: captureAccountId)
-expect(finalCapture.revision == 502 && !finalCapture.filter.shouldHide(text: "odd", peerId: peer.toInt64(), authorId: nil, incoming: true), "final capture reflects all concurrent rule writes")
+expect(finalCapture.revision == captureBaselineRevision + 502 && !finalCapture.filter.shouldHide(text: "odd", peerId: peer.toInt64(), authorId: nil, incoming: true), "final capture reflects all concurrent rule writes")
 let revokedAccountId: Int64 = 98124
-preferences.update(accountId: revokedAccountId) { $0["antiRevoke"] = .bool(true) }
+preferences.update(accountId: revokedAccountId) { $0.filterRules = []; $0["antiRevoke"] = .bool(true) }
 let revokedCapture = preferences.captureFilter(accountId: revokedAccountId)
 var revokedTop = message(40, text: "deleted advertisement")
 revokedTop.attributes = [RGRevokedMessageAttribute()]

@@ -59,13 +59,16 @@ assert 'replaceUnreadRequests(unreadOrder.compactMap { unreadRequests[$0] })' in
 native = (core / 'TelegramEngine/Messages/ApplyMaxReadIndexInteractively.swift').read_text()
 native = declaration(native, 'func _internal_applyMaxReadIndexInteractively(transaction:')
 assert 'Regram' not in native
-message_policy = (ROOT / 'packages/ChatHistoryModel/Sources/ChatHistoryModel/RegramMessagePolicy.swift').read_text()
+history = ROOT / 'packages/ChatHistoryModel/Sources/ChatHistoryModel'
+message_policy = (history / 'RegramMessagePolicy.swift').read_text()
+ad_bridge = (history / 'RegramAdFiltering.swift').read_text()
+production += '\n' + declaration(ad_bridge, 'public func rgAdOriginalMessage(')
 payload = declaration(message_policy, 'public struct RegramMessageFilterPayload:')
 payload = payload.replace('fileprivate func filterText() -> String {', 'fileprivate func filterText() -> String {\n        TestCounters.shared.increment("text")')
 cache = declaration(message_policy, 'private final class RegramMessageVisibilityCache')
 cache = cache.replace('        let identity = RegramMessageFilterPayload.CacheIdentity(payload)', '''        if key.accountId == 77219 {
             TestCounters.shared.increment("captureStores")
-            if hidden != (revision % 2 == 1) { TestCounters.shared.increment("captureMismatch") }
+            if hidden != ((revision - captureBaselineRevision) % 2 == 1) { TestCounters.shared.increment("captureMismatch") }
         }
         let identity = RegramMessageFilterPayload.CacheIdentity(payload)''')
 cache = cache[:-1] + '''
@@ -94,7 +97,7 @@ assert 'dismissedPinnedIds, messageFilterChanges)' in pinned
 assert 'messageView(data.effectiveTopId), messageFilterChanges)' in chat_controller
 pinned = pinned[pinned.index('case let .HistoryView(view, _, _, _):') + len('case let .HistoryView(view, _, _, _):'):pinned.index('\n                        break\n                    }\n                    return message')]
 production += '''
-func visiblePin(_ view: PinnedHistoryView, chatLocation: PinnedLocation, topVisibleMessageRange: PinnedVisibleRange?, dismissed: DismissedPins, filterAccountId: Int64) -> ChatPinnedMessage? {
+func visiblePin(_ view: PinnedHistoryView, chatLocation: PinnedLocation, topVisibleMessageRange: PinnedVisibleRange?, dismissed: DismissedPins, filterAccountId: Int64, preparePinnedAds: ([Message]) -> Set<MessageId> = { _ in [] }, displayPinnedMessage: (Message) -> Message = { $0 }) -> ChatPinnedMessage? {
     var message: ChatPinnedMessage?
 ''' + pinned + '''
     return message

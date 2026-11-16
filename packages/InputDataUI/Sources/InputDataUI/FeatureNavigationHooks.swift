@@ -105,6 +105,7 @@ public struct FeatureNavigationHooks {
     public var presentRegramFolderAfterJoining: ((any AccountContextProtocol, PeerId) -> Void)?
     public var makeRegramMessageController: (any AccountContextProtocol, Message) -> ViewController? = { _, _ in nil }
     public var makeRegramFilterImportController: ((any AccountContextProtocol, Data) -> ViewController?)? = nil
+    public var makeRegramAdSampleController: ((any AccountContextProtocol, Message) -> ViewController?)? = nil
     public var makeRegramWebTranslationController: (any AccountContextProtocol, URL) -> ViewController? = { _, _ in nil }
     public var makeGroupAdminsController: (any AccountContextProtocol, PeerId) -> ViewController? = { _, _ in nil }
     public var showPremiumBoarding: (any AccountContextProtocol, Window, PremiumBoardingSource?, Bool, TelegramPresentationTheme?) -> Void = { _, _, _, _, _ in }

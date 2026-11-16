@@ -19,13 +19,14 @@ EXTENSIONS = 'packages/TGUIKit/Sources/Extensions.swift'
 INPUT = 'packages/InputView/Sources/InputView/ChatTextInputAttribute.swift'
 DATES = 'packages/MessageUtils/Sources/MessageUtils/FormattedDateEntities.swift'
 ENTITIES = 'submodules/TelegramCore/Sources/SyncCore/SyncCore_TextEntitiesMessageAttribute.swift'
+AD_BRIDGE = 'packages/ChatHistoryModel/Sources/ChatHistoryModel/RegramAdFiltering.swift'
 
 
 def read(path):
     if path == ENTITIES:
         pinned = subprocess.check_output(['git', 'ls-tree', 'HEAD', 'submodules/telegram-ios'], cwd=root, text=True).split()[2]
         return subprocess.check_output(['git', 'show', f'{pinned}:{path}'], cwd=ios, text=True)
-    if args.rev and path in (MENU, FOLDING):
+    if args.rev and path in (MENU, FOLDING, AD_BRIDGE):
         return subprocess.check_output(['git', 'show', f'{args.rev}:{path}'], cwd=root, text=True)
     return (root / path).read_text()
 
@@ -55,10 +56,19 @@ entities = strip_comments(read(ENTITIES))
 
 handler = block(menu, 'firstBlock.append(ContextMenuItem(strings().chatMessageContextQuote, handler: {')[1]
 mapping = block(menu, 'func messageTextRange(of range: NSRange, in shown: NSAttributedString, message: Message) -> NSRange? {')[0] if 'func messageTextRange(' in menu else ''
+ad_mapping = ''
+ad_checks = ''
+if 'rgAdOriginalRange' in handler:
+    bridge = strip_comments(read(AD_BRIDGE))
+    ad_mapping = '\n'.join(block(bridge, f'public func {name}(')[0] for name in (
+        'rgAdOriginalMessage', 'rgAdMessageWasFiltered', 'rgAdOriginalRange'))
+    ad_checks = (Path(__file__).with_name('ReSieveQuoteChecks.swift.in')).read_text()
 
 fixture = (Path(__file__).with_name('QuoteExactTextTests.swift.in').read_text()
            .replace('__HANDLER__', handler)
            .replace('__MESSAGE_TEXT_RANGE__', mapping)
+           .replace('__AD_MAPPING__', ad_mapping)
+           .replace('__AD_CHECKS__', ad_checks)
            .replace('__MERGED__', block(folding, 'public var merged: TextViewLayout {')[0])
            .replace('__BREAK_STRING__', block(folding, 'public static func breakString(_ string: NSAttributedString) -> [NSRange] {')[0])
            .replace('__REMOVE_WHITESPACE__', block(extensions, 'func removeWhitespaceFromQuoteAttribute() {')[0])

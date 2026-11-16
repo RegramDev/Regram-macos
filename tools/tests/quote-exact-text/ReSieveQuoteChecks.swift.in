@@ -1,0 +1,10 @@
+do {
+    let original = Message("A广告😀B", [entity(5, 6, .Bold)])
+    let filtered = Message("AB", [entity(1, 2, .Bold)], original: original, cuts: [RGAdRange(1, 5)])
+    let layout = TextViewLayout(shown(filtered))
+    layout.selectedRange.range = NSRange(location: 1, length: 1)
+    let result = quote(layout, filtered)
+    check("a filtered selection uses the original UTF-16 offset", result?.text == "B" && result?.offset == 5 && result?.entities == [entity(0, 1, .Bold)], "quoted \(String(describing: result))")
+    layout.selectedRange.range = NSRange(location: 0, length: 2)
+    check("a selection across filtered text sends a plain reply", quote(layout, filtered) == nil && replied, "expected a reply without a quote")
+}

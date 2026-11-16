@@ -90,6 +90,21 @@ func regramMessageMenu(message: Message, messages: [Message], interaction: ChatI
             }))
         }, itemImage: MenuAnimation.menu_plus.value))
     }
+    let original = rgAdOriginalMessage(message)
+    if !protected, rgCanCorrectAds(original), original.effectivelyIncoming(context.peerId),
+       original.id.peerId.namespace == Namespaces.Peer.CloudChannel || original.id.peerId.namespace == Namespaces.Peer.CloudGroup {
+        if rgAdMessageWasFiltered(message), !original.text.isEmpty {
+            filters.addItem(ContextMenuItem(menuTitle("ReSieve.Original"), handler: {
+                showModalText(for: context.window, text: original.text, title: menuTitle("ReSieve.Original"))
+            }, itemImage: MenuAnimation.menu_eye.value))
+        }
+        if let makeController = FeatureNavigationHooks.shared.makeRegramAdSampleController {
+            filters.addItem(ContextMenuItem(menuTitle("ReSieve.Correct"), handler: {
+                guard let controller = makeController(context, original) else { return }
+                context.bindings.rootNavigation().push(controller)
+            }, itemImage: MenuAnimation.menu_edited.value))
+        }
+    }
     if !filters.items.isEmpty { filters.addItem(ContextSeparatorItem()) }
     let revealed = RegramTemporaryReveal.shared.isRevealed(accountId: accountId, peerId: message.id.peerId.toInt64())
     filters.addItem(ContextMenuItem(menuTitle(revealed ? "menu.restoreFilters" : "menu.revealFilters"), handler: {

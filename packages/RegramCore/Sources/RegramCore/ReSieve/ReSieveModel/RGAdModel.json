@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "architecture": "MiniRBT-H256-6L",
+  "sequenceLength": 128,
+  "weightBits": 16,
+  "threshold": 0.99164,
+  "modelSHA256": "317fb694c4d81160af90ffeb87ceedc8e5f6e120442f3105b1b0ddcd90e31b49",
+  "vocabularySHA256": "45bbac6b341c319adc98a532532882e91a9cefc0329aa57bac9ae761c27b291c",
+  "labels": [
+    "content",
+    "promotion"
+  ],
+  "maxConversionError": 0.004074990749359131
+}

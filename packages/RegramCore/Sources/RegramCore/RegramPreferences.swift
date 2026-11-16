@@ -166,6 +166,8 @@ public struct RegramSetting: Equatable {
         .init("messageFilterRules", .privacy, .string("[]")),
         .init("blockedPeerIds", .privacy, .strings([])),
         .init("messageFilterDisabledPeerIds", .privacy, .strings([])),
+        .init("reSieveEnabled", .privacy, .bool(true)),
+        .init("reSieveDisabledPeerIds", .privacy, .strings([])),
         .init("antiRevoke", .privacy, .bool(false)),
         .init("antiRevokeSkipBots", .privacy, .bool(false)),
         .init("antiRevokePeerIds", .privacy, .strings([])),
@@ -404,6 +406,19 @@ public struct RegramAccountSettings: Codable, Equatable {
     public var filterRules: [RGMessageFilterRule] {
         get { RGMessageFilter.decode(self["messageFilterRules"].string) }
         set { self["messageFilterRules"] = .string(RGMessageFilter.encode(newValue)) }
+    }
+
+    public func reSieveEnabled(for peerId: Int64) -> Bool {
+        self["reSieveEnabled"].bool && !self["reSieveDisabledPeerIds"].strings.contains(String(peerId))
+    }
+
+    public mutating func toggleReSieve(for peerId: Int64) {
+        guard self["reSieveEnabled"].bool else { return }
+        let id = String(peerId)
+        var disabled = self["reSieveDisabledPeerIds"].strings
+        if disabled.contains(id) { disabled.removeAll { $0 == id } }
+        else { disabled.append(id) }
+        self["reSieveDisabledPeerIds"] = .strings(disabled)
     }
 
     public func shouldHide(text: String, peerId: Int64, authorId: Int64?, incoming: Bool) -> Bool {

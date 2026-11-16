@@ -25,6 +25,9 @@ import Foundation
 
     static func main() {
         let blocked = message(2), visible = message(3, hidden: false), later = message(4)
+        expect(regramReadIndexIncludingFilteredTail(messages: [blocked, visible, later], visibleReadIndex: blocked.index, atLatest: true, isHidden: hidden) == blocked.index, "A hidden tail cannot skip an unread visible message")
+        expect(regramReadIndexIncludingFilteredTail(messages: [blocked, visible, later], visibleReadIndex: nil, atLatest: true, isHidden: hidden) == nil, "A hidden tail alone does not give a visible read position")
+        expect(regramReadIndexIncludingFilteredTail(messages: [visible, later], visibleReadIndex: visible.index, atLatest: true, isHidden: hidden) == later.index, "A contiguous hidden tail can advance the read position")
         let otherPeer = message(1, peerId: PeerId(namespace: Namespaces.Peer.CloudChannel, value: 200))
         let otherTopic = message(1, threadId: 20)
         let currentTopic = message(2, threadId: 10)

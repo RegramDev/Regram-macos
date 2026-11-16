@@ -11,7 +11,7 @@ let package = Package(
     ],
     dependencies: [.package(name: "SSignalKit", path: "../../submodules/telegram-ios/submodules/SSignalKit")],
     targets: [
-        .target(name: "RegramCore", resources: [.process("Resources")]),
+        .target(name: "RegramCore", resources: [.process("Resources"), .copy("ReSieve/ReSieveModel")]),
         .target(name: "RegramSignals", dependencies: ["RegramCore", .product(name: "SwiftSignalKit", package: "SSignalKit")]),
         .testTarget(name: "RegramCoreTests", dependencies: ["RegramCore", "RegramSignals"])
     ]

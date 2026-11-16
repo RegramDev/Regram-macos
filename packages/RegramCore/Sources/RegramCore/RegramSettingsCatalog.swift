@@ -296,7 +296,7 @@ public enum RegramSettingsCatalog {
         "recordingSettings": ["Settings.Category.recording", "recording microphone round 录制 麦克风 圆视频"],
         "appUpdate": ["AppUpdate.Title", "update github install 更新 安装 安裝"],
 
-        "messageFilter": ["MessageFilter.Title", "MessageFilter.Regex", "MessageFilter.Test.Title", "filter regex whitelist 过滤 正则 白名单"],
+        "messageFilter": ["MessageFilter.Title", "MessageFilter.Regex", "MessageFilter.Test.Title", "ReSieve.Title", "filter regex whitelist 过滤 正则 白名单"],
         "hiddenUsers": ["HiddenUsers.Title", "hidden blocked 隐藏 屏蔽用户"],
         "mentionAsUserIdLink": ["Mention.UserIdLink", "mention nickname 昵称 提及 艾特"],
         "localPremium": ["LocalPremium.Title", "premium"],

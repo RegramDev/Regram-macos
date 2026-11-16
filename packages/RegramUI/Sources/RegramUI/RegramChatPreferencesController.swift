@@ -65,6 +65,16 @@ public func RegramChatPreferencesController(context: any AccountContextProtocol,
                 RegramTemporaryReveal.shared.setRevealed(!revealed, accountId: accountId, peerId: peerId.toInt64())
             })))
             rows.append(.desc(sectionId: 3, index: 6, text: .plain(regramString("ChatPreferences.Reveal.Notice")), data: .init(color: theme.colors.listGrayText, viewType: .textBottomItem)))
+            if peerId.namespace == Namespaces.Peer.CloudGroup || peerId.namespace == Namespaces.Peer.CloudChannel {
+                var adPage = RegramPageBuilder(page: "chatPreferences", sectionId: 3, index: 7)
+                adPage.section()
+                adPage.row("reSieve", title: regramString("ReSieve.Enable"), type: .switchable(settings.reSieveEnabled(for: peerId.toInt64())), enabled: settings["reSieveEnabled"].bool, action: {
+                    guard currentPeerId() == peerId else { return }
+                    RegramPreferences.shared.update(accountId: accountId) { $0.toggleReSieve(for: peerId.toInt64()) }
+                })
+                adPage.text(regramString("ReSieve.PerChat"))
+                rows.append(contentsOf: adPage.entries)
+            }
         }
         return InputDataSignalValue(entries: rows)
     }

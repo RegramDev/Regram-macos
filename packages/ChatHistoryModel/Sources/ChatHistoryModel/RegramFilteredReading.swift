@@ -7,7 +7,7 @@ public func regramReadIndexIncludingFilteredTail(messages: [Message], visibleRea
     var result = visibleReadIndex
     for message in messages.reversed() {
         if let visibleReadIndex, message.index <= visibleReadIndex { break }
-        guard isHidden(message) else { break }
+        guard isHidden(message) else { return visibleReadIndex }
         if !message.flags.intersection(.IsIncomingMask).isEmpty, result == nil || result! < message.index { result = message.index }
     }
     return result
