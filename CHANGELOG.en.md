@@ -2,6 +2,13 @@
 
 [简体中文](CHANGELOG.md) · **English**
 
+## 13.2.0 (283471) — 2026-11-16
+
+- Merge Telegram for macOS upstream through `4f71cdd5`.
+- Add ReSieve on-device filtering for Chinese ads in groups and channels, including pinned messages, replies, and chat-list previews. Review and correct local samples in Message Filters.
+- Align the ReSieve status, show the full model status, and label filtering outcomes in the sample list.
+- Prioritize filtering in the active chat and coalesce updates by chat. Bundle a precompiled model and use the Neural Engine on supported Apple silicon Macs to speed up screening for ordinary content.
+
 ## 13.2.0 (283470) — 2026-11-15
 
 - Regram settings are shared across accounts on the same Mac. The upgrade uses the main account's existing settings first and matches the startup folder by name.
