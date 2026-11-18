@@ -110,17 +110,30 @@ public enum RGAdPolicy {
             return sample.mediaLabel != .ad || sample.hasUncertainty
         }
 
+        public func requiresSnapshot(for input: RGAdInput) -> Bool { input.hasMedia && !reviewedMedia.isEmpty }
+
+        public func prepare(_ input: RGAdInput, sourceGroup: String = "", sampleId: String? = nil) throws -> (
+            projection: RGAdProjection, isFinal: Bool
+        ) {
+            let projection = try project(input, sourceGroup: sourceGroup, sampleId: sampleId)
+            return (
+                projection,
+                projection.disposition == .hide || review(input, sourceGroup: sourceGroup, sampleId: sampleId) != nil
+                    || (input.text.isEmpty && input.buttons.isEmpty)
+            )
+        }
+
         public func resolve(
             _ input: RGAdInput, sourceGroup: String = "", sampleId: String? = nil,
             classify: (RGAdInput) -> RGAdSemanticResult
         ) throws -> RGAdProjection {
-            let initial = try project(input, sourceGroup: sourceGroup, sampleId: sampleId)
-            if initial.disposition == .hide || review(input, sourceGroup: sourceGroup, sampleId: sampleId) != nil { return initial }
+            let initial = try prepare(input, sourceGroup: sourceGroup, sampleId: sampleId)
+            if initial.isFinal { return initial.projection }
             let semantic = classify(input)
             if semantic.predictions.isEmpty, semantic.buttonIds.isEmpty, !semantic.entireMessage, semantic.promotionalQuotes.isEmpty,
                 (0...1).contains(semantic.threshold)
             {
-                return initial
+                return initial.projection
             }
             return try project(input, sourceGroup: sourceGroup, semantic: semantic, sampleId: sampleId)
         }

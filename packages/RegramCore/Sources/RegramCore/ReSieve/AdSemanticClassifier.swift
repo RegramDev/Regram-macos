@@ -2,7 +2,7 @@ import CoreML
 import Foundation
 import NaturalLanguage
 
-public struct RGAdSemanticResult {
+public struct RGAdSemanticResult: Codable, Equatable {
     public let predictions: [RGAdPrediction]
     public let buttonIds: Set<String>
     public let threshold: Double
@@ -49,7 +49,8 @@ public final class RGAdSemanticClassifier {
     private var loaded: Loaded?
     private var acceleratedModel: MLModel?
     private var retryAfter: TimeInterval = 0
-    private var scores = RGAdBoundedCache<String, Score>(countLimit: 2048, costLimit: 2 * 1024 * 1024)
+    private var scores = RGAdBoundedCache<String, Score>(countLimit: 2048, costLimit: 1792 * 1024)
+    private var windowScores = RGAdBoundedCache<[Int32], Score>(countLimit: 512, costLimit: 256 * 1024)
 
     public init(resourceDirectory: URL? = nil) { self.resourceDirectory = resourceDirectory }
 
@@ -146,18 +147,25 @@ public final class RGAdSemanticClassifier {
         var isExact = true
         for (windowIndex, window) in windows.enumerated() {
             guard window.count == value.ids.count, value.mask.count == value.ids.count else { throw RGAdFilterError.invalidPrediction }
-            let ids = value.ids.dataPointer.assumingMemoryBound(to: Int32.self)
-            let mask = value.mask.dataPointer.assumingMemoryBound(to: Int32.self)
-            for (index, token) in window.enumerated() {
-                ids[index] = token
-                mask[index] = token == 0 ? 0 : 1
+            let score: Score
+            if let cached = windowScores[window], forClassification || cached.isExact {
+                score = cached
+            } else {
+                let ids = value.ids.dataPointer.assumingMemoryBound(to: Int32.self)
+                let mask = value.mask.dataPointer.assumingMemoryBound(to: Int32.self)
+                for (index, token) in window.enumerated() {
+                    ids[index] = token
+                    mask[index] = token == 0 ? 0 : 1
+                }
+                if forClassification, acceleratedContent(value.features) {
+                    score = Score(probability: Self.contentThreshold, isExact: false)
+                } else {
+                    score = Score(probability: try confidence(from: value.model, features: value.features), isExact: true)
+                }
+                windowScores.insert(score, for: window, cost: window.count * MemoryLayout<Int32>.stride + 128)
             }
-            if forClassification, acceleratedContent(value.features) {
-                minimum = Self.contentThreshold
-                isExact = false
-                break
-            }
-            minimum = min(minimum, try confidence(from: value.model, features: value.features))
+            minimum = min(minimum, score.probability)
+            isExact = isExact && score.isExact
             if forClassification, minimum <= Self.contentThreshold, windowIndex + 1 < windows.count {
                 isExact = false
                 break
@@ -171,6 +179,7 @@ public final class RGAdSemanticClassifier {
         lock.lock()
         defer { lock.unlock() }
         scores.removeAll()
+        windowScores.removeAll()
         loaded = nil
         acceleratedModel = nil
     }
@@ -196,10 +205,15 @@ public final class RGAdSemanticClassifier {
             input.buttons.flatMap({ $0 }).allSatisfy({ $0.title.utf16.count <= 1024 })
         else { return RGAdSemanticResult() }
         var normalizedTexts: [String: String] = [:]
+        var normalizedBytes = 0
         func normalize(_ text: String) -> String {
             if let normalized = normalizedTexts[text] { return normalized }
             let normalized = RGAdTokenizer.normalize(text)
-            if normalizedTexts.count < 128 { normalizedTexts[text] = normalized }
+            let cost = (text.utf8.count + normalized.utf8.count) * 2 + 128
+            if normalizedTexts.count < 128, cost <= 256 * 1024 - normalizedBytes {
+                normalizedTexts[text] = normalized
+                normalizedBytes += cost
+            }
             return normalized
         }
         func supportsLanguage(_ text: String) -> Bool {

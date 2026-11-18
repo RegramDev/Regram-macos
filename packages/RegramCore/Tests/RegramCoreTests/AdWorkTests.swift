@@ -4,6 +4,113 @@ import XCTest
 
 @available(macOS 10.15, *)
 final class AdWorkTests: XCTestCase {
+    func testVisibleWorkInterruptsPreviewRecoveryWithoutRemovingPowerProtection() {
+        for conditions in [RGAdWorkConditions(), RGAdWorkConditions(lowPower: true), RGAdWorkConditions(thermal: 2)] {
+            let queue = DispatchQueue(label: "ad-visible-recovery-test")
+            let scheduler = RGAdWorkScheduler(queue: queue)
+            let first = expectation(description: "preview completed")
+            let visible = expectation(description: "visible work completed")
+            var completedAt = 0.0
+            var startedAt = 0.0
+            queue.async {
+                scheduler.updateConditions(conditions)
+                scheduler.enqueueAsync(
+                    cancelled: { false },
+                    step: { finish in
+                        queue.asyncAfter(deadline: .now() + 0.15) {
+                            completedAt = ProcessInfo.processInfo.systemUptime
+                            finish(true)
+                            first.fulfill()
+                        }
+                    }, onCancel: { XCTFail() })
+            }
+            wait(for: [first], timeout: 2)
+            queue.async {
+                let preview = RGAdWorkRequest()
+                scheduler.enqueue(cancelled: { preview.isCancelled }, step: { return true }, onCancel: {})
+                scheduler.enqueue(
+                    priority: 2, cancelled: { false },
+                    step: {
+                        startedAt = ProcessInfo.processInfo.systemUptime
+                        preview.cancel()
+                        visible.fulfill()
+                        return true
+                    }, onCancel: { XCTFail() })
+            }
+            wait(for: [visible], timeout: 3)
+            queue.sync {
+                if conditions.interactive {
+                    XCTAssertLessThan(startedAt - completedAt, 0.12)
+                } else {
+                    XCTAssertGreaterThanOrEqual(startedAt - completedAt, conditions.recoveryDelay(workDuration: 0.14))
+                }
+            }
+        }
+    }
+
+    func testAsyncInferenceLeavesControlQueueFreeAndPreservesSingleAdmission() {
+        let queue = DispatchQueue(label: "ad-async-control-test")
+        let scheduler = RGAdWorkScheduler(queue: queue)
+        let request = RGAdWorkRequest()
+        let entered = expectation(description: "inference started")
+        let cancelled = expectation(description: "cancelled once")
+        let second = expectation(description: "next inference resumed")
+        var finishInference: ((Bool) -> Void)?
+        var starts = 0
+        queue.async {
+            scheduler.enqueueAsync(
+                cancelled: { request.isCancelled },
+                step: { done in
+                    starts += 1
+                    finishInference = done
+                    entered.fulfill()
+                }, onCancel: { cancelled.fulfill() })
+        }
+        wait(for: [entered], timeout: 2)
+        queue.sync {
+            scheduler.enqueue(
+                cancelled: { false },
+                step: {
+                    starts += 1
+                    second.fulfill()
+                    return true
+                }, onCancel: { XCTFail() })
+            XCTAssertEqual(starts, 1)
+            request.cancel()
+            scheduler.updateConditions(RGAdWorkConditions(foreground: false))
+            finishInference?(false)
+        }
+        wait(for: [cancelled], timeout: 2)
+        queue.sync {
+            XCTAssertEqual(starts, 1)
+            scheduler.updateConditions(RGAdWorkConditions())
+        }
+        wait(for: [second], timeout: 2)
+        queue.sync { XCTAssertEqual(starts, 2) }
+    }
+
+    func testCompletedAsyncStepDoesNotAlsoCancelItsDisposedConsumer() {
+        let queue = DispatchQueue(label: "ad-async-completion-test")
+        let scheduler = RGAdWorkScheduler(queue: queue)
+        let done = expectation(description: "following job")
+        var disposed = false
+        queue.async {
+            scheduler.enqueueAsync(
+                cancelled: { disposed },
+                step: { complete in
+                    disposed = true
+                    complete(true)
+                }, onCancel: { XCTFail("completed consumer was cancelled again") })
+            scheduler.enqueue(
+                cancelled: { false },
+                step: {
+                    done.fulfill()
+                    return true
+                }, onCancel: { XCTFail() })
+        }
+        wait(for: [done], timeout: 2)
+    }
+
     func testCancelledPausedWorkReleasesCapturedWindow() {
         final class Window {}
         let queue = DispatchQueue(label: "ad-cancelled-memory-test")
@@ -166,6 +273,10 @@ final class AdWorkTests: XCTestCase {
         XCTAssertEqual(RGAdWorkConditions().recoveryDelay(workDuration: 0.1), 0.1, accuracy: 0.001)
         XCTAssertEqual(RGAdWorkConditions(lowPower: true).recoveryDelay(workDuration: 0.1), 0.3, accuracy: 0.001)
         XCTAssertEqual(RGAdWorkConditions(thermal: 2).recoveryDelay(workDuration: 0.1), 0.7, accuracy: 0.001)
+        XCTAssertTrue(RGAdWorkConditions().interactive)
+        XCTAssertFalse(RGAdWorkConditions(foreground: false).interactive)
+        XCTAssertFalse(RGAdWorkConditions(lowPower: true).interactive)
+        XCTAssertFalse(RGAdWorkConditions(thermal: 2).interactive)
     }
 
     func testReplacingPausedWorkReleasesCancelledJobsBeforeForegrounding() {
@@ -208,6 +319,14 @@ final class AdWorkTests: XCTestCase {
         }
         XCTAssertEqual(try knowledge.resolve(RGAdInput(text: "套餐说明\n\n#ad"), classify: classify).disposition, .hide)
         XCTAssertEqual(calls, 0)
+        XCTAssertTrue(try knowledge.prepare(RGAdInput(text: "", hasMedia: true)).isFinal)
+        _ = try knowledge.resolve(RGAdInput(text: "", hasMedia: true), classify: classify)
+        XCTAssertEqual(calls, 0)
+        let pending = try knowledge.prepare(RGAdInput(text: "正常内容\n\n#推广 套餐介绍\n\n正常结尾"))
+        XCTAssertFalse(pending.isFinal)
+        XCTAssertEqual(pending.projection.disposition, .trim)
+        XCTAssertTrue(pending.projection.text.contains("正常内容"))
+        XCTAssertFalse(pending.projection.text.contains("套餐介绍"))
         _ = try knowledge.resolve(RGAdInput(text: "正常讨论"), classify: classify)
         _ = try knowledge.resolve(RGAdInput(text: "正常内容\n\n#推广 套餐介绍\n\n正常结尾"), classify: classify)
         XCTAssertEqual(calls, 2)

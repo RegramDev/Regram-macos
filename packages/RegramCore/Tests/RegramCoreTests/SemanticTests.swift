@@ -92,7 +92,9 @@ final class SemanticTests: XCTestCase {
         let semantic = classifier.predict(RGAdInput(text: text))
         XCTAssertTrue(semantic.completed)
         XCTAssertTrue(semantic.predictions.isEmpty)
-        XCTAssertEqual(try classifier.probability(text), expected)
+        XCTAssertEqual(try XCTUnwrap(classifier.probability(text)), expected, accuracy: 0.0000001)
+        classifier.reduceMemoryPressure()
+        XCTAssertEqual(try XCTUnwrap(classifier.probability(text)), expected, accuracy: 0.0000001)
     }
 
     func testOverlappingBareDestinationEntitiesPreserveNormalSharing() throws {

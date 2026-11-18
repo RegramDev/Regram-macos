@@ -127,6 +127,8 @@ public final class RGAdSampleStore {
     public let directory: URL
     public private(set) var recordingFailed = false
     private var storedIds: Set<String>?
+    private var reviewedIds: Set<String>?
+    private var indexedDirectoryModified: Double?
     private var cachedSalt: String?
     public init(accountDirectory: URL) { directory = accountDirectory.appendingPathComponent("regram-ad-samples-v1", isDirectory: true) }
 
@@ -202,20 +204,98 @@ public final class RGAdSampleStore {
         return sample
     }
 
-    public func load(reviewedOnly: Bool = false) throws -> [RGAdSample] {
-        try prepare()
+    private struct ReviewIndex: Codable {
+        let version: Int
+        let modified: Double
+        let ids: [String]
+        let checksum: String
+    }
+    private var indexDirectory: URL { directory.appendingPathComponent("index", isDirectory: true) }
+    private var indexFile: URL { indexDirectory.appendingPathComponent("reviewed-v1.json") }
+    private func directoryModified() throws -> Double {
+        guard let date = try FileManager.default.attributesOfItem(atPath: directory.path)[.modificationDate] as? Date else {
+            throw RGAdSampleError.damaged
+        }
+        return date.timeIntervalSince1970
+    }
+    private func indexChecksum(_ modified: Double, _ ids: [String]) -> String {
+        Self.digest("reviews-v1:\(modified):" + ids.joined(separator: ":"))
+    }
+    private func loadReviewIndex() -> [String]? {
+        guard let size = try? indexFile.resourceValues(forKeys: [.fileSizeKey]).fileSize, size <= 1_048_576,
+            let data = try? Data(contentsOf: indexFile), let index = try? JSONDecoder().decode(ReviewIndex.self, from: data),
+            index.version == 1, index.modified == (try? directoryModified()), index.ids.count <= Self.maximumSamples,
+            Set(index.ids).count == index.ids.count, index.ids.allSatisfy({ $0.count == 64 && $0.allSatisfy(\.isHexDigit) }),
+            index.checksum == indexChecksum(index.modified, index.ids)
+        else { return nil }
+        return index.ids
+    }
+    private func saveReviewIndex() {
+        guard let reviewedIds else { return }
+        do {
+            try FileManager.default.createDirectory(at: indexDirectory, withIntermediateDirectories: true)
+            let modified = try directoryModified()
+            let ids = reviewedIds.sorted()
+            indexedDirectoryModified = modified
+            let index = ReviewIndex(version: 1, modified: modified, ids: ids, checksum: indexChecksum(modified, ids))
+            try JSONEncoder().encode(index).write(to: indexFile, options: .atomic)
+        } catch {
+        }
+    }
+    private func sampleFiles() throws -> [URL] {
         let files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.fileSizeKey]).filter {
             $0.pathExtension == "json"
         }
         guard files.count <= Self.maximumSamples else { throw RGAdSampleError.capacity }
+        return files
+    }
+    private func loadStoredIds() throws {
+        if let indexedDirectoryModified, indexedDirectoryModified != (try directoryModified()) {
+            storedIds = nil
+            reviewedIds = nil
+            self.indexedDirectoryModified = nil
+        }
+        guard storedIds == nil else { return }
+        let ids = try sampleFiles().map { $0.deletingPathExtension().lastPathComponent }
+        guard ids.allSatisfy({ $0.count == 64 && $0.allSatisfy(\.isHexDigit) }) else { throw RGAdSampleError.damaged }
+        storedIds = Set(ids)
+    }
+    private func prepareOptionalIndexForMutation() {
+        let modified = try? directoryModified()
+        if reviewedIds == nil || indexedDirectoryModified != modified {
+            storedIds = nil
+            reviewedIds = loadReviewIndex().map { Set($0) }
+            indexedDirectoryModified = modified
+        }
+    }
+
+    public func load(reviewedOnly: Bool = false) throws -> [RGAdSample] {
+        try prepare()
+        if reviewedOnly, let ids = loadReviewIndex() {
+            let samples = try ids.map { try read(directory.appendingPathComponent($0 + ".json")) }
+            if samples.allSatisfy({ $0.reviewedAt != nil }) {
+                reviewedIds = Set(ids)
+                indexedDirectoryModified = try directoryModified()
+                return samples.sorted { $0.recordedAt > $1.recordedAt }
+            }
+        }
+        let files = try sampleFiles()
         var samples: [RGAdSample] = []
         var ids = Set<String>()
+        var reviews = Set<String>()
         for file in files {
             let sample = try autoreleasepool { try read(file) }
             ids.insert(sample.id)
+            if sample.reviewedAt != nil { reviews.insert(sample.id) }
             if !reviewedOnly || sample.reviewedAt != nil { samples.append(sample) }
         }
         storedIds = ids
+        reviewedIds = reviews
+        if files.isEmpty {
+            indexedDirectoryModified = try directoryModified()
+        } else {
+            saveReviewIndex()
+        }
         return samples.sorted { $0.recordedAt > $1.recordedAt }
     }
 
@@ -241,6 +321,7 @@ public final class RGAdSampleStore {
         do {
             let salt = try salt()
             let id = try Self.sampleId(input: input, salt: salt, messageKey: messageKey, mediaIdentity: mediaIdentity)
+            try loadStoredIds()
             if storedIds?.contains(id) == true { return }
             var sample = try draft(input: input, mediaKinds: mediaKinds, salt: salt, id: id)
             guard sample.reviewedAt == nil, sample.detection == nil else { return }
@@ -262,7 +343,8 @@ public final class RGAdSampleStore {
     private func write(_ sample: RGAdSample) throws {
         try sample.validate()
         try prepare()
-        if storedIds == nil { _ = try load() }
+        try loadStoredIds()
+        if reviewedIds == nil { _ = try load(reviewedOnly: true) }
         if storedIds?.contains(sample.id) != true, (storedIds?.count ?? 0) >= Self.maximumSamples { throw RGAdSampleError.capacity }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
@@ -270,12 +352,17 @@ public final class RGAdSampleStore {
         guard data.count <= 1_048_576 else { throw RGAdSampleError.capacity }
         try data.write(to: directory.appendingPathComponent(sample.id + ".json"), options: .atomic)
         storedIds?.insert(sample.id)
+        if sample.reviewedAt != nil { reviewedIds?.insert(sample.id) } else { reviewedIds?.remove(sample.id) }
+        saveReviewIndex()
     }
 
     public func remove(_ sample: RGAdSample) throws {
         try sample.validate()
+        prepareOptionalIndexForMutation()
         try FileManager.default.removeItem(at: directory.appendingPathComponent(sample.id + ".json"))
         storedIds?.remove(sample.id)
+        reviewedIds?.remove(sample.id)
+        saveReviewIndex()
     }
 
     public func export(trainingOnly: Bool = false) throws -> Data {

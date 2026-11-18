@@ -11,6 +11,7 @@ public struct RGAdBoundedCache<Key: Hashable, Value> {
     private var order: [Key] = []
     public private(set) var totalCost = 0
     public var count: Int { entries.count }
+    public var orderedEntries: [(Key, Value)] { order.compactMap { key in entries[key].map { (key, $0.value) } } }
     public init(countLimit: Int, costLimit: Int) {
         self.countLimit = max(0, countLimit)
         self.costLimit = max(0, costLimit)
