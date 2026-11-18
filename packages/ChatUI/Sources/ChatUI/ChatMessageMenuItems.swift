@@ -1102,7 +1102,7 @@ public func chatMenuItems(for message: Message, entry: ChatHistoryEntry?, textLa
                     text = ChatHistoryLink.copyContextText(from: linkType)
                     thirdBlock.append(ContextMenuItem(text, handler: { [weak textLayout] in
                         guard regramCanCopyMessageText(message, accountId: context.peerId.toInt64(), cachedData: chatInteraction.presentation.cachedData) else { return }
-                        if let textLayout = textLayout {
+                        if let textLayout = textLayout, textLayout.selectedRange.range.length > 0 {
                             let attr = textLayout.attributedString.mutableCopy() as! NSMutableAttributedString
 
                             var effectiveRange = textLayout.selectedRange.range

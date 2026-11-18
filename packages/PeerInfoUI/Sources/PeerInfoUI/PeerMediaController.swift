@@ -2479,9 +2479,17 @@ import RegramSignals
             } else {
                 return super.escapeKeyAction()
             }
-        } else if interactions.presentation.state == .selecting {
+        } else {
+            return escapeSelection()
+        }
+    }
+
+    func escapeSelection() -> KeyHandlerResult {
+        if interactions.presentation.state == .selecting {
             interactions.update { $0.withoutSelectionState() }
             return .invoked
+        } else if let controller = currentController as? StoryMediaController<Context> {
+            return controller.escapeKeyAction()
         } else {
             return super.escapeKeyAction()
         }
