@@ -2,6 +2,11 @@
 
 [简体中文](CHANGELOG.md) · **English**
 
+## 13.2.0 (283472) — 2026-11-18
+
+- Merge Telegram for macOS upstream through `38309ec9`.
+- Update ReSieve to 1.3.0 weights and threshold (`0.9835`), and align parameters and filtering pipeline with iOS: add account-local persistent semantic cache, reviewed sample index, window score cache, and async inference scheduling.
+
 ## 13.2.0 (283471) — 2026-11-16
 
 - Merge Telegram for macOS upstream through `4f71cdd5`.
