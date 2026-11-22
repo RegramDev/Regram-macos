@@ -194,7 +194,7 @@ final class AdWorkTests: XCTestCase {
         wait(for: [done], timeout: 3)
         queue.sync {
             XCTAssertEqual(visits, [1, 2, 1, 2])
-            for index in 1..<starts.count { XCTAssertGreaterThanOrEqual(starts[index] - starts[index - 1], 0.035) }
+            for index in 1..<starts.count { XCTAssertGreaterThanOrEqual(starts[index] - starts[index - 1], 0.019) }
         }
     }
 
@@ -270,12 +270,12 @@ final class AdWorkTests: XCTestCase {
                 }, onCancel: { cancelled.fulfill() })
         }
         wait(for: [cancelled], timeout: 2)
-        XCTAssertEqual(RGAdWorkConditions().recoveryDelay(workDuration: 0.1), 0.1, accuracy: 0.001)
-        XCTAssertEqual(RGAdWorkConditions(lowPower: true).recoveryDelay(workDuration: 0.1), 0.3, accuracy: 0.001)
-        XCTAssertEqual(RGAdWorkConditions(thermal: 2).recoveryDelay(workDuration: 0.1), 0.7, accuracy: 0.001)
+        XCTAssertEqual(RGAdWorkConditions().recoveryDelay(workDuration: 0.1), 0, accuracy: 0.001)
+        XCTAssertEqual(RGAdWorkConditions(lowPower: true).recoveryDelay(workDuration: 0.1), 0, accuracy: 0.001)
+        XCTAssertEqual(RGAdWorkConditions(thermal: 2).recoveryDelay(workDuration: 0.1), 0.3, accuracy: 0.001)
         XCTAssertTrue(RGAdWorkConditions().interactive)
         XCTAssertFalse(RGAdWorkConditions(foreground: false).interactive)
-        XCTAssertFalse(RGAdWorkConditions(lowPower: true).interactive)
+        XCTAssertTrue(RGAdWorkConditions(lowPower: true).interactive)
         XCTAssertFalse(RGAdWorkConditions(thermal: 2).interactive)
     }
 

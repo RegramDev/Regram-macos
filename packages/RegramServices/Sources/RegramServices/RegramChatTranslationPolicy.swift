@@ -5,15 +5,13 @@ public enum RegramChatTranslationPolicy {
         case telegram = "default"
         case system
         case google
-        case googleCN
-        case microsoft
         case yandex
         case transmart
         case llm
     }
 
     public static func provider(settings: RegramAccountSettings) -> Provider? {
-        Provider(rawValue: settings["translationBackend"].string)
+        Provider(rawValue: settings["translationBackend"].string) ?? (RegramSetting.retiredTranslationBackends.contains(settings["translationBackend"].string) ? .google : nil)
     }
 
     public static func usesTextRequests(settings: RegramAccountSettings, hasTelegramPremium: Bool) -> Bool {

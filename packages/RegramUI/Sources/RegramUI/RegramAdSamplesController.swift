@@ -30,7 +30,8 @@ private func regramAdSampleError(_ error: Error) -> String {
 }
 
 @available(macOS 12, *)
-func RegramAdSamplesController(context: any AccountContextProtocol) -> InputDataController {
+public func RegramAdSamplesController(context: any AccountContextProtocol, peerId: PeerId? = nil) -> InputDataController {
+    let chatPeerId = peerId?.toInt64()
     let session = RegramAdFilterSession.get(context.account)
     let accountId = context.peerId.toInt64()
     let state = Atomic(value: RegramAdSamplesState())
@@ -51,8 +52,8 @@ func RegramAdSamplesController(context: any AccountContextProtocol) -> InputData
         _ = generation.swap(revision)
         session.perform(
             { store in
-                let samples = Result { try store.load() }
-                return (samples, store.recordingFailed, RGAdSemanticClassifier.shared.prepareModel())
+                let samples = Result { try store.load(peerId: chatPeerId) }
+                return (samples, store.recordingFailed, chatPeerId == nil ? RGAdSemanticClassifier.shared.prepareModel() : true)
             },
             completion: { result in
                 guard generation.with({ $0 }) == revision, !context.isFrozen else { return }
@@ -92,17 +93,21 @@ func RegramAdSamplesController(context: any AccountContextProtocol) -> InputData
     let signal =
         combineLatest(promise.get(), regramPreferenceChanges(accountId: accountId, keys: ["reSieveEnabled"]), appearanceSignal)
         |> map { state, settings, _ -> InputDataSignalValue in
-            var page = RegramPageBuilder(page: "reSieve")
-            page.section()
-            page.row(
-                "enabled", title: regramString("ReSieve.Enable"), type: .switchable(settings["reSieveEnabled"].bool),
-                action: {
-                    RegramPreferences.shared.update(accountId: accountId) { $0["reSieveEnabled"] = .bool(!$0["reSieveEnabled"].bool) }
-                })
-            let modelStatus = state.modelReady.map { $0 ? "ReSieve.Ready" : "ReSieve.Unavailable" } ?? "ReSieve.Checking"
-            page.row("model", title: regramString("ReSieve.Model"), type: .context(regramString(modelStatus)))
-            page.text(regramString("ReSieve.Notice"))
-            page.section("ReSieve.Samples")
+            var page = RegramPageBuilder(page: chatPeerId == nil ? "reSieve" : "reSieve.chat")
+            if chatPeerId == nil {
+                page.section()
+                page.row(
+                    "enabled", title: regramString("ReSieve.Enable"), type: .switchable(settings["reSieveEnabled"].bool),
+                    action: {
+                        RegramPreferences.shared.update(accountId: accountId) { $0["reSieveEnabled"] = .bool(!$0["reSieveEnabled"].bool) }
+                    })
+                let modelStatus = state.modelReady.map { $0 ? "ReSieve.Ready" : "ReSieve.Unavailable" } ?? "ReSieve.Checking"
+                page.row("model", title: regramString("ReSieve.Model"), type: .context(regramString(modelStatus)))
+                page.text(regramString("ReSieve.Notice"))
+                page.section("ReSieve.Samples")
+            } else {
+                page.section()
+            }
             if let error = state.error {
                 page.text(error)
             } else if let samples = state.samples {
@@ -110,22 +115,24 @@ func RegramAdSamplesController(context: any AccountContextProtocol) -> InputData
                 if !samples.isEmpty {
                     page.text(String(format: regramString("ReSieve.SampleCount"), samples.count, ready))
                 }
-                if samples.count >= RGAdSampleStore.maximumSamples {
+                if chatPeerId == nil, samples.count >= RGAdSampleStore.maximumSamples {
                     page.text(regramString("ReSieve.Capacity"))
-                } else if state.recordingFailed {
+                } else if chatPeerId == nil, state.recordingFailed {
                     page.text(regramString("ReSieve.StorageError"))
                 }
                 if samples.isEmpty {
-                    let emptyText = regramString("ReSieve.EmptySamples")
+                    let emptyText = regramString(chatPeerId == nil ? "ReSieve.EmptySamples" : "AdSamples.PerChat.Empty")
                     page.custom("empty", equatable: InputDataEquatable(emptyText)) { size, stableId in
                         RegramEmptyRowItem(size, stableId: stableId, height: 112, text: emptyText, symbolName: "tray")
                     }
                 } else {
-                    page.row("export", title: regramString("ReSieve.ExportAll"), action: { export(trainingOnly: false) })
-                    page.row(
-                        "exportReviewed", title: regramString("ReSieve.ExportReviewed"), enabled: ready > 0,
-                        action: { export(trainingOnly: true) })
-                    page.section()
+                    if chatPeerId == nil {
+                        page.row("export", title: regramString("ReSieve.ExportAll"), action: { export(trainingOnly: false) })
+                        page.row(
+                            "exportReviewed", title: regramString("ReSieve.ExportReviewed"), enabled: ready > 0,
+                            action: { export(trainingOnly: true) })
+                        page.section()
+                    }
                     for sample in samples.prefix(state.limit) {
                         let firstLine = sample.input.text.split(whereSeparator: \.isNewline).first.map { String($0.prefix(120)) }
                         let title = firstLine ?? sample.input.buttons.first?.first?.title ?? regramString("ReSieve.Media")
@@ -160,7 +167,8 @@ func RegramAdSamplesController(context: any AccountContextProtocol) -> InputData
             return InputDataSignalValue(entries: page.entries)
         }
     let controller = RegramFormController(
-        dataSignal: signal, title: regramString("ReSieve.Title"), removeAfterDisappear: false, hasDone: false, identifier: "regram.reSieve")
+        dataSignal: signal, title: regramString(chatPeerId == nil ? "ReSieve.Title" : "AdSamples.PerChat.Records"), removeAfterDisappear: false,
+        hasDone: false, identifier: chatPeerId == nil ? "regram.reSieve" : "regram.reSieve.chat")
     controller.didAppear = { _ in reload() }
     controller.willDisappear = { _ in _ = generation.swap(UUID()) }
     return controller

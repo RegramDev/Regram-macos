@@ -45,8 +45,23 @@ final class RegramCoreTests: XCTestCase {
     func testSettingsLinksOnlyNavigateToKnownDestinations() throws {
         let route = try XCTUnwrap(RegramSettingsRoute(page: "privacy", item: "antiRevoke"))
         XCTAssertEqual(RegramSettingsRoute(url: route.url), route)
+        for link in ["reza://settings?page=privacy&item=antiRevoke", "regram://settings?page=privacy&item=antiRevoke", "tg://reza/settings?page=privacy&item=antiRevoke"] {
+            XCTAssertEqual(RegramSettingsRoute(url: try XCTUnwrap(URL(string: link))), route)
+        }
         for link in ["regram://settings?page=privacy&clear=true", "regram://settings?page=privacy&page=tools", "regram://settings?page=privacy&item=panguSpacing", "https://settings?page=privacy", "regram://settings?page=unknown"] {
             XCTAssertNil(RegramSettingsRoute(url: try XCTUnwrap(URL(string: link))))
+        }
+    }
+
+    func testRetiredTranslationBackendsAndPreviewHostsMigrate() throws {
+        for backend in ["googleCN", "microsoft", "gtranslate"] {
+            let stored = RegramAccountSettings(values: ["translationBackend": .string(backend), "linkPreviewInstagramHost": .string("ddinstagram.com")])
+            XCTAssertEqual(stored["translationBackend"].string, "google")
+            XCTAssertEqual(stored["linkPreviewInstagramHost"].string, RGLinkPreviewRules.defaultInstagramHost)
+            let data = Data("{\"version\":1,\"createdAt\":\"2026-11-22T00:00:00Z\",\"values\":{\"translationBackend\":\"\(backend)\",\"linkPreviewInstagramHost\":\"ddinstagram.com\"}}".utf8)
+            let settings = try RegramSettingsBackup.decode(data).applying(to: RegramAccountSettings())
+            XCTAssertEqual(settings.values["translationBackend"], .string("google"))
+            XCTAssertEqual(settings.values["linkPreviewInstagramHost"], .string(RGLinkPreviewRules.defaultInstagramHost))
         }
     }
 

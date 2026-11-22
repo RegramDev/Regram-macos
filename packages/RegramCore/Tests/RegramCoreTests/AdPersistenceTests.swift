@@ -122,8 +122,8 @@ final class AdPersistenceTests: XCTestCase {
         XCTAssertNotEqual(first, RGAdSemanticCache.bundledNamespace(resourceDirectory: root))
     }
 
-    private func pending(_ store: RGAdSampleStore, key: String) throws -> RGAdSample {
-        let input = RGAdInput(text: "商业套餐 \(key)\n#ad", peerId: 9)
+    private func pending(_ store: RGAdSampleStore, key: String, peerId: Int64 = 9) throws -> RGAdSample {
+        let input = RGAdInput(text: "商业套餐 \(key)\n#ad", peerId: peerId)
         try store.recordDetection(input: input, messageKey: key, mediaKinds: [], mediaIdentity: "", projection: RGAdPolicy.project(input))
         return try store.draft(input: input, messageKey: key, mediaKinds: [], mediaIdentity: "")
     }
@@ -132,6 +132,29 @@ final class AdPersistenceTests: XCTestCase {
         sample.reviewedAt = Date().timeIntervalSince1970
         sample.spans = []
         try JSONEncoder().encode(sample).write(to: store.directory.appendingPathComponent(sample.id + ".json"), options: .atomic)
+    }
+
+    func testPeerRecordsUseExistingAccountSaltForPendingAndReviewedSamples() throws {
+        let root = try account()
+        let store = RGAdSampleStore(accountDirectory: root)
+        let pendingHere = try pending(store, key: "auto", peerId: 10)
+        let reviewedHere = try pending(store, key: "review", peerId: 10)
+        try store.save(reviewedHere)
+        let elsewhere = try pending(store, key: "elsewhere", peerId: 11)
+        let reopened = RGAdSampleStore(accountDirectory: root)
+        XCTAssertEqual(Set(try reopened.load(peerId: 10).map(\.id)), [pendingHere.id, reviewedHere.id])
+        XCTAssertEqual(try reopened.load(reviewedOnly: true, peerId: 10).map(\.id), [reviewedHere.id])
+        XCTAssertEqual(try reopened.load(peerId: 11).map(\.id), [elsewhere.id])
+        XCTAssertTrue(try reopened.load(peerId: 12).isEmpty)
+        XCTAssertEqual(try reopened.load().count, 3)
+
+        let otherAccount = RGAdSampleStore(accountDirectory: try account())
+        let other = try pending(otherAccount, key: "auto", peerId: 10)
+        XCTAssertNotEqual(pendingHere.sourceGroup, other.sourceGroup)
+        XCTAssertEqual(try otherAccount.load(peerId: 10).map(\.id), [other.id])
+        try reopened.remove(reviewedHere)
+        XCTAssertEqual(try reopened.load(peerId: 10).map(\.id), [pendingHere.id])
+        XCTAssertEqual(try reopened.load(peerId: 11).map(\.id), [elsewhere.id])
     }
 
     func testReviewedStartupSkipsPendingBodiesButLibraryStillReportsTheirCorruption() throws {

@@ -397,7 +397,7 @@ private enum AccountInfoEntry<Context: AccountContextProtocol> : TableItemListNo
                 arguments.addAccount(accounts)
             }, thumb: GeneralThumbAdditional(thumb: theme.icons.account_add_account, textInset: 35, thumbInset: 0), inset:NSEdgeInsets(left: 12, right: 12), customTheme: .initialize(theme, background: .clear))
         case let .regram(_, viewType):
-            return GeneralInteractedRowItem(initialSize, stableId: stableId, name: "Regram Pro", icon: FeatureNavigationHooks.shared.regramSettingsIcon() ?? theme.icons.settingsGeneral, type: .next, viewType: viewType, action: {
+            return GeneralInteractedRowItem(initialSize, stableId: stableId, name: "Reza Pro", icon: FeatureNavigationHooks.shared.regramSettingsIcon() ?? theme.icons.settingsGeneral, type: .next, viewType: viewType, action: {
                 if let controller = FeatureNavigationHooks.shared.makeRegramController(arguments.context, nil) {
                     arguments.presentController(controller, true)
                 }

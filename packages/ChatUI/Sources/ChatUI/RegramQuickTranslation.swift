@@ -21,11 +21,15 @@ private func quickTranslationKey(_ message: Message) -> RGBookmarkMessageId {
     RGBookmarkMessageId(peerId: message.id.peerId.toInt64(), namespace: message.id.namespace, id: message.id.id)
 }
 
+private func quickTranslationSourceText(_ message: Message) -> String {
+    if let page = regramRichTranslationPage(message) { return richTextPlainPreview(from: page).text }
+    return message.text
+}
+
 private func regramQuickTranslationCanProcess(_ item: ChatRowItem) -> Bool {
     guard let message = item.message, message.id.namespace == Namespaces.Message.Cloud,
-          message.id.peerId.namespace != Namespaces.Peer.SecretChat, !message.text.isEmpty,
+          message.id.peerId.namespace != Namespaces.Peer.SecretChat, !quickTranslationSourceText(message).isEmpty,
           message.adAttribute == nil, !message.containsSecretMedia, !message.isCopyProtected(cachedData: item.chatInteraction.presentation.cachedData),
-          !message.attributes.contains(where: { $0 is RichTextMessageAttribute }),
           !message.media.contains(where: { $0 is TelegramMediaAction || $0 is TelegramMediaExpiredContent || $0 is TelegramMediaPaidContent }) else { return false }
     return true
 }
@@ -35,9 +39,10 @@ func regramQuickTranslationIsAvailable(_ item: ChatRowItem) -> Bool {
     let accountId = item.context.peerId.toInt64()
     let settings = RegramPreferences.shared.settings(accountId: accountId)
     if regramQuickTranslationLanguage(message, settings: settings) != nil || RegramQuickTranslationTasks.shared.task(accountId: accountId, messageId: quickTranslationKey(message)) != nil { return true }
-    guard settings["quickTranslateButton"].bool, message.text.unicodeScalars.contains(where: CharacterSet.letters.contains) else { return false }
+    let source = quickTranslationSourceText(message)
+    guard settings["quickTranslateButton"].bool, source.unicodeScalars.contains(where: CharacterSet.letters.contains) else { return false }
     let appearance = appAppearance
-    let language = Translate.detectLanguage(for: message.text)
+    let language = Translate.detectLanguage(for: source)
     let interfaceLanguage = RegramChatLanguagePolicy.interfaceCode(primary: appearance.language.primaryLanguage.languageCode, base: appearance.languageCode)
     return RegramChatLanguagePolicy.canTranslateMessage(source: language, interfaceLanguage: interfaceLanguage, configured: item.context.sharedContext.baseSettings.doNotTranslate)
 }
@@ -76,6 +81,10 @@ func regramToggleQuickTranslation(_ item: ChatRowItem) {
     let isCurrent = {
         tasks.task(accountId: accountId, messageId: key)?.token == token && RegramPreferences.shared.settings(accountId: accountId).translationIdentity == configuration
     }
+    if regramRichTranslationPage(message) != nil {
+        regramToggleRichQuickTranslation(item, message: message, target: target, token: token, configuration: configuration, isCurrent: isCurrent)
+        return
+    }
     let entities = message.textEntitiesAttribute?.entities ?? []
     let external = settings["translationBackend"].string != "default"
     func externalRequest(_ configuration: RegramAccountSettings) -> Signal<(String, [MessageTextEntity]), TranslateFetchError> {
@@ -113,9 +122,8 @@ func regramToggleQuickTranslation(_ item: ChatRowItem) {
     if external {
         translated = externalRequest(settings)
     } else {
-        let native: Signal<(String, [MessageTextEntity])?, TranslationError> = regramTranslateTelegramText(engine: context.engine, text: message.text, to: target, entities: entities) |> `catch` { error -> Signal<(String, [MessageTextEntity])?, TranslationError> in
-            if case .tryAlternative = error { return .single(nil) }
-            return .fail(error)
+        let native: Signal<(String, [MessageTextEntity])?, TranslationError> = regramTranslateTelegramText(engine: context.engine, text: message.text, to: target, entities: entities) |> `catch` { _ -> Signal<(String, [MessageTextEntity])?, TranslationError> in
+            return .single(nil)
         }
         translated = native |> mapError { _ in TranslateFetchError.network } |> mapToSignal { result -> Signal<(String, [MessageTextEntity]), TranslateFetchError> in
             if let result, !result.0.isEmpty { return .single(result) }
@@ -134,6 +142,62 @@ func regramToggleQuickTranslation(_ item: ChatRowItem) {
                 guard current.stableVersion == message.stableVersion, isCurrent(), !current.isCopyProtected(cachedData: transaction.getPeerCachedData(peerId: current.id.peerId)) else { return .skip }
                 var attributes = current.attributes.filter { !($0 is TranslationMessageAttribute || $0 is RegramTranslationMessageAttribute) }
                 attributes.append(TranslationMessageAttribute(text: text, entities: entities, toLang: target))
+                attributes.append(RegramTranslationMessageAttribute(configuration: configuration, quickToLang: target))
+                applied = true
+                return .update(quickTranslationStoreMessage(current, attributes: attributes))
+            }
+            return applied
+        } |> castError(TranslateFetchError.self) |> mapToSignal { applied -> Signal<Void, TranslateFetchError> in
+            applied ? .single(()) : .fail(.outdated)
+        }
+    } |> afterDisposed { tasks.finish(accountId: accountId, messageId: key, token: token) }
+    let holder = MetaDisposable()
+    interaction.regramQuickTranslationRequests[message.id] = holder
+    holder.set((signal |> deliverOnMainQueue).start(error: { [weak context, weak interaction, weak holder] error in
+        if let context { showModalText(for: context.window, text: quickTranslationString({ if case .outdated = error { return "quickTranslate.outdated" }; return "quickTranslate.failed" }())) }
+        tasks.finish(accountId: accountId, messageId: key, token: token)
+        if interaction?.regramQuickTranslationRequests[message.id] === holder { interaction?.regramQuickTranslationRequests.removeValue(forKey: message.id) }
+    }, completed: { [weak interaction, weak holder] in
+        tasks.finish(accountId: accountId, messageId: key, token: token)
+        if interaction?.regramQuickTranslationRequests[message.id] === holder { interaction?.regramQuickTranslationRequests.removeValue(forKey: message.id) }
+    }))
+}
+
+private func regramToggleRichQuickTranslation(_ item: ChatRowItem, message: Message, target: String, token: UUID, configuration: String, isCurrent: @escaping () -> Bool) {
+    let interaction = item.chatInteraction
+    let context = item.context
+    let accountId = context.peerId.toInt64()
+    let key = quickTranslationKey(message)
+    let tasks = RegramQuickTranslationTasks.shared
+    let settings = RegramPreferences.shared.settings(accountId: accountId)
+    let viaProvider: (RegramAccountSettings) -> Signal<InstantPage, TranslateFetchError> = { settings in
+        regramTranslateRichMessage(account: context.account, messageId: message.id, to: target, settings: settings, isCurrent: isCurrent)
+    }
+    var fallback = settings
+    fallback["translationBackend"] = .string("google")
+    let translated: Signal<InstantPage, TranslateFetchError>
+    if settings["translationBackend"].string == "default" {
+        translated = context.engine.messages.translateRichMessage(messageId: message.id, toLang: target)
+        |> mapError { _ in TranslateFetchError.network }
+        |> mapToSignal { page -> Signal<InstantPage, TranslateFetchError> in
+            page.map { .single($0) } ?? viaProvider(fallback)
+        }
+        |> `catch` { error -> Signal<InstantPage, TranslateFetchError> in
+            if case .outdated = error { return .fail(error) }
+            return viaProvider(fallback)
+        }
+    } else {
+        translated = viaProvider(settings)
+    }
+    let postbox = context.account.postbox
+    let signal = translated |> mapToSignal { page -> Signal<Void, TranslateFetchError> in
+        guard isCurrent() else { return .fail(.outdated) }
+        return postbox.transaction { transaction -> Bool in
+            var applied = false
+            transaction.updateMessage(message.id) { current in
+                guard current.stableVersion == message.stableVersion, isCurrent(), !current.isCopyProtected(cachedData: transaction.getPeerCachedData(peerId: current.id.peerId)) else { return .skip }
+                var attributes = current.attributes.filter { !($0 is TranslationMessageAttribute || $0 is RegramTranslationMessageAttribute) }
+                attributes.append(TranslationMessageAttribute(text: "", entities: [], toLang: target, instantPage: page))
                 attributes.append(RegramTranslationMessageAttribute(configuration: configuration, quickToLang: target))
                 applied = true
                 return .update(quickTranslationStoreMessage(current, attributes: attributes))

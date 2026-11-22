@@ -41,7 +41,7 @@ public func regramTranslateImageRegions(_ regions: [String], to: String, account
             value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .fail(.network) : .single(value)
         }
     }
-    return rgTranslateSequentially(signals, chunkTimeout: ["llm", "system"].contains(settings["translationBackend"].string) ? 120 : 30)
+    return rgTranslateConcurrently(signals, limit: regramTranslationConcurrency(backend: settings["translationBackend"].string), chunkTimeout: ["llm", "system"].contains(settings["translationBackend"].string) ? 120 : 30)
     |> mapError { error -> RegramImageTranslationError in
         switch error { case .outdated: return .outdated; case .network: return .failed }
     }

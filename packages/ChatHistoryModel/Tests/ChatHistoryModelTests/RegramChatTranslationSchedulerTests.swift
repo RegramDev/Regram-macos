@@ -8,6 +8,16 @@ import MessageUtils
 @testable import ChatHistoryModel
 
 final class RegramChatTranslationSchedulerTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        RegramTranslationFallback.translate = { _, _ in .fail(.network) }
+    }
+
+    override func tearDown() {
+        RegramTranslationFallback.translate = { text, to in googleTranslate(text, to) }
+        super.tearDown()
+    }
+
     private func message(_ id: Int32, version: UInt32 = 1, text: String = "Public translation fixture", attributes: [MessageAttribute] = [], peerId: PeerId? = nil) -> Message {
         let peer = peerId ?? PeerId(namespace: Namespaces.Peer.CloudGroup, id: ._internalFromInt64Value(11))
         return Message(stableId: UInt32(id), stableVersion: version, id: MessageId(peerId: peer, namespace: Namespaces.Message.Cloud, id: id), globallyUniqueId: nil, groupingKey: nil, groupInfo: nil, threadId: nil, timestamp: id, flags: [.Incoming], tags: [], globalTags: [], localTags: [], customTags: [], forwardInfo: nil, author: nil, text: text, attributes: attributes, media: [], peers: SimpleDictionary(), associatedMessages: SimpleDictionary(), associatedMessageIds: [], associatedMedia: [:], associatedThreadInfo: nil, associatedStories: [:])

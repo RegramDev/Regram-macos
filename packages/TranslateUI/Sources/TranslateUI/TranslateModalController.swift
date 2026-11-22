@@ -1048,7 +1048,7 @@ private func translateModalText(context: any AccountContextProtocol, text: Strin
                 allowed ? Translate.translateText(text: block, from: from.map(RegramChatLanguagePolicy.targetCode), to: to) : .fail(.generic)
             }
         }
-        return regramTranslateSequentially(signals, chunkTimeout: 45, failure: .generic) |> map { parts in
+        return regramTranslateConcurrently(signals, chunkTimeout: 45, failure: .generic) |> map { parts in
             let (translated, entities) = regramJoinTranslationBlocks(parts.map { ($0.result, []) }, source: blocks)
             return (detect: parts.compactMap(\.detect).first, result: translated, entities: entities)
         }
@@ -1057,16 +1057,9 @@ private func translateModalText(context: any AccountContextProtocol, text: Strin
     switch permitsExternal ? configState : .enabled {
     case .enabled:
         return regramTranslateTelegramText(engine: context.engine, text: text, to: to, entities: entities, tone: tone) |> `catch` { error in
-            switch error {
-            case .limitExceeded: return .fail(.limitExceeded)
-            case .tryAlternative: return permitsExternal ? .single(nil) : .fail(.generic)
-            default:
-                #if DEBUG
-                return permitsExternal ? .single(nil) : .fail(.generic)
-                #else
-                return .fail(.generic)
-                #endif
-            }
+            if permitsExternal { return .single(nil) }
+            if case .limitExceeded = error { return .fail(.limitExceeded) }
+            return .fail(.generic)
         } |> mapToSignal { result in
             if let result { return .single((detect: nil, result: result.0, entities: result.1)) }
             return permitsExternal ? alternative() : .fail(.generic)
@@ -1280,8 +1273,26 @@ public func TranslateModalController(context: any AccountContextProtocol, from: 
             // Rich messages translate through messages.translateRichMessage (layer 228); the result is an
             // InstantPage — rendered in the RESULT row via IV2, and stored on the message by the core so
             // the chat's inline translation shows the same rich result.
-            let richSignal = context.engine.messages.translateRichMessage(messageId: messageId, toLang: state.to, tone: state.tone)
-            |> deliverOnMainQueue
+            let richSettings = RegramPreferences.shared.settings(accountId: accountId)
+            let target = state.to
+            let viaProvider: (RegramAccountSettings) -> Signal<InstantPage?, TranslationError> = { settings in
+                regramTranslateRichMessage(account: context.account, messageId: messageId, to: target, settings: settings)
+                |> map(Optional.init)
+                |> mapError { _ in TranslationError.generic }
+            }
+            let richSignal: Signal<InstantPage?, TranslationError>
+            if richSettings["translationBackend"].string == "default" {
+                var fallback = richSettings
+                fallback["translationBackend"] = .string("google")
+                richSignal = context.engine.messages.translateRichMessage(messageId: messageId, toLang: target, tone: state.tone)
+                |> `catch` { _ in viaProvider(fallback) }
+                |> mapToSignal { page -> Signal<InstantPage?, TranslationError> in
+                    page != nil ? .single(page) : viaProvider(fallback)
+                }
+                |> deliverOnMainQueue
+            } else {
+                richSignal = viaProvider(richSettings) |> deliverOnMainQueue
+            }
             disposable.set(getAnalyticsContext().preservingPresentation(richSignal).start(next: { page in
                 updateState { current in
                     var current = current

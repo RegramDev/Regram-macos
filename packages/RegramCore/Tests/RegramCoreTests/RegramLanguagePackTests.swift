@@ -19,7 +19,7 @@ final class RegramLanguagePackTests: XCTestCase {
             XCTAssertEqual(RegramLanguagePack.language(code), "zh-Hans")
             XCTAssertEqual(regramLocalizedString("profile.dataCenter", languageCode: code), "数据中心")
         }
-        XCTAssertEqual(regramLocalizedString("LanguagePack.Name", languageCode: "en-US"), "Regram English")
+        XCTAssertEqual(regramLocalizedString("LanguagePack.Name", languageCode: "en-US"), "Reza English")
         XCTAssertEqual(regramLocalizedString("Settings.FolderTags", languageCode: "unknown"), "Folder Tags")
         XCTAssertEqual(regramLocalizedString("missing.fixture", languageCode: "zh"), "missing.fixture")
     }

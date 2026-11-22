@@ -32,31 +32,64 @@ final class RegramChatTranslationPolicyTests: XCTestCase {
         XCTAssertEqual(requests.map(\.1), ["zh-TW"])
     }
 
-    func testTelegramSelectionWithoutTextAdapterFailsWithoutFallback() {
+    override func setUp() {
+        super.setUp()
+        RegramTranslationFallback.translate = { _, _ in .fail(.network) }
+    }
+
+    override func tearDown() {
+        RegramTranslationFallback.translate = { text, to in googleTranslate(text, to) }
+        super.tearDown()
+    }
+
+    func testTelegramSelectionWithoutTextAdapterUsesGoogleFallback() {
         let done = expectation(description: "missing Telegram adapter")
-        let task = regramExternalTranslate(text: "hello", to: "zh", accountId: 1, settings: RegramAccountSettings()).start(next: { _ in
-            XCTFail("Missing adapter must not invoke a replacement provider")
+        var fallback: [(String, String)] = []
+        RegramTranslationFallback.translate = { text, to in
+            fallback.append((text, to))
+            return .single("你好")
+        }
+        let task = regramExternalTranslate(text: "hello", to: "zh", accountId: 1, settings: RegramAccountSettings()).start(next: { result in
+            XCTAssertEqual(result, "你好")
+            done.fulfill()
+        }, error: { _ in XCTFail("Missing adapter must fall back to Google") })
+        defer { task.dispose() }
+        wait(for: [done], timeout: 1)
+        XCTAssertEqual(fallback.map(\.0), ["hello"])
+        XCTAssertEqual(fallback.map(\.1), ["zh"])
+    }
+
+    func testTelegramProviderErrorFallsBackToGoogleOnce() {
+        let done = expectation(description: "provider failure")
+        var requests = 0
+        var fallbackRequests = 0
+        RegramTranslationFallback.translate = { _, _ in
+            fallbackRequests += 1
+            return .single("你好")
+        }
+        let task = regramExternalTranslate(text: "hello", to: "zh", accountId: 1, settings: RegramAccountSettings(), telegramTranslate: { _, _ in
+            requests += 1
+            return .fail(.network)
+        }).start(next: { result in
+            XCTAssertEqual(result, "你好")
+            done.fulfill()
+        }, error: { _ in XCTFail("Telegram failure must fall back to Google") })
+        defer { task.dispose() }
+        wait(for: [done], timeout: 1)
+        XCTAssertEqual(requests, 1)
+        XCTAssertEqual(fallbackRequests, 1)
+    }
+
+    func testTelegramFailureAndFallbackFailureReturnNetworkError() {
+        let done = expectation(description: "both providers fail")
+        let task = regramExternalTranslate(text: "hello", to: "zh", accountId: 1, settings: RegramAccountSettings(), telegramTranslate: { _, _ in .fail(.network) }).start(next: { _ in
+            XCTFail("Failed providers must not return a result")
         }, error: { error in
             guard case .network = error else { return XCTFail("Unexpected error") }
             done.fulfill()
         })
         defer { task.dispose() }
         wait(for: [done], timeout: 1)
-    }
-
-    func testTelegramProviderErrorIsReturnedWithoutRetryingAnotherEngine() {
-        let done = expectation(description: "provider failure")
-        var requests = 0
-        let task = regramExternalTranslate(text: "hello", to: "zh", accountId: 1, settings: RegramAccountSettings(), telegramTranslate: { _, _ in
-            requests += 1
-            return .fail(.network)
-        }).start(next: { _ in XCTFail("Failed provider must not return another engine's result") }, error: { error in
-            guard case .network = error else { return XCTFail("Unexpected error") }
-            done.fulfill()
-        })
-        defer { task.dispose() }
-        wait(for: [done], timeout: 1)
-        XCTAssertEqual(requests, 1)
     }
 
     func testAuthorizationBlocksTheProviderBeforeSendingText() {

@@ -16,5 +16,5 @@ public func regramProtectedTranslation(text: String, to: String, accountId: Int6
     case "system": timeout = 120
     default: timeout = rgTranslationSegmentTimeout(utf16Length: text.utf16.count, maxChunkLength: 1000, chunkTimeout: 30)
     }
-    return rgTranslateSequentially(signals, chunkTimeout: timeout) |> map { plan.restore(translations: $0) }
+    return rgTranslateConcurrently(signals, limit: regramTranslationConcurrency(backend: backend), chunkTimeout: timeout) |> map { plan.restore(translations: $0) }
 }

@@ -15,10 +15,11 @@ private enum RegramProfilePrivacyEntry: PeerInfoEntry {
     case toggle(Int, String, String, Bool, PeerId, viewType: GeneralViewType = .singleItem, enabled: Bool = true)
     case notice(Int, String)
     case remark(Int, String, PeerId, viewType: GeneralViewType = .singleItem)
+    case link(Int, String, String, viewType: GeneralViewType = .singleItem)
 
     private var index: Int {
         switch self {
-        case let .separator(index), let .toggle(index, _, _, _, _, _, _), let .notice(index, _), let .remark(index, _, _, _): return index
+        case let .separator(index), let .toggle(index, _, _, _, _, _, _), let .notice(index, _), let .remark(index, _, _, _), let .link(index, _, _, _): return index
         }
     }
 
@@ -32,6 +33,7 @@ private enum RegramProfilePrivacyEntry: PeerInfoEntry {
             return a == f && b == g && c == h && d == i && e == j && viewType == otherViewType && enabled == otherEnabled
         case let (.notice(a, b), .notice(c, d)): return a == c && b == d
         case let (.remark(a, b, c, viewType), .remark(d, e, f, otherViewType)): return a == d && b == e && c == f && viewType == otherViewType
+        case let (.link(a, b, c, viewType), .link(d, e, f, otherViewType)): return a == d && b == e && c == f && viewType == otherViewType
         default: return false
         }
     }
@@ -59,6 +61,10 @@ private enum RegramProfilePrivacyEntry: PeerInfoEntry {
                     settings[key] = .strings(ids)
                 }
             }, enabled: enabled)
+        case let .link(_, title, route, viewType):
+            return GeneralInteractedRowItem(initialSize, stableId: stableId.hashValue, name: string(title), type: .next, viewType: viewType, action: {
+                if let controller = FeatureNavigationHooks.shared.makeRegramController(arguments.context, route) { arguments.pushViewController(controller) }
+            })
         case let .remark(_, value, peerId, viewType):
             return GeneralInteractedRowItem(initialSize, stableId: stableId.hashValue, name: string("GroupRemark.Title"), type: .nextContext(value), viewType: viewType, action: {
                 if let controller = FeatureNavigationHooks.shared.makeRegramController(arguments.context, "remark/\(peerId.toInt64())") { arguments.pushViewController(controller) }
@@ -101,7 +107,8 @@ func regramProfilePrivacyEntries<Context: AccountContextProtocol>(_ original: [P
     let filtered = !settings["messageFilterDisabledPeerIds"].strings.contains(String(view.peerId.toInt64()))
     additions.append(RegramProfilePrivacyEntry.toggle(5, "messageFilterDisabledPeerIds", "MessageFilter.PerChat.Title", filtered, view.peerId, viewType: hasRemark ? .innerItem : .singleItem))
     if hasRemark {
-        additions.append(RegramProfilePrivacyEntry.toggle(12, "reSieveDisabledPeerIds", "ReSieve.Enable", settings.reSieveEnabled(for: peer.id.toInt64()), peer.id, viewType: .lastItem, enabled: settings["reSieveEnabled"].bool))
+        additions.append(RegramProfilePrivacyEntry.toggle(12, "reSieveDisabledPeerIds", "ReSieve.Enable", settings.reSieveEnabled(for: peer.id.toInt64()), peer.id, viewType: .innerItem, enabled: settings["reSieveEnabled"].bool))
+        additions.append(RegramProfilePrivacyEntry.link(13, "AdSamples.PerChat.Records", "reSieveRecords/\(peer.id.toInt64())", viewType: .lastItem))
     }
     additions.append(RegramProfilePrivacyEntry.notice(6, "MessageFilter.PerChat.Notice"))
     if settings["antiRevoke"].bool {

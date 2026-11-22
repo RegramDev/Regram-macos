@@ -40,7 +40,7 @@ fileprivate class AboutModalView : Control {
 
         let attr = NSMutableAttributedString()
         
-        _ = attr.append(string: "Regram", color: theme.colors.text, font: .medium(.header))
+        _ = attr.append(string: "Reza", color: theme.colors.text, font: .medium(.header))
         _ = attr.append(string: "\n\(vText)", color: theme.colors.link, font: .medium(.text))
         
         attr.addAttribute(.link, value: "copy", range: attr.range)

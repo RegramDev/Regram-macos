@@ -2,6 +2,16 @@
 
 [简体中文](CHANGELOG.md) · **English**
 
+## 13.2.0 (283473) — 2026-11-22
+
+- Rename the app to Reza and add four cat icons (Orange Tabby, Calico, Siamese, Tuxedo), with Orange Tabby as the default. The bundle identifier, install location and automatic updates are unchanged, and a previously selected icon is kept.
+- Add "ReSieve Filter Records" to channel and group profiles to review the original text filtered in that chat, correct misjudgements or delete records; records stay available after filtering is paused for the chat.
+- Translation: send message and segment requests in parallel (as on iOS), fall back to Google when the default Telegram translation fails, and remove the dead Google CN and Microsoft backends, migrating saved and imported settings to Google.
+- Rich-text messages support quick translation, the translation window uses the selected service for them, and ReSieve filters ad blocks inside rich-text messages.
+- Fix chat list preview flicker when ReSieve detects an ad: keep the last settled preview while recalculating and drop unnecessary throttling on macOS.
+- Apply ghost mode's "don't send online" change immediately; anti self-destruct also keeps view-once media in cloud chats.
+- Link preview repair: default Instagram host is now instagramfix.com (migrating stored values), add www.tiktok.com and reddit.com, and merge remote rules with the built-in ones.
+
 ## 13.2.0 (283472) — 2026-11-18
 
 - Merge Telegram for macOS upstream through `38309ec9`.

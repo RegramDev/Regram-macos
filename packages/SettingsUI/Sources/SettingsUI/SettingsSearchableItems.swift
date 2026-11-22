@@ -718,7 +718,7 @@ private extension SettingsSearchableItemId {
 private func regramSearchableItems<Context: AccountContextProtocol>(context: Context) -> [SettingsSearchableItem<Context>] {
     let language = appCurrentLanguage.primaryLanguage.languageCode
     return RegramSettingsCatalog.entries.map { entry in
-        SettingsSearchableItem(id: .appearance(entry.stableId), title: entry.title(language: language), alternate: entry.alternate(language: language), icon: .regram, breadcrumbs: ["Regram Pro", regramLocalizedString(entry.pageTitleKey, languageCode: language)], present: { context, _, present in
+        SettingsSearchableItem(id: .appearance(entry.stableId), title: entry.title(language: language), alternate: entry.alternate(language: language), icon: .regram, breadcrumbs: ["Reza Pro", regramLocalizedString(entry.pageTitleKey, languageCode: language)], present: { context, _, present in
             if let controller = FeatureNavigationHooks.shared.makeRegramController(context, entry.destination) {
                 present(.push, controller)
             }

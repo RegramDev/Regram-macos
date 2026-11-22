@@ -3,7 +3,8 @@ import Foundation
 public enum RGLinkPreviewRules {
     public static let didChangeNotification = Notification.Name("RGLinkPreviewRulesDidChange")
     public static let defaultXHost = "fixupx.com"
-    public static let defaultInstagramHost = "ddinstagram.com"
+    public static let defaultInstagramHost = "instagramfix.com"
+    public static let retiredInstagramHosts: Set<String> = ["ddinstagram.com"]
 
     public static func isValidHost(_ value: String) -> Bool {
         let value = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()

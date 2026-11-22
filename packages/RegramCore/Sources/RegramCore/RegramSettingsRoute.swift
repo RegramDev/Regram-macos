@@ -63,7 +63,7 @@ public struct RegramSettingsRoute: Equatable {
     public init?(url: URL, appSpecificScheme: String = "regram") {
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false), components.user == nil, components.password == nil, components.port == nil, components.fragment == nil else { return nil }
         let scheme = components.scheme?.lowercased() ?? "", host = components.host?.lowercased() ?? ""
-        let aliases = ["rg", "regram"]
+        let aliases = ["rg", "regram", "reza"]
         let supported = scheme == "tg" || aliases.contains(scheme) || (scheme != "sg" && scheme == appSpecificScheme.lowercased())
         guard supported, (aliases.contains(host) && components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) == "settings") || (aliases.contains(scheme) && host == "settings" && components.path.isEmpty) else { return nil }
         let items = components.queryItems ?? []

@@ -1423,7 +1423,7 @@ class AppDelegate: NSResponder, NSApplicationDelegate, NSUserNotificationCenterD
         AppDelegate.eventProcessed = url
         
         if let url = AppDelegate.eventProcessed {
-            if let parsed = URL(string: url), parsed.scheme?.lowercased() == "regram", RegramSettingsRoute(url: parsed) == nil {
+            if let parsed = URL(string: url), ["regram", "reza"].contains(parsed.scheme?.lowercased() ?? ""), RegramSettingsRoute(url: parsed) == nil {
                 AppDelegate.eventProcessed = nil
                 return
             }

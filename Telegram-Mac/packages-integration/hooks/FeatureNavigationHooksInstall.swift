@@ -402,6 +402,9 @@ func installFeatureNavigationHooks() {
             case "chat": return RegramChatSettingsController(context: context, peerId: PeerId(id))
             case "remark": return RegramGroupRemarkController(context: context, peerId: PeerId(id))
             case "outgoingTranslation": return RegramOutgoingLanguageController(context: context, peerId: PeerId(id))
+            case "reSieveRecords":
+                if #available(macOS 12, *) { return RegramAdSamplesController(context: context, peerId: PeerId(id)) }
+                return nil
             default: break
             }
         }
@@ -427,7 +430,7 @@ func installFeatureNavigationHooks() {
         PeerInfoController.push(navigation: context.bindings.rootNavigation(), context: context, peerId: peerId)
     }
     regramHooks.selectChats = { context, selected in
-        selectModalPeers(window: context.window, context: context, title: "Regram", settings: [.contacts, .remote, .groups, .channels], selectedPeerIds: Set(selected))
+        selectModalPeers(window: context.window, context: context, title: "Reza", settings: [.contacts, .remote, .groups, .channels], selectedPeerIds: Set(selected))
     }
     regramHooks.openPeer = { context, peerId in
         navigateToChat(navigation: context.bindings.rootNavigation(), context: context as! AccountContext, chatLocation: .peer(peerId))

@@ -17,7 +17,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Regram</string>
+	<string>Reza</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -30,6 +30,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>regram</string>
+				<string>reza</string>
 			</array>
 		</dict>
 		<dict>
@@ -105,7 +106,7 @@
 	<key>RegramTeamIdentifier</key>
 	<string>$(DEVELOPMENT_TEAM)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Regram</string>
+	<string>Reza</string>
 	<key>RegramUpdatesDisabled</key>
 	<false/>
 	<key>SUEnableAutomaticChecks</key>

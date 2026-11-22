@@ -6,7 +6,13 @@ public enum TranslateFetchError {
     case network
 }
 
-private let rgTranslateSessionConfiguration: URLSessionConfiguration = .ephemeral
+private let rgTranslateSessionConfiguration: URLSessionConfiguration = {
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.timeoutIntervalForRequest = 20
+    configuration.httpMaximumConnectionsPerHost = 8
+    configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+    return configuration
+}()
 private let rgTranslateSession: URLSession = URLSession(configuration: rgTranslateSessionConfiguration)
 
 private let rgLegacyUserAgent: String = "Mozilla/4.0 (compatible;MSIE 6.0;Windows NT 5.1;SV1;.NET CLR 1.1.4322;.NET CLR 2.0.50727;.NET CLR 3.0.04506.30)"
@@ -21,11 +27,62 @@ private let rgTranslateQueryAllowedCharacters: CharacterSet = {
 let rgTranslateMaxChunkLength: Int = 1200
 
 
+private final class RGTranslateRequestLimiter {
+    private let lock = NSLock()
+    private let limit: Int
+    private var running = 0
+    private var nextToken: UInt64 = 0
+    private var waiting: [(token: UInt64, start: () -> Void)] = []
+
+    init(limit: Int) {
+        self.limit = limit
+    }
+
+    func acquire(_ start: @escaping () -> Void) -> UInt64? {
+        lock.lock()
+        if running < limit {
+            running += 1
+            lock.unlock()
+            start()
+            return nil
+        }
+        nextToken &+= 1
+        let token = nextToken
+        waiting.append((token, start))
+        lock.unlock()
+        return token
+    }
+
+    func cancel(_ token: UInt64) {
+        lock.lock()
+        waiting.removeAll { $0.token == token }
+        lock.unlock()
+    }
+
+    func release() {
+        lock.lock()
+        if waiting.isEmpty {
+            running -= 1
+            lock.unlock()
+        } else {
+            let next = waiting.removeFirst()
+            lock.unlock()
+            next.start()
+        }
+    }
+}
+
+private let rgTranslateRequestLimiter = RGTranslateRequestLimiter(limit: 10)
+
 func rgTranslatePerform(_ request: URLRequest) -> Signal<Data, TranslateFetchError> {
     return Signal { subscriber in
         let completed: Atomic<Bool> = Atomic(value: false)
+        let started: Atomic<Bool> = Atomic(value: false)
+        var request = request
+        request.timeoutInterval = min(request.timeoutInterval, 20)
         let downloadTask: URLSessionDataTask = rgTranslateSession.dataTask(with: request, completionHandler: { data, response, _ in
             let _ = completed.swap(true)
+            rgTranslateRequestLimiter.release()
             guard let response: HTTPURLResponse = response as? HTTPURLResponse, (200 ..< 300).contains(response.statusCode), let data: Data = data else {
                 subscriber.putError(.network)
                 return
@@ -33,9 +90,16 @@ func rgTranslatePerform(_ request: URLRequest) -> Signal<Data, TranslateFetchErr
             subscriber.putNext(data)
             subscriber.putCompletion()
         })
-        downloadTask.resume()
+        let token = rgTranslateRequestLimiter.acquire {
+            let _ = started.swap(true)
+            downloadTask.resume()
+        }
 
         return ActionDisposable {
+            if let token, !started.with({ $0 }) {
+                rgTranslateRequestLimiter.cancel(token)
+                if !started.with({ $0 }) { return }
+            }
             if !completed.with({ $0 }) {
                 downloadTask.cancel()
             }
@@ -78,7 +142,7 @@ func rgTranslateInChunks(_ text: String, _ toLang: String, maxLength: Int = rgTr
         }
     }
 
-    return rgTranslateSequentially(signals, chunkTimeout: chunkTimeout)
+    return rgTranslateConcurrently(signals, chunkTimeout: chunkTimeout)
     |> map { results in
         return results.joined()
     }
@@ -254,4 +318,119 @@ public func regramTranslateSequentially<Value, Failure>(_ signals: [Signal<Value
 
 func rgTranslateSequentially(_ signals: [Signal<String, TranslateFetchError>], chunkTimeout: Double = 20.0) -> Signal<[String], TranslateFetchError> {
     regramTranslateSequentially(signals, chunkTimeout: chunkTimeout, failure: .network)
+}
+
+public let regramTranslationDefaultConcurrency = 6
+
+public func regramTranslateConcurrently<Value, Failure>(_ signals: [Signal<Value, Failure>], limit: Int = regramTranslationDefaultConcurrency, chunkTimeout: Double, failure: Failure) -> Signal<[Value], Failure> {
+    if signals.isEmpty { return .single([]) }
+    return Signal { subscriber in
+        let lock = NSLock()
+        let timeoutQueue = Queue(name: "regram.translate-parallel")
+        let disposables = DisposableSet()
+        let limit = max(1, limit)
+        var values: [Value?] = Array(repeating: nil, count: signals.count)
+        var next = 0
+        var active = 0
+        var remaining = signals.count
+        var finished = false
+        var pumping = false
+        var needsPump = false
+
+        func fail(_ error: Failure) {
+            lock.lock()
+            guard !finished else { lock.unlock(); return }
+            finished = true
+            lock.unlock()
+            disposables.dispose()
+            subscriber.putError(error)
+        }
+
+        func launch() -> Bool {
+            lock.lock()
+            guard !finished, active < limit, next < signals.count else { lock.unlock(); return false }
+            let index = next
+            next += 1
+            active += 1
+            lock.unlock()
+            var received = false
+            let disposable = MetaDisposable()
+            disposables.add(disposable)
+            disposable.set((signals[index] |> take(1) |> timeout(chunkTimeout, queue: timeoutQueue, alternate: .fail(failure))).start(next: { value in
+                lock.lock()
+                if !finished {
+                    values[index] = value
+                    received = true
+                }
+                lock.unlock()
+            }, error: { error in
+                fail(error)
+            }, completed: {
+                lock.lock()
+                guard !finished else { lock.unlock(); return }
+                guard received else {
+                    lock.unlock()
+                    fail(failure)
+                    return
+                }
+                active -= 1
+                remaining -= 1
+                let done = remaining == 0
+                if done { finished = true }
+                let result = done ? values.compactMap { $0 } : []
+                lock.unlock()
+                if done {
+                    subscriber.putNext(result)
+                    subscriber.putCompletion()
+                } else {
+                    pump()
+                }
+            }))
+            return true
+        }
+
+        func pump() {
+            lock.lock()
+            if pumping {
+                needsPump = true
+                lock.unlock()
+                return
+            }
+            pumping = true
+            lock.unlock()
+            while true {
+                lock.lock()
+                needsPump = false
+                lock.unlock()
+                while launch() {}
+                lock.lock()
+                if !needsPump {
+                    pumping = false
+                    lock.unlock()
+                    return
+                }
+                lock.unlock()
+            }
+        }
+
+        pump()
+        return ActionDisposable {
+            lock.lock()
+            finished = true
+            lock.unlock()
+            disposables.dispose()
+        }
+    }
+}
+
+func rgTranslateConcurrently(_ signals: [Signal<String, TranslateFetchError>], limit: Int = regramTranslationDefaultConcurrency, chunkTimeout: Double = 20.0) -> Signal<[String], TranslateFetchError> {
+    regramTranslateConcurrently(signals, limit: limit, chunkTimeout: chunkTimeout, failure: .network)
+}
+
+public func regramTranslationConcurrency(backend: String) -> Int {
+    switch backend {
+    case "system": return 1
+    case "llm": return 3
+    default: return regramTranslationDefaultConcurrency
+    }
 }

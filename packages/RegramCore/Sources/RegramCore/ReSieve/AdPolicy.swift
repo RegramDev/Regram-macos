@@ -156,7 +156,7 @@ public enum RGAdPolicy {
             }
             let source = input.text as NSString
             let lines = RGAdFilter.paragraphRanges(input.text)
-            let matchingDeadline = ProcessInfo.processInfo.systemUptime + 0.05
+            let matchingDeadline = ProcessInfo.processInfo.systemUptime + 0.25
             let disclosed = RGAdDisclosure.ranges(input)
             let disclosedWhole = disclosed.contains { $0 == RGAdRange(0, source.length) }
             var ranges: [RGAdRange] = disclosed
@@ -194,7 +194,7 @@ public enum RGAdPolicy {
                     precedingPromotion = true
                 }
             }
-            let deadline = ProcessInfo.processInfo.systemUptime + 0.02
+            let deadline = ProcessInfo.processInfo.systemUptime + 0.1
             for snippet in snippets[sourceGroup] ?? [] {
                 var start = 0
                 while start < source.length {

@@ -4,7 +4,9 @@ import AppKit
 
 final class RegramBrandingAssetsTests: XCTestCase {
     func testBundledSourceArtworkAndAdditionalFontCatalogHaveExactChoices() {
-        XCTAssertEqual(RegramBranding.icons.count, 11)
+        XCTAssertEqual(RegramBranding.icons.count, 15)
+        XCTAssertEqual(RegramBranding.defaultIcon, "RGCatOrange")
+        XCTAssertEqual(RegramBranding.titleKey(RegramBranding.defaultIcon), "AppIcon.Name.orangeTabby")
         XCTAssertEqual(RegramBranding.titleKey(RegramBranding.telegramIconName), "AppIcon.Name.telegram")
         for name in RegramBranding.icons where name != RegramBranding.telegramIconName {
             XCTAssertNotNil(RegramBranding.image(name, dark: false), name)
@@ -17,7 +19,7 @@ final class RegramBrandingAssetsTests: XCTestCase {
     }
 
     func testNativeApplicationIconsHavePaddingMaskAndAllDockRepresentations() throws {
-        XCTAssertEqual(RegramBranding.icons, ["RGConversation", "RGAzure", "RGIris", "RGMint", "RGGathering", "RGAmber", "RGNebula", "RGJade", "RGSilver", "RGClassic", "AppIcon"])
+        XCTAssertEqual(RegramBranding.icons, ["RGCatOrange", "RGCatCalico", "RGCatSiamese", "RGCatTuxedo", "RGConversation", "RGAzure", "RGIris", "RGMint", "RGGathering", "RGAmber", "RGNebula", "RGJade", "RGSilver", "RGClassic", "AppIcon"])
         for dark in [false, true] {
             var renderedChoices = Set<Data>()
             for name in RegramBranding.icons where name != RegramBranding.telegramIconName {
@@ -37,7 +39,7 @@ final class RegramBrandingAssetsTests: XCTestCase {
                 XCTAssertGreaterThan(alpha(64, 64), 250, name)
                 renderedChoices.insert(pixels)
             }
-            XCTAssertEqual(renderedChoices.count, 10)
+            XCTAssertEqual(renderedChoices.count, 14)
         }
         XCTAssertNil(RegramBranding.applicationIcon("Default.icns", dark: false))
     }

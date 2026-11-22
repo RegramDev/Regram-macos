@@ -26,10 +26,9 @@ public struct RGAdWorkConditions: Equatable {
         self.thermal = thermal
     }
     public var paused: Bool { !foreground || thermal >= 3 }
-    public var interactive: Bool { foreground && !lowPower && thermal < 2 }
+    public var interactive: Bool { foreground && thermal < 2 }
     public func recoveryDelay(workDuration: TimeInterval) -> TimeInterval {
-        let multiplier = thermal >= 2 ? 7.0 : lowPower ? 3.0 : thermal == 1 ? 2.0 : 1.0
-        return max(0.005, workDuration * multiplier)
+        thermal >= 2 ? max(0.005, workDuration * 3) : 0
     }
 }
 
@@ -92,7 +91,7 @@ public final class RGAdWorkScheduler {
 
     private func schedule() {
         guard !conditions.paused, !jobs.isEmpty, !running else { return }
-        let interactive = conditions.interactive && jobs.contains { $0.priority > 0 }
+        let interactive = conditions.interactive
         if let scheduled {
             guard scheduledInteractive != interactive else { return }
             scheduled.cancel()

@@ -4,7 +4,166 @@ import RegramCore
 import SwiftSignalKit
 import TelegramCore
 
+struct RGAdRichLayout {
+    let text: String
+    let entities: [RGAdEntity]
+    let blocks: [RGAdRange]
+    let blockTexts: [String]
+}
+
+private func rgAdRichTexts(_ block: InstantPageBlock, depth: Int = 0) -> [(RichText, RGAdEntity.Kind?)] {
+    guard depth <= 32 else { return [] }
+    func nested(_ blocks: [InstantPageBlock]) -> [(RichText, RGAdEntity.Kind?)] { blocks.flatMap { rgAdRichTexts($0, depth: depth + 1) } }
+    func caption(_ value: InstantPageCaption) -> [(RichText, RGAdEntity.Kind?)] { [(value.text, nil), (value.credit, nil)] }
+    switch block {
+    case let .title(text), let .subtitle(text), let .header(text), let .subheader(text), let .paragraph(text), let .footer(text), let .kicker(text), let .thinking(text):
+        return [(text, nil)]
+    case let .heading(text, _), let .authorDate(text, _):
+        return [(text, nil)]
+    case let .preformatted(text, _):
+        return [(text, .code)]
+    case let .list(items, _):
+        return items.flatMap { item -> [(RichText, RGAdEntity.Kind?)] in
+            switch item {
+            case let .text(text, _, _): return [(text, nil)]
+            case let .blocks(blocks, _, _): return nested(blocks)
+            case .unknown: return []
+            }
+        }
+    case let .blockQuote(blocks, text, _):
+        let quoted: [(RichText, RGAdEntity.Kind?)] = nested(blocks).map { ($0.0, $0.1 ?? .quote) }
+        return quoted + [(text, .quote)]
+    case let .details(title, blocks, _):
+        return [(title, nil)] + nested(blocks)
+    case let .pullQuote(text, textCaption):
+        return [(text, .quote), (textCaption, .quote)]
+    case let .cover(value):
+        return rgAdRichTexts(value, depth: depth + 1)
+    case let .table(title, rows, _, _, _):
+        let cells: [(RichText, RGAdEntity.Kind?)] = rows.flatMap { row in row.cells.compactMap { cell -> (RichText, RGAdEntity.Kind?)? in cell.text.map { ($0, nil) } } }
+        return [(title, nil)] + cells
+    case let .postEmbed(_, _, _, _, _, blocks, value), let .collage(blocks, value), let .slideshow(blocks, value):
+        return nested(blocks) + caption(value)
+    case let .image(_, value, _, _, _), let .video(_, value, _, _, _), let .audio(_, value), let .document(_, value), let .webEmbed(_, _, _, value, _, _, _), let .map(_, _, _, _, value):
+        return caption(value)
+    case let .buttonRow(_, buttons):
+        return buttons.map { button -> (RichText, RGAdEntity.Kind?) in (RichText.url(text: button.text, url: rgAdButtonTarget(button.action) ?? "", webpageId: nil), nil) }
+    case let .relatedArticles(title, _):
+        return [(title, nil)]
+    default:
+        return []
+    }
+}
+
+private func rgAdButtonTarget(_ action: ReplyMarkupButtonAction) -> String? {
+    switch action {
+    case .url(let url), .urlAuth(let url, _), .openWebView(let url, _): return url
+    default: return nil
+    }
+}
+
+private func rgAdAppend(_ rich: RichText, kind: RGAdEntity.Kind?, text: NSMutableString, entities: inout [RGAdEntity], depth: Int = 0) {
+    guard depth <= 64 else { return }
+    let start = text.length
+    func walk(_ value: RichText) { rgAdAppend(value, kind: nil, text: text, entities: &entities, depth: depth + 1) }
+    func mark(_ kind: RGAdEntity.Kind, _ value: String?) {
+        if text.length > start { entities.append(RGAdEntity(range: RGAdRange(start, text.length), kind: kind, value: value)) }
+    }
+    switch rich {
+    case .empty, .image: break
+    case let .plain(string): text.append(string)
+    case let .formula(latex): text.append(latex)
+    case let .textCustomEmoji(fileId, alt):
+        text.append(alt)
+        mark(.customEmoji, String(fileId))
+    case let .url(value, url, _):
+        walk(value)
+        if !url.isEmpty { mark(.link, url) }
+    case let .textAutoUrl(value):
+        walk(value)
+        mark(.link, text.substring(from: start))
+    case let .textMention(value):
+        walk(value)
+        mark(.mention, text.substring(from: start))
+    case let .textMentionName(value, _):
+        walk(value)
+        mark(.mention, nil)
+    case let .fixed(value):
+        walk(value)
+        mark(.code, nil)
+    case let .concat(values):
+        values.forEach(walk)
+    case let .bold(value), let .italic(value), let .underline(value), let .strikethrough(value), let .subscript(value), let .superscript(value), let .marked(value), let .textSpoiler(value), let .textAutoEmail(value), let .textAutoPhone(value), let .textBankCard(value), let .textTonAddress(value), let .textBotCommand(value), let .textCashtag(value), let .textHashtag(value):
+        walk(value)
+    case let .email(value, _), let .phone(value, _), let .anchor(value, _), let .textDate(value, _, _):
+        walk(value)
+    case let .textButton(button):
+        walk(button.text)
+        if let target = rgAdButtonTarget(button.action) { mark(.link, target) }
+    }
+    if let kind { mark(kind, nil) }
+}
+
+func rgAdRichLayout(_ page: InstantPage) -> RGAdRichLayout {
+    let text = NSMutableString()
+    var entities: [RGAdEntity] = []
+    var blocks: [RGAdRange] = []
+    var blockTexts: [String] = []
+    for block in page.blocks {
+        if text.length > 0 { text.append("\n") }
+        let start = text.length
+        for (index, part) in rgAdRichTexts(block).enumerated() {
+            if index > 0, text.length > start, !text.hasSuffix("\n") { text.append("\n") }
+            rgAdAppend(part.0, kind: part.1, text: text, entities: &entities)
+        }
+        blocks.append(RGAdRange(start, text.length))
+        blockTexts.append(text.substring(with: NSRange(location: start, length: text.length - start)))
+    }
+    return RGAdRichLayout(text: text as String, entities: entities, blocks: blocks, blockTexts: blockTexts)
+}
+
+func rgAdRichPage(_ message: Message) -> InstantPage? {
+    guard let rich = message.attributes.first(where: { $0 is RichTextMessageAttribute }) as? RichTextMessageAttribute else { return nil }
+    return rich.fullInstantPage ?? rich.instantPage
+}
+
+private func rgAdFilteredRichAttribute(_ message: Message, removedRanges: [RGAdRange]) -> RichTextMessageAttribute? {
+    guard let rich = message.attributes.first(where: { $0 is RichTextMessageAttribute }) as? RichTextMessageAttribute else { return nil }
+    let layout = rgAdRichLayout(rich.fullInstantPage ?? rich.instantPage)
+    let source = layout.text as NSString
+    var removed = Set<String>()
+    for (index, block) in layout.blocks.enumerated() where block.upper > block.lower {
+        var lower = block.lower
+        var upper = block.upper
+        while lower < upper, let scalar = UnicodeScalar(source.character(at: lower)), CharacterSet.whitespacesAndNewlines.contains(scalar) { lower += 1 }
+        while upper > lower, let scalar = UnicodeScalar(source.character(at: upper - 1)), CharacterSet.whitespacesAndNewlines.contains(scalar) { upper -= 1 }
+        guard upper > lower else { continue }
+        var cursor = lower
+        for range in removedRanges.sorted(by: { $0.lower < $1.lower }) where range.upper > cursor && range.lower <= cursor {
+            cursor = max(cursor, range.upper)
+            if cursor >= upper { break }
+        }
+        if cursor >= upper { removed.insert(layout.blockTexts[index]) }
+    }
+    guard !removed.isEmpty else { return nil }
+    func filtered(_ page: InstantPage) -> InstantPage {
+        let current = rgAdRichLayout(page)
+        let blocks = page.blocks.enumerated().filter { !removed.contains(current.blockTexts[$0.offset]) }.map(\.element)
+        return InstantPage(blocks: blocks, media: page.media, isComplete: page.isComplete, rtl: page.rtl, url: page.url, views: page.views)
+    }
+    let instant = filtered(rich.instantPage)
+    let full = rich.fullInstantPage.map(filtered)
+    guard !(full ?? instant).blocks.isEmpty else { return nil }
+    return RichTextMessageAttribute(instantPage: instant, fullInstantPage: full)
+}
+
 public func rgAdInput(_ message: Message) -> RGAdInput {
+    if let page = rgAdRichPage(message) {
+        let layout = rgAdRichLayout(page)
+        return RGAdInput(
+            text: layout.text, peerId: message.id.peerId.toInt64(), entities: layout.entities, buttons: rgAdButtons(message),
+            hasMedia: message.media.contains { !($0 is TelegramMediaWebpage) }, previewTarget: nil)
+    }
     let source = message.text as NSString
     let entities = (message.textEntitiesAttribute?.entities ?? []).compactMap { entity -> RGAdEntity? in
         let range = RGAdRange(entity.range.lowerBound, entity.range.upperBound)
@@ -39,17 +198,7 @@ public func rgAdInput(_ message: Message) -> RGAdInput {
         }
         return RGAdEntity(range: range, kind: kind, value: value)
     }
-    let markup = message.attributes.first { $0 is ReplyMarkupMessageAttribute } as? ReplyMarkupMessageAttribute
-    let buttons = (markup?.flags.contains(.inline) == true ? markup?.rows ?? [] : []).enumerated().map { row, value in
-        value.buttons.enumerated().map { column, button -> RGAdButton in
-            let target: String?
-            switch button.action {
-            case .url(let url), .urlAuth(let url, _), .openWebView(let url, _): target = url
-            default: target = nil
-            }
-            return RGAdButton(id: "\(row):\(column)", title: button.title, target: target)
-        }
-    }
+    let buttons = rgAdButtons(message)
     let preview = message.media.compactMap { media -> String? in
         if let web = media as? TelegramMediaWebpage, case .Loaded(let content) = web.content { return content.url }
         return nil
@@ -59,10 +208,24 @@ public func rgAdInput(_ message: Message) -> RGAdInput {
         hasMedia: message.media.contains { !($0 is TelegramMediaWebpage) }, previewTarget: preview)
 }
 
+private func rgAdButtons(_ message: Message) -> [[RGAdButton]] {
+    let markup = message.attributes.first { $0 is ReplyMarkupMessageAttribute } as? ReplyMarkupMessageAttribute
+    return (markup?.flags.contains(.inline) == true ? markup?.rows ?? [] : []).enumerated().map { row, value in
+        value.buttons.enumerated().map { column, button -> RGAdButton in
+            let target: String?
+            switch button.action {
+            case .url(let url), .urlAuth(let url, _), .openWebView(let url, _): target = url
+            default: target = nil
+            }
+            return RGAdButton(id: "\(row):\(column)", title: button.title, target: target)
+        }
+    }
+}
+
 public func rgCanCorrectAds(_ message: Message) -> Bool {
     message.id.namespace == Namespaces.Message.Cloud && message.id.peerId.namespace != Namespaces.Peer.SecretChat
-        && !message.isCopyProtected() && !message.containsSecretMedia && message.richText == nil
-        && (!message.text.isEmpty || !message.media.isEmpty || message.attributes.contains { $0 is ReplyMarkupMessageAttribute })
+        && !message.isCopyProtected() && !message.containsSecretMedia
+        && (!message.text.isEmpty || rgAdRichPage(message) != nil || !message.media.isEmpty || message.attributes.contains { $0 is ReplyMarkupMessageAttribute })
 }
 
 private func rgIsAdFilteringPeer(_ message: Message) -> Bool {
@@ -274,6 +437,7 @@ public final class RegramAdFilterSession {
     private var refreshAllScopes = false
     private var retryNeeded = false
     private var retryScheduled = false
+    private var retryAttempts = 0
     private var foreground = true
     private var workConditions = RGAdWorkConditions()
     private var observers: [NSObjectProtocol] = []
@@ -328,7 +492,9 @@ public final class RegramAdFilterSession {
     private func scheduleRetry() {
         guard retryNeeded, !retryScheduled else { return }
         retryScheduled = true
-        queue.asyncAfter(deadline: .now() + 60) { [weak self] in
+        let delay = min(60, 2 * pow(2, Double(min(retryAttempts, 5))))
+        retryAttempts += 1
+        queue.asyncAfter(deadline: .now() + delay) { [weak self] in
             guard let self else { return }
             self.retryScheduled = false
             guard self.retryNeeded, self.foreground, ProcessInfo.processInfo.thermalState.rawValue < 3 else { return }
@@ -357,6 +523,7 @@ public final class RegramAdFilterSession {
         }
         pending.removeAll()
         retryNeeded = false
+        retryAttempts = 0
         lock.lock()
         cacheEpoch &+= 1
         workRevision &+= 1
@@ -383,7 +550,7 @@ public final class RegramAdFilterSession {
 
     private func changed(_ scope: Scope? = nil, urgent: Bool = false) {
         let now = ProcessInfo.processInfo.systemUptime
-        let delay = max(0.016, lastRefresh + (urgent ? 0.016 : 0.05) - now)
+        let delay = max(0.008, lastRefresh + 0.016 - now)
         let deadline = now + delay
         lock.lock()
         defer { lock.unlock() }
@@ -673,7 +840,7 @@ public final class RegramAdFilterSession {
             return
         }
         let knowledge = self.knowledge
-        let interactive = workConditions.interactive && priority(batch.scope) > 0
+        let interactive = workConditions.interactive
         inferenceQueue.async(
             execute: DispatchWorkItem(qos: interactive ? .userInitiated : .utility, flags: .enforceQoS) {
                 let result: (RGAdProjection?, RGAdSemanticResult) = autoreleasepool {
@@ -962,6 +1129,13 @@ public final class RegramAdFilterSession {
             projection.disposition == .trim || clearHiddenBody
         else { return message }
         let removed = projection.removedRanges
+        if rgAdRichPage(message) != nil {
+            guard projection.disposition == .trim, let rich = rgAdFilteredRichAttribute(message, removedRanges: removed) else { return message }
+            var attributes = message.attributes.filter { !($0 is RichTextMessageAttribute || $0 is TranslationMessageAttribute || $0 is RegramTranslationMessageAttribute) }
+            attributes.append(rich)
+            attributes.append(RGAdOriginalAttribute(message, projection: projection))
+            return message.withUpdatedAttributes(attributes).withUpdatedStableVersion(stableVersion: message.stableVersion &+ 0x8000_0000 &+ value.revision)
+        }
         func mapped(_ range: Range<Int>) -> [Range<Int>] {
             var result: [Range<Int>] = []
             var offset = 0

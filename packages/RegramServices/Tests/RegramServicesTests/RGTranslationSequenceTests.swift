@@ -128,4 +128,54 @@ final class RGTranslationSequenceTests: XCTestCase {
         defer { task.dispose() }
         wait(for: [done], timeout: 1)
     }
+
+    func testConcurrentTranslationKeepsOrderAndBoundsParallelism() {
+        let queue = Queue()
+        let lock = NSLock()
+        var running = 0
+        var peak = 0
+        let signals: [Signal<String, TranslateFetchError>] = (0 ..< 12).map { index in
+            Signal { subscriber in
+                lock.lock()
+                running += 1
+                peak = max(peak, running)
+                lock.unlock()
+                queue.after(Double(12 - index) * 0.003) {
+                    lock.lock()
+                    running -= 1
+                    lock.unlock()
+                    subscriber.putNext("译\(index)")
+                    subscriber.putCompletion()
+                }
+                return EmptyDisposable
+            }
+        }
+        let done = expectation(description: "parallel")
+        let task = rgTranslateConcurrently(signals, limit: 4).start(next: { values in
+            XCTAssertEqual(values, (0 ..< 12).map { "译\($0)" })
+            done.fulfill()
+        }, error: { _ in XCTFail("Parallel translation must succeed") })
+        wait(for: [done], timeout: 2)
+        task.dispose()
+        XCTAssertEqual(peak, 4)
+    }
+
+    func testConcurrentTranslationFailureCancelsRemainingWork() {
+        var cancelled = 0
+        let lock = NSLock()
+        let pending: Signal<String, TranslateFetchError> = Signal { _ in
+            ActionDisposable {
+                lock.lock()
+                cancelled += 1
+                lock.unlock()
+            }
+        }
+        let done = expectation(description: "failure")
+        let task = rgTranslateConcurrently([pending, .fail(.network), pending], limit: 3).start(next: { _ in
+            XCTFail("A failed segment must not produce a result")
+        }, error: { _ in done.fulfill() })
+        wait(for: [done], timeout: 1)
+        task.dispose()
+        XCTAssertEqual(cancelled, 1)
+    }
 }

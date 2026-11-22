@@ -12,7 +12,7 @@ public enum RGAdFilter {
             promotionalQuoteRanges.count <= 128, confirmedButtonIds.count <= 128, preservedButtonIds.count <= 128,
             input.buttons.count <= 128
         else { throw RGAdFilterError.invalidInput }
-        let deadline = ProcessInfo.processInfo.systemUptime + 0.05
+        let deadline = ProcessInfo.processInfo.systemUptime + 0.25
         let boundaries = rgAdBoundaries(input.text)
         let allButtons = input.buttons.flatMap { $0 }
         guard allButtons.count <= 128, allButtons.allSatisfy({ $0.title.utf16.count <= 1024 }), threshold.isFinite,

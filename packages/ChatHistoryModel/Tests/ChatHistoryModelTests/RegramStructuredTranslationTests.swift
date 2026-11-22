@@ -201,13 +201,15 @@ final class RegramStructuredTranslationTests: XCTestCase {
             transaction.updateMessage(messages[4].id) { .update(RegramTranslationPostboxFixture.store($0, text: "edited")) }
         }
         let settings = RegramAccountSettings()
+        let lock = NSLock()
         var requested: [Int32] = []
         var committed: [Int32] = []
         let done = expectation(description: "mixed batch")
         let task = regramTranslateMessageBatch(messages: originals, to: "zh-TW", isCurrent: { true }, translate: { message, part in
+            lock.lock()
             requested.append(message.id.id)
+            lock.unlock()
             if message.id.id == 2 {
-                XCTAssertEqual(committed, [1])
                 return .fail(.network)
             }
             if message.id.id == 6 { return .single(.init(text: "", entities: [])) }
@@ -216,14 +218,18 @@ final class RegramStructuredTranslationTests: XCTestCase {
         }, commit: { original, attribute in
             fixture.postbox.transaction { transaction in
                 let applied = regramCommitMessageTranslation(transaction: transaction, original: original, attribute: attribute, context: [], settings: settings, configurationIdentity: settings.translationIdentity, tone: .formal, isCurrent: { true })
-                if applied { committed.append(original.id.id) }
+                if applied {
+                    lock.lock()
+                    committed.append(original.id.id)
+                    lock.unlock()
+                }
                 return applied
             }
         }).start(error: { _ in XCTFail("A local failure must not abort the batch"); done.fulfill() }, completed: { done.fulfill() })
         defer { task.dispose() }
         wait(for: [done], timeout: 10)
-        XCTAssertEqual(requested, [1, 2, 5, 6, 7, 8, 9, 9])
-        XCTAssertEqual(committed, [1, 8, 9])
+        XCTAssertEqual(requested.sorted(), [1, 2, 5, 6, 7, 8, 9, 9])
+        XCTAssertEqual(committed.sorted(), [1, 8, 9])
         let stored = try XCTUnwrap(fixture.transaction { transaction in messages.compactMap { transaction.getMessage($0.id) } })
         for value in stored {
             let attribute = value.attributes.compactMap { $0 as? TranslationMessageAttribute }.first
@@ -269,7 +275,7 @@ final class RegramStructuredTranslationTests: XCTestCase {
         wait(for: [done], timeout: 10)
         XCTAssertEqual(requested, [1, 2])
         let stored = try XCTUnwrap(fixture.transaction { transaction in messages.compactMap { transaction.getMessage($0.id) } })
-        XCTAssertTrue(regramTranslationMatches(stored[0], settings: settings))
+        XCTAssertFalse(regramTranslationMatches(stored[0], settings: settings))
         XCTAssertFalse(regramTranslationMatches(stored[1], settings: settings))
         XCTAssertFalse(regramTranslationMatches(stored[2], settings: settings))
     }
@@ -317,13 +323,13 @@ final class RegramStructuredTranslationTests: XCTestCase {
             committed = true
             return .single(true)
         }).start()
-        XCTAssertEqual(requested, [1])
+        XCTAssertEqual(requested, [1, 2])
         XCTAssertFalse(cancelled)
         task.dispose()
         XCTAssertTrue(cancelled)
         response?()
         XCTAssertFalse(committed)
-        XCTAssertEqual(requested, [1])
+        XCTAssertEqual(requested, [1, 2])
     }
 }
 

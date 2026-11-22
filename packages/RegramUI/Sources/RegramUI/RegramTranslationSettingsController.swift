@@ -14,7 +14,7 @@ public func RegramTranslationSettingsController(context: any AccountContextProto
     let accountId = context.peerId.toInt64()
     let signal = combineLatest(regramPreferenceChanges(accountId: accountId), appearanceSignal) |> map { settings, _ -> InputDataSignalValue in
         let backend = settings["translationBackend"].string
-        let options = ["default", "google", "googleCN", "microsoft", "yandex", "transmart", "llm", "system"].map { option in
+        let options = ["default", "google", "yandex", "transmart", "llm", "system"].map { option in
             ContextMenuItem(regramString("Settings.Translation.Backend." + option), handler: {
                 if option == "system" {
                     guard #available(macOS 15.0, *) else { alert(for: context.window, info: regramString("translation.systemUnavailable")); return }

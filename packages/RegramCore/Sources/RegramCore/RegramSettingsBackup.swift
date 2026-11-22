@@ -17,7 +17,7 @@ public struct RegramSettingsBackup: Codable, Equatable {
     public init(values: [String: RegramValue], createdAt: Date = Date()) {
         version = 1
         self.createdAt = createdAt
-        var normalized = values.filter { Self.category(for: $0.key) != nil }
+        var normalized = values.filter { Self.category(for: $0.key) != nil }.reduce(into: [String: RegramValue]()) { $0[$1.key] = RegramSetting.migrated(key: $1.key, value: $1.value) }
         if case let .dictionary(stored)? = normalized[RegramBottomBarSettings.storageKey] {
             let layout = RegramBottomBarSettings(storedValues: stored)
             normalized[RegramBottomBarSettings.storageKey] = .dictionary(layout.storedValues)
@@ -67,7 +67,7 @@ public struct RegramSettingsBackup: Codable, Equatable {
         let result = try decoder.decode(Self.self, from: data)
         guard result.version == 1 else { throw Failure.unsupportedVersion }
         for (key, value) in result.values where category(for: key) != nil {
-            guard isValid(value, key: key) else { throw Failure.invalidValue(key) }
+            guard isValid(RegramSetting.migrated(key: key, value: value), key: key) else { throw Failure.invalidValue(key) }
         }
         return RegramSettingsBackup(values: result.values, createdAt: result.createdAt)
     }
@@ -106,9 +106,10 @@ public struct RegramSettingsBackup: Codable, Equatable {
             selected = imported.values
         }
         if selected["features.chatListStartupFolderMode"] == nil, case let .bool(value)? = selected["rememberLastFolder"] { selected["features.chatListStartupFolderMode"] = .string(value ? "last" : "telegram") }
-        for (key, value) in selected where Self.isValid(value, key: key) {
-            if key == "translationBackend", value == .string("gtranslate") { result.values[key] = .string("google") }
-            else if key == "downloadSpeedBoost", value == .string("maximum") { result.values[key] = .string("medium") }
+        for (key, value) in selected {
+            let value = RegramSetting.migrated(key: key, value: value)
+            guard Self.isValid(value, key: key) else { continue }
+            if key == "downloadSpeedBoost", value == .string("maximum") { result.values[key] = .string("medium") }
             else if key == "chatListLines", !["1", "2"].contains(value.string) { result.values[key] = .string("2") }
             else { result.values[key] = value }
             if key == "native.enableVoipTcp" { result.values["enableVoipTcp"] = value }

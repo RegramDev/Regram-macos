@@ -208,31 +208,35 @@ func regramHasSelectedTranslationContent(_ message: Message) -> Bool {
     (try? RegramMessageTranslationPlan(message: message).hasContent) ?? false
 }
 
-func regramTranslateMessageBatch(messages: [Message], to: String, isCurrent: @escaping () -> Bool, translate: @escaping (Message, RegramMessageTranslationPlan.Text) -> Signal<TranslationMessageAttribute.Additional, TranslateFetchError>, commit: @escaping (Message, TranslationMessageAttribute) -> Signal<Bool, NoError>) -> Signal<Void, TranslateFetchError> {
-    let result = messages.reduce(Signal<Void, TranslateFetchError>.complete()) { previous, message in
-        previous |> then(
-            deferred { () -> Signal<Void, TranslateFetchError> in
-                guard isCurrent() else { return .fail(.outdated) }
-                guard let plan = try? RegramMessageTranslationPlan(message: message), plan.hasContent else { return .single(()) }
-                let translations = plan.texts.reduce(Signal<[TranslationMessageAttribute.Additional], TranslateFetchError>.single([])) { previous, part in
-                    previous |> mapToSignal { values in
-                        guard isCurrent() else { return .fail(.outdated) }
-                        return translate(message, part) |> take(1) |> map { values + [$0] }
-                    }
-                }
-                return translations |> mapToSignal { results -> Signal<Void, TranslateFetchError> in
+func regramTranslateMessageBatch(messages: [Message], to: String, isCurrent: @escaping () -> Bool, concurrency: Int = regramTranslationDefaultConcurrency, translate: @escaping (Message, RegramMessageTranslationPlan.Text) -> Signal<TranslationMessageAttribute.Additional, TranslateFetchError>, commit: @escaping (Message, TranslationMessageAttribute) -> Signal<Bool, NoError>) -> Signal<Void, TranslateFetchError> {
+    let signals = messages.map { message -> Signal<Void, TranslateFetchError> in
+        deferred { () -> Signal<Void, TranslateFetchError> in
+            guard isCurrent() else { return .fail(.outdated) }
+            guard let plan = try? RegramMessageTranslationPlan(message: message), plan.hasContent else { return .single(()) }
+            let parts = plan.texts.map { part -> Signal<TranslationMessageAttribute.Additional, TranslateFetchError> in
+                deferred {
                     guard isCurrent() else { return .fail(.outdated) }
-                    guard let attribute = try? plan.attribute(translations: results, toLang: to) else { return .fail(.network) }
-                    return commit(message, attribute) |> take(1) |> castError(TranslateFetchError.self) |> mapToSignal { applied in
-                        applied && isCurrent() ? .single(()) : .fail(.outdated)
+                    if part.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        return .single(TranslationMessageAttribute.Additional(text: part.text, entities: part.entities))
                     }
-                } |> `catch` { _ in
-                    isCurrent() ? .single(()) : .fail(.outdated)
+                    return translate(message, part) |> take(1)
                 }
             }
-        )
+            return regramTranslateConcurrently(parts, limit: concurrency, chunkTimeout: 600, failure: .network) |> mapToSignal { results -> Signal<Void, TranslateFetchError> in
+                guard isCurrent() else { return .fail(.outdated) }
+                guard let attribute = try? plan.attribute(translations: results, toLang: to) else { return .fail(.network) }
+                return commit(message, attribute) |> take(1) |> castError(TranslateFetchError.self) |> mapToSignal { applied in
+                    applied && isCurrent() ? .single(()) : .fail(.outdated)
+                }
+            } |> `catch` { _ in
+                isCurrent() ? .single(()) : .fail(.outdated)
+            }
+        }
     }
-    return result |> filter { _ in false } |> then(deferred { isCurrent() ? .single(()) : .fail(.outdated) })
+    return regramTranslateConcurrently(signals, limit: concurrency, chunkTimeout: 900, failure: .network)
+    |> map { _ in () }
+    |> filter { _ in false }
+    |> then(deferred { isCurrent() ? .single(()) : .fail(.outdated) })
 }
 
 func regramCommitMessageTranslation(transaction: Transaction, original: Message, attribute: TranslationMessageAttribute, context: [String], settings: RegramAccountSettings, configurationIdentity: String, tone: TranslationTone, isCurrent: () -> Bool) -> Bool {
@@ -262,7 +266,7 @@ func regramTranslateMessages(account: Account, messageIds: [MessageId], to: Stri
     |> castError(TranslateFetchError.self)
     |> mapToSignal { messages in
         let contexts = Dictionary(messages.map { ($0.0.id, $0.1) }, uniquingKeysWith: { first, _ in first })
-        return regramTranslateMessageBatch(messages: messages.map(\.0), to: to, isCurrent: current, translate: { message, part in
+        return regramTranslateMessageBatch(messages: messages.map(\.0), to: to, isCurrent: current, concurrency: regramTranslationConcurrency(backend: settings["translationBackend"].string), translate: { message, part in
             let context = contexts[message.id] ?? []
             let permission: () -> Signal<Bool, NoError> = {
                 account.postbox.transaction { transaction in
@@ -304,5 +308,47 @@ func regramTranslateMessages(account: Account, messageIds: [MessageId], to: Stri
                 return regramCommitMessageTranslation(transaction: transaction, original: message, attribute: attribute, context: contexts[message.id] ?? [], settings: currentSettings, configurationIdentity: identity, tone: tone, isCurrent: current)
             }
         })
+    }
+}
+
+public func regramRichTranslationPage(_ message: Message) -> InstantPage? {
+    guard let rich = message.attributes.compactMap({ $0 as? RichTextMessageAttribute }).first else { return nil }
+    return rich.fullInstantPage ?? rich.instantPage
+}
+
+public func regramTranslateRichMessage(account: Account, messageId: MessageId, to: String, settings: RegramAccountSettings, isCurrent: @escaping () -> Bool = { true }) -> Signal<InstantPage, TranslateFetchError> {
+    let accountId = account.peerId.toInt64()
+    return account.postbox.transaction { transaction -> (Message, [String])? in
+        guard let message = transaction.getMessage(messageId), regramSupportsSelectedTranslationProvider(message, cachedData: transaction.getPeerCachedData(peerId: messageId.peerId)), regramRichTranslationPage(message) != nil else { return nil }
+        return (message, regramLLMTranslationContext(transaction: transaction, message: message, settings: settings))
+    }
+    |> castError(TranslateFetchError.self)
+    |> mapToSignal { value -> Signal<InstantPage, TranslateFetchError> in
+        guard let (message, context) = value, isCurrent(), let plan = try? RegramMessageTranslationPlan(message: message), plan.hasContent else { return .fail(.network) }
+        let permission: () -> Signal<Bool, NoError> = {
+            account.postbox.transaction { transaction in
+                guard isCurrent(), let current = transaction.getMessage(messageId), current.stableVersion == message.stableVersion,
+                      regramSupportsSelectedTranslationProvider(current, cachedData: transaction.getPeerCachedData(peerId: messageId.peerId)) else { return false }
+                return true
+            }
+        }
+        let telegramTranslate: (String, String) -> Signal<String, TranslateFetchError> = { text, language in
+            TelegramEngine(account: account).messages.translate(text: text, toLang: RegramChatLanguagePolicy.targetCode(language), entities: [])
+            |> mapError { _ in TranslateFetchError.network }
+            |> mapToSignal { result in
+                guard let result else { return .fail(.network) }
+                return .single(result.0)
+            }
+        }
+        let parts = plan.texts.map { part -> Signal<TranslationMessageAttribute.Additional, TranslateFetchError> in
+            if part.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return .single(.init(text: part.text, entities: [])) }
+            return regramProtectedTranslation(text: part.text, to: to, accountId: accountId, settings: settings, ranges: [], protectedIds: [], context: context, permitsNetworkFallback: permission, telegramTranslate: telegramTranslate)
+            |> map { TranslationMessageAttribute.Additional(text: $0.text, entities: []) }
+        }
+        return regramTranslateConcurrently(parts, limit: regramTranslationConcurrency(backend: settings["translationBackend"].string), chunkTimeout: 600, failure: .network)
+        |> mapToSignal { results -> Signal<InstantPage, TranslateFetchError> in
+            guard isCurrent(), let attribute = try? plan.attribute(translations: results, toLang: to), let translated = attribute.instantPage else { return .fail(.network) }
+            return .single(translated)
+        }
     }
 }

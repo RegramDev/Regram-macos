@@ -15,6 +15,10 @@ public func regramLLMConfiguration(settings: RegramAccountSettings) throws -> RG
     )
 }
 
+public enum RegramTranslationFallback {
+    public static var translate: (String, String) -> Signal<String, TranslateFetchError> = { text, to in googleTranslate(text, to) }
+}
+
 public func regramExternalTranslate(text: String, to: String, accountId _: Int64, settings: RegramAccountSettings, context: [String] = [], permitsNetworkFallback: @escaping () -> Signal<Bool, NoError> = { .single(true) }, telegramTranslate: ((String, String) -> Signal<String, TranslateFetchError>)? = nil) -> Signal<String, TranslateFetchError> {
     guard let provider = RegramChatTranslationPolicy.provider(settings: settings) else { return .fail(.network) }
     func authorized(_ request: @escaping () -> Signal<String, TranslateFetchError>) -> Signal<String, TranslateFetchError> {
@@ -25,9 +29,13 @@ public func regramExternalTranslate(text: String, to: String, accountId _: Int64
         }
     }
     if provider == .telegram {
-        guard let telegramTranslate else { return .fail(.network) }
+        guard let telegramTranslate else { return authorized { RegramTranslationFallback.translate(text, to) } }
         return rgTranslateInChunks(text, to, maxLength: 1024) { chunk, target in
             authorized { telegramTranslate(chunk, target) }
+        }
+        |> `catch` { error -> Signal<String, TranslateFetchError> in
+            if case .outdated = error { return .fail(error) }
+            return authorized { RegramTranslationFallback.translate(text, to) }
         }
     }
     return authorized {
@@ -35,8 +43,6 @@ public func regramExternalTranslate(text: String, to: String, accountId _: Int64
         case .telegram: return .fail(.network)
         case .system: return regramSystemTranslate(text: text, to: to)
         case .google: return googleTranslate(text, to)
-        case .googleCN: return googleCNTranslate(text, to)
-        case .microsoft: return microsoftTranslate(text, to)
         case .yandex: return yandexTranslate(text, to)
         case .transmart: return tranSmartTranslate(text, to)
         case .llm:

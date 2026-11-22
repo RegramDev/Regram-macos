@@ -1,6 +1,7 @@
 import Cocoa
 import TGUIKit
 import RegramCore
+import RegramServices
 import TelegramTheme
 
 public enum RegramSettingsArtwork {
@@ -11,8 +12,9 @@ public enum RegramSettingsArtwork {
     }()
 
     public static func entry(dark: Bool) -> CGImage? {
-        cached("entry-\(dark)") {
-            guard let image = resource("regram-" + (dark ? "dark" : "light"), extension: "png") else { return nil }
+        let icon = RegramBranding.selectedIcon
+        return cached("entry-\(icon)-\(dark)") {
+            guard let image = RegramBranding.image(icon, dark: dark) ?? resource("regram-" + (dark ? "dark" : "light"), extension: "png") else { return nil }
             return generateImage(CGSize(width: 24, height: 24), contextGenerator: { size, context in
                 let bounds = CGRect(origin: .zero, size: size)
                 context.clear(bounds)

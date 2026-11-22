@@ -43,6 +43,7 @@ final class RegramAdChatListPreview {
     private var runningBatch: UUID?
     private var activeScans = Set<UIChatListEntryId>()
     private var previewStamps: [UIChatListEntryId: PreviewStamp] = [:]
+    private var settled: [UIChatListEntryId: [Message]] = [:]
     private var nextPreviewRevision: Int64 = 0
     private var preferencesRevision: Int64?
     private var preparationRevision: UInt64?
@@ -96,10 +97,30 @@ final class RegramAdChatListPreview {
             return item.topMessage?._asMessage()
         }
         topScope.prepare(chats.flatMap { $0.2 } + groupMessages, accountPeerId: accountPeerId)
+        let captured = RegramPreferences.shared.captureFilter(accountId: accountId)
+        func held(_ id: UIChatListEntryId, upperBound: MessageIndex?) -> [Message]? {
+            guard let upperBound, let messages = settled[id], !messages.isEmpty else { return nil }
+            let originals = messages.map(rgAdOriginalMessage)
+            guard originals.allSatisfy({ $0.index <= upperBound }),
+                session.hiddenMessageIds(in: originals, accountPeerId: accountPeerId, scope: topScope.scope).isEmpty,
+                !originals.contains(where: {
+                    regramChatListMessageIsHidden($0, accountId: accountId, filter: captured.filter, revision: captured.revision)
+                })
+            else { return nil }
+            return messages
+        }
         var previews = presentation.previews
         var changes: [UIChatListEntryId: [Message]] = [:]
+        var shown: [UIChatListEntryId: [Message]] = [:]
         var needed = Set<UIChatListEntryId>()
         for (id, threadId, messages) in chats where !messages.isEmpty {
+            let upperBound = regramChatListPreviewUpperBound(messages)
+            let unprepared = messages.contains { !session.isPrepared($0, accountPeerId: accountPeerId, scope: topScope.scope) }
+            if unprepared, let held = held(id, upperBound: upperBound) {
+                changes[id] = held
+                shown[id] = held
+                continue
+            }
             let hidden = session.hiddenMessageIds(in: messages, accountPeerId: accountPeerId, scope: topScope.scope)
             let visible = messages.filter { !hidden.contains($0.id) }
             if !visible.isEmpty {
@@ -107,9 +128,10 @@ final class RegramAdChatListPreview {
                     session.display($0, accountPeerId: accountPeerId, scope: topScope.scope, includeReply: false)
                 }
                 if !hidden.isEmpty || zip(displayed, visible).contains(where: { $0.0 !== $0.1 }) { changes[id] = displayed }
+                if !unprepared { shown[id] = displayed }
                 continue
             }
-            guard let upperBound = regramChatListPreviewUpperBound(messages) else { continue }
+            guard let upperBound else { continue }
             let source = Source(upperBound: upperBound, threadId: threadId, payloads: messages.map(RegramMessageFilterPayload.init))
             needed.insert(id)
             if fallbacks[id]?.source != source {
@@ -117,8 +139,17 @@ final class RegramAdChatListPreview {
                 fallbacks[id] = Fallback(source: source)
                 pending.append(id)
             }
-            changes[id] = fallbacks[id]?.preview ?? []
+            let preview = fallbacks[id]?.preview ?? []
+            if preview.isEmpty, let held = held(id, upperBound: upperBound) {
+                changes[id] = held
+                shown[id] = held
+            } else {
+                changes[id] = preview
+                if !preview.isEmpty { shown[id] = preview }
+            }
         }
+        let rows = Set(chats.map(\.0))
+        settled = settled.filter { rows.contains($0.key) }.merging(shown) { _, new in new }
         for id in Array(fallbacks.keys) where !needed.contains(id) { removeFallback(id) }
         pending.removeAll { !needed.contains($0) }
         loadNextBatch()
@@ -173,8 +204,8 @@ final class RegramAdChatListPreview {
 
     private func loadNextBatch() {
         guard runningBatch == nil, activeScans.isEmpty, !pending.isEmpty else { return }
-        let requests = pending.prefix(16).compactMap { id in fallbacks[id].map { (id, $0) } }
-        pending.removeFirst(min(16, pending.count))
+        let requests = pending.prefix(64).compactMap { id in fallbacks[id].map { (id, $0) } }
+        pending.removeFirst(min(64, pending.count))
         guard !requests.isEmpty else { return }
         let batch = UUID()
         runningBatch = batch
@@ -284,7 +315,7 @@ final class RegramAdChatListPreview {
     private func emitChange() {
         guard !refreshScheduled else { return }
         refreshScheduled = true
-        queue.after(0.02) { [weak self] in
+        queue.async { [weak self] in
             guard let self else { return }
             self.refreshScheduled = false
             self.refreshRevision &+= 1

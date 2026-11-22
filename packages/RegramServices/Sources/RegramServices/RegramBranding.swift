@@ -5,7 +5,8 @@ import SwiftSignalKit
 public enum RegramBranding {
     public static let didChange = Notification.Name("Regram.NativeAppIcon.DidChange")
     static let telegramIconName = "AppIcon"
-    public static let icons = ["RGConversation", "RGAzure", "RGIris", "RGMint", "RGGathering", "RGAmber", "RGNebula", "RGJade", "RGSilver", "RGClassic", telegramIconName]
+    public static let defaultIcon = "RGCatOrange"
+    public static let icons = [defaultIcon, "RGCatCalico", "RGCatSiamese", "RGCatTuxedo", "RGConversation", "RGAzure", "RGIris", "RGMint", "RGGathering", "RGAmber", "RGNebula", "RGJade", "RGSilver", "RGClassic", telegramIconName]
     private static let iconKey = "RegramNativeApplicationIcon"
     private static let iconCache: NSCache<NSString, NSImage> = {
         let cache = NSCache<NSString, NSImage>()
@@ -15,8 +16,8 @@ public enum RegramBranding {
     }()
 
     public static var selectedIcon: String {
-        let value = UserDefaults.standard.string(forKey: iconKey) ?? "RGConversation"
-        return icons.contains(value) ? value : "RGConversation"
+        let value = UserDefaults.standard.string(forKey: iconKey) ?? defaultIcon
+        return icons.contains(value) ? value : defaultIcon
     }
 
     public static var selection: Signal<String, NoError> {
@@ -28,8 +29,8 @@ public enum RegramBranding {
     }
 
     public static func titleKey(_ name: String) -> String {
-        let names = ["RGConversation": "conversation", "RGAzure": "azure", "RGIris": "iris", "RGMint": "mint", "RGGathering": "gathering", "RGAmber": "amber", "RGNebula": "nebula", "RGJade": "jade", "RGClassic": "classic", "RGSilver": "silver", telegramIconName: "telegram"]
-        return "AppIcon.Name." + (names[name] ?? "conversation")
+        let names = [defaultIcon: "orangeTabby", "RGCatCalico": "calico", "RGCatSiamese": "siamese", "RGCatTuxedo": "tuxedo", "RGConversation": "conversation", "RGAzure": "azure", "RGIris": "iris", "RGMint": "mint", "RGGathering": "gathering", "RGAmber": "amber", "RGNebula": "nebula", "RGJade": "jade", "RGClassic": "classic", "RGSilver": "silver", telegramIconName: "telegram"]
+        return "AppIcon.Name." + (names[name] ?? "orangeTabby")
     }
 
     public static func image(_ name: String, dark: Bool) -> NSImage? {

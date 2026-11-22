@@ -2552,7 +2552,7 @@ index 0c03828fbe3031dccb58cb8405e1891cc883f34b..7d532d3f386a072fa4b125386e85dd01
              
              for (peerId, summary) in fetchedChats.mentionTagSummaries {
 diff --git a/submodules/TelegramCore/Sources/State/ManagedAccountPresence.swift b/submodules/TelegramCore/Sources/State/ManagedAccountPresence.swift
-index 7256668bf953823b2c324642f04290174fbf3825..34cf846dc4a736aefa80d0123f4b81f9a65e77d5 100644
+index 7256668bf953823b2c324642f04290174fbf3825..b7466388d6995560430074b998cd4f6da1f858a4 100644
 --- a/submodules/TelegramCore/Sources/State/ManagedAccountPresence.swift
 +++ b/submodules/TelegramCore/Sources/State/ManagedAccountPresence.swift
 @@ -1,4 +1,7 @@
@@ -2573,13 +2573,18 @@ index 7256668bf953823b2c324642f04290174fbf3825..34cf846dc4a736aefa80d0123f4b81f9
      
      init(queue: Queue, shouldKeepOnlinePresence: Signal<Bool, NoError>, network: Network) {
          self.queue = queue
-@@ -33,6 +39,15 @@ private final class AccountPresenceManagerImpl {
+@@ -33,6 +39,20 @@ private final class AccountPresenceManagerImpl {
                  self.updatePresence(value)
              }
          })
 +        #if os(macOS)
 +        self.regramObserver = NotificationCenter.default.addObserver(forName: RegramPreferences.didChange, object: nil, queue: nil) { [weak self] notification in
-+            guard let self, let id = notification.object as? Int64, RegramAccountScope.shared.accountId(for: self.network) == id else { return }
++            guard let self else { return }
++            if let id = notification.object as? Int64 {
++                guard RegramAccountScope.shared.accountId(for: self.network) == id else { return }
++            } else if let keys = notification.userInfo?[RegramPreferences.changedKeysUserInfoKey] as? Set<String>, !keys.contains("ghostDontSendOnline") {
++                return
++            }
 +            self.queue.async { [weak self] in
 +                guard let self else { return }
 +                self.updatePresence(self.wasOnline)
@@ -2589,7 +2594,7 @@ index 7256668bf953823b2c324642f04290174fbf3825..34cf846dc4a736aefa80d0123f4b81f9
      }
      
      deinit {
-@@ -40,9 +55,20 @@ private final class AccountPresenceManagerImpl {
+@@ -40,9 +60,20 @@ private final class AccountPresenceManagerImpl {
          self.shouldKeepOnlinePresenceDisposable?.dispose()
          self.currentRequestDisposable.dispose()
          self.onlineTimer?.invalidate()
@@ -2612,7 +2617,7 @@ index 7256668bf953823b2c324642f04290174fbf3825..34cf846dc4a736aefa80d0123f4b81f9
          if isOnline {
              let timer = SignalKitTimer(timeout: 30.0, repeat: false, completion: { [weak self] in
 diff --git a/submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift b/submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift
-index 713bf6f417f5126de698975d6577fdcac694f019..d6ddee2f4b0d4096c22e9cf08647cddbfeb9d147 100644
+index 713bf6f417f5126de698975d6577fdcac694f019..583bb16ee5264eaedd977676deaedda9879d6919 100644
 --- a/submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift
 +++ b/submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift
 @@ -1,4 +1,7 @@
@@ -2623,14 +2628,21 @@ index 713bf6f417f5126de698975d6577fdcac694f019..d6ddee2f4b0d4096c22e9cf08647cddb
  import Postbox
  import SwiftSignalKit
  internal import TelegramApi
-@@ -82,6 +85,15 @@ func managedAutoremoveMessageOperations(network: Network, postbox: Postbox, isRe
+@@ -82,6 +85,22 @@ func managedAutoremoveMessageOperations(network: Network, postbox: Postbox, isRe
                      Logger.shared.log("Autoremove", "Performing autoremove for \(entry.messageId), isRemove: \(isRemove)")
  
                      if let message = transaction.getMessage(entry.messageId) {
 +                        #if os(macOS)
 +                        let settings = RegramAccountScope.shared.settings(for: network)
-+                        let retentionKey = !isRemove || message.id.peerId.namespace == Namespaces.Peer.SecretChat ? "antiSelfDestruct" : "antiAutoDelete"
-+                        if settings[retentionKey].bool {
++                        let keep: Bool
++                        if message.id.peerId.namespace == Namespaces.Peer.SecretChat {
++                            keep = settings["antiSelfDestruct"].bool
++                        } else if !isRemove {
++                            keep = settings["antiSelfDestruct"].bool || settings["antiAutoDelete"].bool
++                        } else {
++                            keep = settings["antiAutoDelete"].bool
++                        }
++                        if keep {
 +                            transaction.clearTimestampBasedAttribute(id: entry.messageId, tag: tag)
 +                            rgIgnoreMessageExpiry(transaction: transaction, id: entry.messageId, tag: tag)
 +                            return

@@ -49,7 +49,7 @@ public struct RegramSettingsCatalogEntry {
     public func alternate(language: String) -> [String] {
         let pageContext = ["llm": "LLM OpenAI Anthropic 大模型", "stt": "STT ASR OpenAI Whisper 自定义识别 自訂辨識"]
         let aliases = (RegramSettingsCatalog.aliases[key] ?? []) + [pageContext[page] ?? ""]
-        return ["Regram Pro", title(language: language), title(language: "en"), regramLocalizedString(pageTitleKey, languageCode: language), regramLocalizedString(pageTitleKey, languageCode: "en"), keywords, key] + aliases.map { $0.contains(".") ? regramLocalizedString($0, languageCode: language) : $0 }
+        return ["Reza Pro", "Regram Pro", title(language: language), title(language: "en"), regramLocalizedString(pageTitleKey, languageCode: language), regramLocalizedString(pageTitleKey, languageCode: "en"), keywords, key] + aliases.map { $0.contains(".") ? regramLocalizedString($0, languageCode: language) : $0 }
     }
     public func matches(_ query: RegramSettingsSearchQuery, language: String) -> Bool { query.matches(alternate(language: language).joined(separator: " ")) }
 }
@@ -282,7 +282,7 @@ public enum RegramSettingsCatalog {
     static let aliases: [String: [String]] = [
         "sttSettings": ["RG.STTSettings", "speech transcription whisper openai model voice audio round video 语音 转写 识别 圆视频 模型 密钥 音频 語音 辨識"],
         "transcriptionSettings": ["Settings.Category.transcription", "Settings.Transcription.Backend", "speech voice telegram apple 语音 转写 识别"],
-        "translationSettings": ["Settings.Category.translation", "translation google microsoft yandex transmart llm 翻译"],
+        "translationSettings": ["Settings.Category.translation", "translation google yandex transmart llm 翻译"],
         "llmSettings": ["LLMTranslation.Title", "LLMTranslation.Model", "openai anthropic prompt temperature context 大模型 提示词 温度 上下文"],
         "messageActionsSettings": ["Settings.Category.messageActions", "DoubleTap.Action", "Settings.ShowMessageId", "Settings.ShowForwardedMessageDate", "menu double tap id forwarded 消息 菜单 双击 时间 转发"],
         "chatListSettings": ["Settings.Category.chatList", "Settings.UnlimitedPinnedChats", "chat list pinned swipe 聊天 列表 无限 置顶 侧滑"],

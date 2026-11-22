@@ -53,6 +53,15 @@ public struct RegramSetting: Equatable {
         self.choices = choices
     }
 
+    public static let retiredTranslationBackends: Set<String> = ["gtranslate", "googleCN", "microsoft"]
+
+    public static func migrated(key: String, value: RegramValue) -> RegramValue {
+        guard case let .string(string) = value else { return value }
+        if key == "translationBackend", retiredTranslationBackends.contains(string) { return .string("google") }
+        if key == "linkPreviewInstagramHost", RGLinkPreviewRules.retiredInstagramHosts.contains(string.lowercased()) { return .string(RGLinkPreviewRules.defaultInstagramHost) }
+        return value
+    }
+
     public func accepts(_ value: RegramValue) -> Bool {
         if key == "messageFilterRules", case let .string(json) = value {
             return (try? JSONDecoder().decode([RGMessageFilterRule].self, from: Data(json.utf8))) != nil
@@ -147,7 +156,7 @@ public struct RegramSetting: Equatable {
         .init("serviceConfigurationRevision", .translation, .integer(0)),
         .init("translationConfigurationRevision", .translation, .integer(0)),
         .init("transcriptionConfigurationRevision", .translation, .integer(0)),
-        .init("translationBackend", .translation, .string("default"), choices: ["default", "google", "googleCN", "microsoft", "yandex", "transmart", "llm", "system"].map(RegramValue.string)),
+        .init("translationBackend", .translation, .string("default"), choices: ["default", "google", "yandex", "transmart", "llm", "system"].map(RegramValue.string)),
         .init("quickTranslateButton", .translation, .bool(false)),
         .init("outgoingLanguageTranslation", .translation, .dictionary([:])),
         .init("translationLLMAPIFormat", .translation, .string("openai"), choices: ["openai", "anthropic"].map(RegramValue.string)),
@@ -188,7 +197,7 @@ public struct RegramSetting: Equatable {
         .init("localPremiumEmojiStatus", .privacy, .dictionary([:])),
         .init("fixLinkPreviews", .media, .bool(false)),
         .init("linkPreviewXHost", .media, .string(RGLinkPreviewRules.defaultXHost)),
-        .init("linkPreviewInstagramHost", .media, .string("ddinstagram.com")),
+        .init("linkPreviewInstagramHost", .media, .string(RGLinkPreviewRules.defaultInstagramHost)),
         .init("outgoingPhotoQuality", .media, .integer(100), choices: (0...100).map { .integer(Int64($0)) }),
         .init("sendLargePhotos", .media, .bool(false)),
         .init("clipboardOriginalImages", .media, .bool(true)),
@@ -394,9 +403,11 @@ public struct RegramAccountSettings: Codable, Equatable {
         get {
             if key == "mediaLoadingExperiment" { return .bool(false) }
             if key == "native.enableVoipTcp" || key == "enableVoipTcp" { return values["enableVoipTcp"] ?? values["native.enableVoipTcp"] ?? .bool(false) }
-            return values[key] ?? RegramSetting.byKey[key]?.defaultValue ?? .string("")
+            if let value = values[key] { return RegramSetting.migrated(key: key, value: value) }
+            return RegramSetting.byKey[key]?.defaultValue ?? .string("")
         }
         set {
+            let newValue = RegramSetting.migrated(key: key, value: newValue)
             guard RegramSetting.byKey[key]?.accepts(newValue) == true else { return }
             values[key] = newValue
             if key == "native.enableVoipTcp" || key == "enableVoipTcp" { values["enableVoipTcp"] = newValue; values["native.enableVoipTcp"] = newValue }
@@ -560,7 +571,10 @@ public final class RegramPreferences {
         let old = shared.settings
         var updated = old
         transform(&updated)
-        updated.values = updated.values.filter { RegramSetting.byKey[$0.key]?.accepts($0.value) == true }
+        updated.values = updated.values.reduce(into: [:]) { result, entry in
+            let value = RegramSetting.migrated(key: entry.key, value: entry.value)
+            if RegramSetting.byKey[entry.key]?.accepts(value) == true { result[entry.key] = value }
+        }
         shared.settings = updated
         guard updated != old, persist(shared) else { lock.unlock(); return }
         let changedKeys = Set(old.values.keys).union(updated.values.keys).filter { old.values[$0] != updated.values[$0] }

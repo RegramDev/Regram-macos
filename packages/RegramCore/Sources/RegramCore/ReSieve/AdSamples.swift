@@ -269,9 +269,10 @@ public final class RGAdSampleStore {
         }
     }
 
-    public func load(reviewedOnly: Bool = false) throws -> [RGAdSample] {
+    public func load(reviewedOnly: Bool = false, peerId: Int64? = nil) throws -> [RGAdSample] {
         try prepare()
-        if reviewedOnly, let ids = loadReviewIndex() {
+        let sourceGroup = try peerId.map { Self.sourceGroup(salt: try salt(), peerId: $0) }
+        if reviewedOnly, sourceGroup == nil, let ids = loadReviewIndex() {
             let samples = try ids.map { try read(directory.appendingPathComponent($0 + ".json")) }
             if samples.allSatisfy({ $0.reviewedAt != nil }) {
                 reviewedIds = Set(ids)
@@ -287,7 +288,9 @@ public final class RGAdSampleStore {
             let sample = try autoreleasepool { try read(file) }
             ids.insert(sample.id)
             if sample.reviewedAt != nil { reviews.insert(sample.id) }
-            if !reviewedOnly || sample.reviewedAt != nil { samples.append(sample) }
+            if (!reviewedOnly || sample.reviewedAt != nil) && (sourceGroup == nil || sample.sourceGroup == sourceGroup) {
+                samples.append(sample)
+            }
         }
         storedIds = ids
         reviewedIds = reviews
